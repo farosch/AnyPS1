@@ -1,0 +1,12 @@
+build/
+build-*/
+.cache/
+*.a
+*.o
+*.obj
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+
