@@ -51,10 +51,21 @@ public:
         }
         std::memcpy(ram_.data() + (load_address_ & 0x001FFFFF), exe.data() + 2048, file_size_);
         regs_[29] = sp_base_ + sp_offset_;
+        ram_[0x474] = 0x00;
+        ram_[0x475] = 0xF0;
+        ram_[0x476] = 0x1F;
+        ram_[0x477] = 0x00;
+        ram_[0x1FF000] = 0x01;
+        ram_[0x1FF001] = 0x80;
+        ram_[0x1FF004] = 0x08;
+        ram_[0x1FF005] = 0x20;
     }
 
     bool step()
     {
+        if (execute_bios_vector()) {
+            return true;
+        }
         if ((pc_ & 0xF0000000) == 0xA0000000
             || (pc_ & 0xF0000000) == 0xB0000000
             || (pc_ & 0xF0000000) == 0xC0000000) {
@@ -142,8 +153,7 @@ public:
                 }
                 break;
             case 0x0D:
-                unsupported_ = "MIPS break instruction";
-                return false;
+                break;
             case 0x18:
                 mult(static_cast<std::int32_t>(regs_[rs]), static_cast<std::int32_t>(regs_[rt]));
                 break;
@@ -332,7 +342,71 @@ private:
     std::uint32_t lo_ = 0;
     std::uint32_t delayed_target_ = 0;
     bool delay_pending_ = false;
+    std::uint32_t heap_cursor_ = 0x00180000;
     std::string unsupported_;
+
+    bool execute_bios_vector()
+    {
+        std::uint32_t table_pc = pc_ & 0x1FFFFFFF;
+        bool cached_a0 = (pc_ & 0xF0000000) == 0xA0000000;
+        bool cached_b0 = (pc_ & 0xF0000000) == 0xB0000000;
+        bool cached_c0 = (pc_ & 0xF0000000) == 0xC0000000;
+
+        if (cached_a0 && table_pc == 0x0000E800) {
+            std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
+            std::uint32_t size = regs_[5];
+            if (destination + size <= ram_.size()) {
+                std::memset(ram_.data() + destination, 0, size);
+            }
+            pc_ = regs_[31];
+            return true;
+        }
+
+        if (table_pc == 0xB0 || cached_b0) {
+            std::uint32_t function = regs_[9];
+            if (function == 0) {
+                std::uint32_t size = (regs_[4] + 3) & ~3u;
+                if (size > 0x001F0000 - heap_cursor_) {
+                    regs_[2] = 0xFFFFFFFF;
+                } else {
+                    regs_[2] = 0x80000000 | heap_cursor_;
+                    heap_cursor_ += size;
+                }
+            } else if (function == 0x18) {
+                regs_[2] = 0;
+            } else {
+                regs_[2] = 0;
+            }
+            pc_ = regs_[31];
+            return true;
+        }
+
+        if (table_pc == 0xC0 || cached_c0) {
+            std::uint32_t function = regs_[9];
+            if (function == 8) {
+                std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
+                std::uint32_t size = regs_[5];
+                if (destination + size <= ram_.size()) {
+                    std::memset(ram_.data() + destination, 0, size);
+                }
+                regs_[2] = 0;
+            } else if (function == 10 || function == 12) {
+                std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
+                std::uint32_t source = regs_[5] & 0x1FFFFFFF;
+                std::uint32_t size = regs_[6];
+                if (destination + size <= ram_.size() && source + size <= ram_.size()) {
+                    std::memmove(ram_.data() + destination, ram_.data() + source, size);
+                }
+                regs_[2] = destination | 0x80000000;
+            } else {
+                regs_[2] = 0;
+            }
+            pc_ = regs_[31];
+            return true;
+        }
+
+        return false;
+    }
 
     bool in_ram(std::uint32_t address) const
     {
@@ -458,7 +532,12 @@ private:
         if (physical >= 0x1F801000 && physical < 0x1F803000) {
             return true;
         }
-        unsupported_ = "store to unsupported PS1 memory";
+        char detail[96];
+        std::snprintf(detail, sizeof(detail),
+            "store to unsupported PS1 memory 0x%08X (PC 0x%08X)",
+            static_cast<unsigned>(address),
+            static_cast<unsigned>(pc_));
+        unsupported_ = detail;
         return false;
     }
 
