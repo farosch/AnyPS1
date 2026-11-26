@@ -122,14 +122,19 @@
             dma_bcr[channel] = value;
         } else if (offset == 8) {
             dma_chcr[channel] = value;
-            if (channel == 6
+            if (channel == 2
+                && (value & 0x01000000u) != 0
+                && ((value >> 8) & 3u) == 2) {
+                dma_gpu_linked(dma_madr[channel]);
+            } else if (channel == 2
+                && (value & 0x01000000u) != 0
+                && ((value >> 8) & 3u) == 1) {
+                dma_block(channel);
+            } else if (channel == 6
                 && (value & 0x01000201u) == 0x01000201u) {
                 dma_otc(dma_madr[channel], dma_bcr[channel]);
-            } else if ((value & 0x01000000) != 0 && channel == 2 && (value & 0x400) != 0) {
-                dma_gpu_linked(dma_madr[channel]);
-            } else if ((value & 0x01000000) != 0 && channel == 2) {
-                dma_block(channel);
-            } else if ((value & 0x01000000) != 0 && (value & 0x1) != 0) {
+            } else if ((value & 0x01000000u) != 0
+                && (value & 1u) != 0) {
                 dma_block(channel);
             }
         }
@@ -139,7 +144,9 @@
     {
         const std::uint32_t word_count = dma_bcr[channel] & 0xFFFF;
         const std::uint32_t block_count = (dma_bcr[channel] >> 16) & 0xFFFF;
-        const std::uint32_t count = block_count ? word_count * block_count : word_count;
+        const std::uint32_t count = word_count == 0
+            ? (block_count == 0 ? 1u : block_count)
+            : (block_count == 0 ? word_count : word_count * block_count);
         std::uint32_t address = dma_madr[channel];
         for (std::uint32_t index = 0; index < count && address < ram_.size(); ++index) {
             if (channel == 2) {

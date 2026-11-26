@@ -453,7 +453,28 @@ public:
         if (apply_load_delay
             && (!pending_load_valid_
                 || pending_load_register_ != load_delay_register)) {
-            regs_[load_delay_register] = load_delay_value;
+            bool cancelled = false;
+            if (opcode == 0) {
+                const std::uint32_t special = instruction & 63;
+                if (special != 0x08 && special != 0x09
+                    && special != 0x18 && special != 0x19
+                    && special != 0x1A && special != 0x1B
+                    && special != 0x0C && special != 0x0D
+                    && rd == load_delay_register) {
+                    cancelled = true;
+                }
+            } else if (opcode >= 0x08 && opcode <= 0x0F
+                && rt == load_delay_register) {
+                cancelled = true;
+            } else if (opcode >= 0x20 && opcode <= 0x27
+                && opcode != 0x22 && opcode != 0x23
+                && opcode != 0x26 && opcode != 0x27
+                && rt == load_delay_register) {
+                cancelled = opcode == 0x20 || opcode == 0x24 || opcode == 0x25;
+            }
+            if (!cancelled) {
+                regs_[load_delay_register] = load_delay_value;
+            }
         }
         if (exception_pending_) {
             exception_pending_ = false;

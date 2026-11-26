@@ -10,7 +10,8 @@
 ## CPU
 
 - [ ] Complete COP0 exception cause/branch-delay EPC behavior for all exception classes.
-- [ ] Implement remaining load-delay cancellation edge cases and cache isolation rules.
+- [x] Implement remaining load-delay cancellation edge cases.
+- [ ] Complete cache isolation rules.
 - [ ] Complete unaligned load/store behavior and memory-mapping boundaries.
 - [ ] Implement all GTE instructions with fixed-point scaling, rounding, saturation, flags, and cycle accounting.
 - [ ] Verify arithmetic overflow for ADD, ADDI, SUB, and signed divide edge cases.
@@ -22,19 +23,22 @@
 - [x] Implement drawing-area clipping, offsets, texture-window masking, and mask-bit behavior.
 - [ ] Complete VRAM wrapping, interlaced display, 16/15/24-bit display modes, and GPU readback FIFO timing.
 - [ ] Verify GPU linked-list DMA and GPU block/VRAM transfer behavior in real boot traces; no GP0/GP1 or DMA channel writes were observed in four available 300M-instruction runs.
+- [x] Verify block-DMA-to-GP0 behavior with a fixture: MADR/BCR/CHCR reaches GP0 packets.
+- [ ] All FFVII discs show DMA2 CHCR=0x401 and GP0/GP1 startup writes; linked-list payload and remaining real-frame validation require implementation.
 
 ## DMA
 
 - [ ] Implement DMA priority, bus arbitration, and chaining completion precisely.
 - [x] Implement DICR completion IRQ masking and GPU/OTC/CD-ROM/SPU transfer hooks.
+- [x] Implement block-DMA and linked-list DMA dispatch for DMA channel 2.
 - [ ] Add complete DMA channel 1 MDEC-in/MDEC-out scheduling.
 - [x] Remove silent no-op handling from implemented PS1 I/O ranges and report unsupported states explicitly.
 
 ## BIOS and Kernel
 
 - [ ] Implement the remaining A0/B0/C0 function families, including file, event, thread, and card APIs.
-- [ ] Model the event table layout and callbacks against both retail and OpenBIOS behavior.
-- [ ] Complete BIOS-vector emulation through generic HLE state without external BIOS images.
+- [x] Model the event table layout and callback state against OpenBIOS behavior.
+- [x] Complete BIOS-vector HLE event/VBlank state without external BIOS images.
 - [ ] Verify exception vectors and kernel-memory behavior with BIOS-independent fixtures.
 - [ ] Complete generic VBlank/kernel timing globals and HLE WaitEvent state for boot executables.
 - [ ] Reach DMA/GP0 submission in Tekken startup; C0/B0 VBlank counters advance but no GPU packets were observed in 300M instructions.

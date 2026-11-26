@@ -29,74 +29,58 @@
         }
         if (rs == 16) {
             const std::uint32_t command = instruction & 0x3F;
-            if (command == 0x06) {
-                const std::int64_t x1 = gte_data_[12];
-                const std::int64_t y1 = gte_data_[13];
-                const std::int64_t z1 = gte_data_[14];
+            const std::int64_t x = gte_data_[9];
+            const std::int64_t y = gte_data_[10];
+            const std::int64_t z = gte_data_[11];
+            switch (command) {
+            case 0x01:
+            case 0x00:
+            case 0x30:
+                gte_control[24] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(x / 16, -32768, 32767));
+                gte_control[25] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(y, -32768, 32767));
+                gte_control[26] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(z, -32768, 32767));
+                break;
+            case 0x06:
                 gte_control[24] = static_cast<std::uint32_t>(
-                    x1 * y1 - y1 * z1 + z1 * x1
-                );
-            } else if (command == 0x01 || command == 0x30) {
-                gte_control[24] = static_cast<std::uint32_t>(std::clamp(gte_data_[9] / 16, -32768, 32767));
-                gte_control[25] = static_cast<std::uint32_t>(std::clamp(gte_data_[10], -32768, 32767));
-                gte_control[26] = static_cast<std::uint32_t>(std::clamp(gte_data_[11], -32768, 32767));
-            } else if (command == 0x12) {
+                    x * gte_data_[13] - y * gte_data_[14] + z * gte_data_[12]);
+                break;
+            case 0x12:
                 gte_control[24] = static_cast<std::uint32_t>(gte_data_[9]);
                 gte_control[25] = static_cast<std::uint32_t>(gte_data_[10] & 0xFFFF);
                 gte_control[26] = static_cast<std::uint32_t>(gte_data_[11]);
-            } else if (command == 0x14) {
-                gte_control[24] = static_cast<std::uint32_t>(gte_data_[13] * gte_data_[13]);
-                gte_control[25] = static_cast<std::uint32_t>(gte_data_[14] * gte_data_[14]);
-                gte_control[26] = static_cast<std::uint32_t>(gte_data_[15] * gte_data_[15]);
-            } else if (command == 0x2A) {
-                gte_control[24] = static_cast<std::uint32_t>(
-                    std::clamp(gte_data_[9] + gte_data_[10] + gte_data_[11], 0, 0xFFFF));
-            } else if (command == 0x2D) {
-                gte_control[24] = static_cast<std::uint32_t>(
-                    std::clamp(gte_data_[9] + gte_data_[10] + gte_data_[11] + gte_data_[12], 0, 0xFFFF));
-            } else if (command == 0x29 || command == 0x2D) {
-                gte_control[24] = gte_control[24];
-            } else if (command == 0x0D) {
-                gte_control[24] = static_cast<std::uint32_t>(gte_data_[12]);
-                gte_control[25] = static_cast<std::uint32_t>(gte_data_[13]);
-                gte_control[26] = static_cast<std::uint32_t>(gte_data_[14]);
-            } else if (command == 0x1E) {
-                gte_control[24] = static_cast<std::uint32_t>(std::clamp(gte_data_[13], 0, 0x1FF));
-                gte_control[25] = static_cast<std::uint32_t>(std::clamp(gte_data_[14], 0, 0x1FF));
-                gte_control[26] = static_cast<std::uint32_t>(std::clamp(gte_data_[15], 0, 0x1FF));
-            } else if (command == 0x3F) {
-                gte_control[24] = static_cast<std::uint32_t>(std::clamp(gte_data_[13] * gte_data_[12] / 4096, 0, 0x1FFFF));
-                gte_control[25] = static_cast<std::uint32_t>(std::clamp(gte_data_[14] * gte_data_[12] / 4096, 0, 0x1FFFF));
-                gte_control[26] = static_cast<std::uint32_t>(std::clamp(gte_data_[15] * gte_data_[12] / 4096, 0, 0x1FFFF));
-            } else if (command == 0x30) {
-                gte_control[24] = gte_control[24];
-            } else if (command == 0x01 || command == 0x00) {
-                gte_control[24] = static_cast<std::uint32_t>(gte_data_[9] / 16);
-                gte_control[25] = gte_data_[10];
-                gte_control[26] = gte_data_[11];
-            } else if (command == 0x30) {
-                gte_control[24] = static_cast<std::uint32_t>(gte_data_[9] / 16);
-                gte_control[25] = gte_data_[10];
-                gte_control[26] = gte_data_[11];
-            } else if (command == 0x12) {
-                gte_control[24] = gte_data_[9] + gte_data_[12];
-                gte_control[25] = gte_data_[10] + gte_data_[13];
-                gte_control[26] = gte_data_[11] + gte_data_[14];
-            } else if (command == 0x14) {
-                gte_control[24] = gte_data_[9] * gte_data_[9];
-                gte_control[25] = gte_data_[10] * gte_data_[10];
-                gte_control[26] = gte_data_[11] * gte_data_[11];
-            } else if (command == 0x10 || command == 0x11 || command == 0x13
-                || command == 0x1B || command == 0x1C || command == 0x1D
-                || command == 0x1E || command == 0x28 || command == 0x29
-                || command == 0x2A || command == 0x2D || command == 0x2E
-                || command == 0x3F) {
-                gte_control[24] = static_cast<std::uint32_t>(
-                    std::clamp(gte_data_[9], -32768, 32767));
-                gte_control[25] = static_cast<std::uint32_t>(
-                    std::clamp(gte_data_[10], -32768, 32767));
-                gte_control[26] = static_cast<std::uint32_t>(
-                    std::clamp(gte_data_[11], -32768, 32767));
+                break;
+            case 0x14:
+                gte_control[24] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(x * x / 4096, -32768, 32767));
+                gte_control[25] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(y * y / 4096, -32768, 32767));
+                gte_control[26] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(z * z / 4096, -32768, 32767));
+                break;
+            case 0x0D:
+            case 0x29:
+            case 0x2D:
+                gte_control[24] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(x + y + z, -32768, 32767));
+                gte_control[25] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(y + z, -32768, 32767));
+                gte_control[26] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(z, -32768, 32767));
+                break;
+            case 0x10:
+            case 0x11:
+            case 0x13:
+            case 0x1B:
+            case 0x1C:
+            case 0x1D:
+            case 0x1E:
+            case 0x28:
+            case 0x2A:
+            case 0x2E:
+            case 0x3F:
+                gte_control[24] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(x, -32768, 32767));
+                gte_control[25] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(y, -32768, 32767));
+                gte_control[26] = static_cast<std::uint32_t>(std::clamp<std::int64_t>(z, -32768, 32767));
+                break;
+            default:
+                gte_control[24] = static_cast<std::uint32_t>(x);
+                gte_control[25] = static_cast<std::uint32_t>(y);
+                gte_control[26] = static_cast<std::uint32_t>(z);
+                break;
             }
             return true;
         }
@@ -207,7 +191,9 @@
             gp0_command = word;
             gp0_param_count = 0;
             const std::uint32_t opcode = word >> 24;
-            if (opcode == 0x02) {
+            if (opcode == 0x01) {
+                gp0_expected = 0;
+            } else if (opcode == 0x02) {
                 gp0_expected = 3;
             } else if (opcode >= 0x20 && opcode <= 0x3F) {
                 const bool textured = (opcode & 0x04) != 0;
@@ -254,7 +240,13 @@
         }
 
         const std::uint32_t opcode = gp0_command >> 24;
-        if (opcode == 0x02) {
+        if (opcode == 0x01) {
+            gp0_param_count = 0;
+            gp0_expected = 0;
+            gp0_command = 0;
+            gp0_transfer_remaining = 0;
+            gpu_status = 0x1F400000;
+        } else if (opcode == 0x02) {
             const std::uint32_t x = gp0_params_[1] & 0xFFFF;
             const std::uint32_t y = gp0_params_[1] >> 16;
             const std::uint32_t width = gp0_params_[2] & 0xFFFF;
@@ -422,6 +414,8 @@
             gpu_status &= ~0x08000000u;
         } else if (command == 0x03) {
             gpu_status = (gpu_status & ~0x00800000u) | ((parameter & 1) ? 0 : 0x00800000u);
+        } else if (command == 0x04) {
+            gpu_status = (gpu_status & ~0x600u) | ((parameter & 3u) << 9);
         } else if (command == 0x05) {
             display_x = parameter & 0x3FF;
             display_y = (parameter >> 10) & 0x1FF;

@@ -80,6 +80,14 @@ void test_dma(const std::filesystem::path& fixtures)
     require(snapshot.dma_otc_last == 0x00FFFFFF, "DMA OTC terminal chain value");
 }
 
+void test_dma_gpu(const std::filesystem::path& fixtures)
+{
+    const auto snapshot = run_fixture(fixtures, "runtime-dma-gpu.ps-exe", 100);
+    require(snapshot.dma_madr[2] == 0x00010100, "DMA GPU base address");
+    require(snapshot.dma_bcr[2] == 1, "DMA GPU block count");
+    require(snapshot.gpu_write_count >= 1, "DMA GPU GP0 packet writes");
+}
+
 void test_cdrom(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-cdrom.ps-exe");
@@ -141,6 +149,7 @@ int main(int argc, char** argv)
         test_gte(fixtures);
         test_gpu(fixtures);
         test_dma(fixtures);
+        test_dma_gpu(fixtures);
         test_cdrom(fixtures);
         test_spu(fixtures);
         test_timers(fixtures);

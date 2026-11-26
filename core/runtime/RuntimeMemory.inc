@@ -26,7 +26,19 @@
                     heap_cursor_ += size;
                 }
             } else if (function == 0x07) {
-                regs_[2] = 0;
+                const std::uint32_t event_class = regs_[4];
+                const std::uint32_t event_spec = regs_[5];
+                regs_[2] = 1;
+                for (std::uint32_t handle = 0; handle < bios_events.size(); ++handle) {
+                    if (bios_events[handle] != 0
+                        && bios_event_flags[handle] == 0x2000
+                        && bios_event_classes[handle] == event_class
+                        && bios_event_specs[handle] == event_spec) {
+                        bios_event_flags[handle] = 0x4000;
+                        regs_[2] = 1;
+                        break;
+                    }
+                }
             } else if (function == 0x08) {
                 regs_[2] = 0;
             } else if (function == 0x09) {
@@ -96,6 +108,12 @@
                 } else {
                     ++timer_count[1];
                 }
+            } else if (function == 0x32 || function == 0x33
+                || function == 0x3C || function == 0x3D
+                || function == 0x3E || function == 0x3F
+                || function == 0x40 || function == 0x44) {
+                ++kernel_frame_counter;
+                regs_[2] = kernel_frame_counter;
             } else if (function == 0x18) {
                 regs_[2] = 0;
             } else if (function == 0x19) {
