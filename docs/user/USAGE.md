@@ -23,6 +23,10 @@ extracted/
   filesystem/
   SYSTEM.CNF
   boot/
+  tracks/
+    original Track 1.bin
+    original Track 2.bin
+    ...
   game.json
 ```
 

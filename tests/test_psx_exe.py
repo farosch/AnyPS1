@@ -126,6 +126,30 @@ class GameExtractionTest(unittest.TestCase):
             self.assertEqual(tracks[1].number, 2)
             self.assertEqual(tracks[1].mode, "AUDIO")
 
+    def test_parse_separate_data_and_audio_bins(self):
+        cue = (
+            'FILE "Track 1.bin" BINARY\n'
+            "  TRACK 01 MODE2/2352\n"
+            'FILE "Track 2.bin" BINARY\n'
+            "  TRACK 02 AUDIO\n"
+            "    INDEX 01 00:00:00\n"
+            'FILE "Track 3.bin" BINARY\n'
+            "  TRACK 03 AUDIO\n"
+            "    INDEX 01 00:00:00\n"
+        )
+        with __import__("tempfile").TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Track 1.bin").write_bytes(b"\x00" * (2352 * 10))
+            (root / "Track 2.bin").write_bytes(b"\x00" * (2352 * 5))
+            (root / "Track 3.bin").write_bytes(b"\x00" * (2352 * 3))
+            (root / "Game.cue").write_text(cue)
+
+            tracks = parse_cue(root / "Game.cue")
+
+            self.assertEqual([track.number for track in tracks], [1, 2, 3])
+            self.assertEqual(tracks[1].file_start_lba, 10)
+            self.assertEqual(tracks[2].file_start_lba, 15)
+
     def test_rejects_parent_traversal_path(self):
         with __import__("tempfile").TemporaryDirectory() as directory:
             root = Path(directory)

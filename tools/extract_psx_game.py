@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,11 +17,17 @@ class CueTrack:
     number: int
     mode: str
     bin_file: str
+    index_offset: int = 0
+    start_lba: int = 0
+    file_start_lba: int = 0
 
 
 def parse_cue(cue_path: Path) -> list[CueTrack]:
     tracks = []
     current_file = None
+    file_start_lba = 0
+    pending_track = None
+    pending_index_offset = 0
     cue_directory = cue_path.parent
     for raw_line in cue_path.read_text(encoding="utf-8", errors="replace").splitlines():
         line = raw_line.strip()
@@ -31,10 +38,41 @@ def parse_cue(cue_path: Path) -> list[CueTrack]:
             if not bin_path.is_file():
                 raise ValueError(f"CUE track file not found: {bin_path}")
             current_file = bin_name
+            if current_file and tracks:
+                previous = tracks[-1]
+                previous_size = (cue_directory / previous.bin_file).stat().st_size
+                previous_sectors = previous_size // 2352
+                file_start_lba += previous_sectors
             continue
         track_match = re.match(r"TRACK\s+(\d+)\s+(\S+)", line, re.IGNORECASE)
         if track_match and current_file:
-            tracks.append(CueTrack(int(track_match.group(1)), track_match.group(2).upper(), current_file))
+            pending_track = CueTrack(
+                int(track_match.group(1)),
+                track_match.group(2).upper(),
+                current_file,
+                0,
+                file_start_lba,
+                file_start_lba,
+            )
+            tracks.append(pending_track)
+            continue
+        index_match = re.match(r"INDEX\s+(\d+)\s+(\d{2}):(\d{2}):(\d{2})", line, re.IGNORECASE)
+        if index_match and pending_track:
+            index_number = int(index_match.group(1))
+            if index_number in (0, 1):
+                offset = int(index_match.group(2)) * 60 * 75
+                offset += int(index_match.group(3)) * 75
+                offset += int(index_match.group(4))
+                if index_number == 1:
+                    tracks[-1] = CueTrack(
+                        pending_track.number,
+                        pending_track.mode,
+                        pending_track.bin_file,
+                        offset,
+                        file_start_lba + offset,
+                        file_start_lba,
+                    )
+                    pending_track = None
     if not tracks:
         raise ValueError("CUE sheet contains no tracks")
     return tracks
@@ -79,21 +117,20 @@ def safe_output_path(root: Path, entry_path: str) -> Path:
 def read_external_entry(
     cue_path: Path,
     tracks: list[CueTrack],
-    external_start_lba: int,
     entry_lba: int,
     entry_size: int,
 ) -> bytes:
     output = bytearray()
-    cursor = external_start_lba
     remaining = entry_size
     for track in tracks:
         if not track.mode.startswith("AUDIO"):
             continue
         bin_path = cue_path.parent / track.bin_file
         track_sectors = bin_path.stat().st_size // 2352
-        track_end = cursor + track_sectors
-        if entry_lba < track_end:
-            sector_offset = max(0, entry_lba - cursor)
+        track_start = track.file_start_lba
+        track_end = track_start + track_sectors
+        if track_start <= entry_lba < track_end:
+            sector_offset = entry_lba - track_start
             with bin_path.open("rb") as stream:
                 stream.seek(sector_offset * 2352)
                 readable = min(remaining, (track_end - entry_lba) * 2352)
@@ -106,7 +143,6 @@ def read_external_entry(
                     readable -= len(chunk)
             if remaining == 0:
                 break
-        cursor = track_end
     if remaining:
         raise ValueError(
             f"external track entry at LBA {entry_lba} exceeds available CUE tracks"
@@ -124,15 +160,35 @@ def extract_game(cue_path: Path, output: Path) -> dict:
     output.mkdir(parents=True, exist_ok=True)
     filesystem_output = output / "filesystem"
     boot_output = output / "boot"
+    tracks_output = output / "tracks"
     filesystem_output.mkdir(parents=True, exist_ok=True)
     boot_output.mkdir(parents=True, exist_ok=True)
+    tracks_output.mkdir(parents=True, exist_ok=True)
+
+    cue_tracks = parse_cue(cue_path)
+    copied_bins = set()
+    track_manifest = []
+    for cue_track in cue_tracks:
+        source_bin = cue_path.parent / cue_track.bin_file
+        track_manifest.append(
+            {
+                "number": cue_track.number,
+                "mode": cue_track.mode,
+                "bin": cue_track.bin_file,
+                "index_offset": cue_track.index_offset,
+                "start_lba": cue_track.start_lba,
+                "file_start_lba": cue_track.file_start_lba,
+            }
+        )
+        if cue_track.bin_file not in copied_bins:
+            track_dir = tracks_output / cue_track.bin_file
+            shutil.copyfile(source_bin, track_dir)
+            copied_bins.add(cue_track.bin_file)
 
     disc_iso = output / "disc.iso"
     convert_data_track(track, bin_path, disc_iso)
 
     volume_id, entries = inspect_psx_disc.inspect_disc(disc_iso)
-    external_start_lba = inspect_psx_disc.primary_volume_size(disc_iso)
-    cue_tracks = parse_cue(cue_path)
     disc_sector_count = disc_iso.stat().st_size // PAYLOAD_SIZE
     extracted_files = 0
     for entry in entries:
@@ -146,7 +202,6 @@ def extract_game(cue_path: Path, output: Path) -> dict:
             data = read_external_entry(
                 cue_path,
                 cue_tracks,
-                external_start_lba,
                 entry.lba,
                 entry.size,
             )
@@ -178,6 +233,10 @@ def extract_game(cue_path: Path, output: Path) -> dict:
         },
         "disc_iso": str(disc_iso),
         "filesystem": str(filesystem_output),
+        "tracks": str(tracks_output),
+        "track_count": len(cue_tracks),
+        "bin_count": len(copied_bins),
+        "track_manifest": track_manifest,
         "system_cnf": str(system_path),
         "boot_entry": boot_entry.path,
         "boot_executable": str(boot_path),
