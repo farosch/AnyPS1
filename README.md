@@ -29,3 +29,13 @@ ctest --test-dir build --output-on-failure
 python3 tools/extract_psx_game.py "/path/to/Game.cue"
 ```
 
+## Relink a PS-X EXE
+
+```sh
+anyps1 "/path/to/PS-X.EXE" "/path/to/output.elf"
+```
+
+The first stage validates the PS-X header and writes an ELF32 MIPS layout
+artifact. It does not yet translate MIPS instructions or produce a runnable
+native Linux or Windows game executable.
+

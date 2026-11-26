@@ -15,7 +15,10 @@ int main(int argc, char** argv)
     options.output = argv[2];
 
     try {
-        anyps1::relink(options);
+        if (!anyps1::relink(options)) {
+            return 1;
+        }
+        std::cout << "PS-X EXE layout artifact written to " << options.output << "\n";
     } catch (const std::exception& error) {
         std::cerr << "Error: " << error.what() << "\n";
         return 1;

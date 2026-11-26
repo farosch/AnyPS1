@@ -6,6 +6,16 @@ anyps1 <input.ps-exe> <output>
 
 The relinker is currently a scaffold and does not yet convert executable images.
 
+## Relink a PS-X EXE layout
+
+```sh
+anyps1 <input.ps-exe> <output.elf>
+```
+
+The first relinker stage writes an ELF32 MIPS layout artifact for the PS-X code
+section. It does not translate PS1 MIPS instructions or claim native execution
+support yet.
+
 ## Extract a PS1 CUE/BIN game
 
 ```sh
