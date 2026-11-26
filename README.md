@@ -39,3 +39,14 @@ The first stage validates the PS-X header and writes an ELF32 MIPS layout
 artifact. It does not yet translate MIPS instructions or produce a runnable
 native Linux or Windows game executable.
 
+## Run an extracted PS-X executable in the first runtime
+
+```sh
+anyps1 --run "/path/to/PS-X.EXE" 1000000
+```
+
+This generic interpreter provides 2 MiB main RAM, scratchpad and MMIO handling,
+BIOS-vector returns, and MIPS I startup instructions. It is not yet a complete
+game runtime and may stop at unsupported graphics, CD-ROM, controller, SPU, or
+GTE behavior.
+

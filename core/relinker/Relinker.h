@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace anyps1 {
@@ -16,5 +17,12 @@ struct RelinkOptions {
 };
 
 bool relink(const RelinkOptions& options);
+
+struct RunOptions {
+    std::string input;
+    std::uint64_t max_instructions = 1000000;
+};
+
+bool run_psx(const RunOptions& options);
 
 }

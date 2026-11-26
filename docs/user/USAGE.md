@@ -16,6 +16,15 @@ The first relinker stage writes an ELF32 MIPS layout artifact for the PS-X code
 section. It does not translate PS1 MIPS instructions or claim native execution
 support yet.
 
+## Run a boot executable
+
+```sh
+anyps1 --run <input.ps-exe> <instruction-limit>
+```
+
+The native host executable uses the initial interpreter stage. It supports PS1
+main RAM and scratchpad access, BIOS-vector returns, and core MIPS I instructions.
+
 ## Extract a PS1 CUE/BIN game
 
 ```sh

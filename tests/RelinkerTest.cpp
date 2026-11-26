@@ -54,6 +54,12 @@ int main()
         if (!anyps1::relink(options)) {
             throw std::runtime_error("relink failed");
         }
+        anyps1::RunOptions run_options;
+        run_options.input = input_path;
+        run_options.max_instructions = 10;
+        if (!anyps1::run_psx(run_options)) {
+            throw std::runtime_error("runtime stopped");
+        }
 
         std::ifstream artifact(output_path, std::ios::binary);
         std::array<unsigned char, 52> header{};
