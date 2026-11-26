@@ -35,6 +35,7 @@
 - [ ] Model the event table layout and callbacks against both retail and OpenBIOS behavior.
 - [ ] Complete BIOS-vector emulation through generic HLE state without external BIOS images.
 - [ ] Verify exception vectors and kernel-memory behavior with BIOS-independent fixtures.
+- [ ] Complete generic VBlank/kernel timing globals and HLE WaitEvent state for boot executables; C0/B0 VBlank counters are present but Tekken still needs no DMA/GP0 activity verified.
 
 ## CD-ROM
 

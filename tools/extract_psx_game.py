@@ -1,6 +1,7 @@
 import argparse
 import json
 import re
+import shutil
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -114,6 +115,14 @@ def safe_output_path(root: Path, entry_path: str) -> Path:
     return destination
 
 
+def prepare_extraction_output(output: Path) -> None:
+    if output.exists():
+        if not output.is_dir():
+            raise ValueError(f"extraction output is not a directory: {output}")
+        shutil.rmtree(output)
+    output.mkdir(parents=True, exist_ok=True)
+
+
 def read_external_entry(
     cue_path: Path,
     tracks: list[CueTrack],
@@ -157,11 +166,7 @@ def extract_game(cue_path: Path, output: Path) -> dict:
         raise ValueError(f"CUE sheet not found: {cue_path}")
 
     track, bin_path = find_data_track(cue_path)
-    output.mkdir(parents=True, exist_ok=True)
-    filesystem_output = output / "filesystem"
-    boot_output = output / "boot"
-    filesystem_output.mkdir(parents=True, exist_ok=True)
-    boot_output.mkdir(parents=True, exist_ok=True)
+    prepare_extraction_output(output)
 
     cue_tracks = parse_cue(cue_path)
     track_manifest = []
@@ -187,7 +192,7 @@ def extract_game(cue_path: Path, output: Path) -> dict:
     for entry in entries:
         if entry.is_directory:
             continue
-        destination = safe_output_path(filesystem_output, entry.path)
+        destination = safe_output_path(output, entry.path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         if entry.lba < disc_sector_count:
             data = inspect_psx_disc.read_entry(disc_iso, entry)
@@ -202,17 +207,6 @@ def extract_game(cue_path: Path, output: Path) -> dict:
         extracted_files += 1
 
     boot_entry, boot_exe = inspect_psx_disc.find_boot_entry(disc_iso)
-    boot_name = boot_entry.path.replace("\\", "/").rstrip("/").split("/")[-1]
-    boot_path = boot_output / boot_name
-    boot_path.write_bytes(boot_exe)
-
-    system_entry = next(
-        entry for entry in entries
-        if entry.path.upper().endswith("SYSTEM.CNF")
-    )
-    system_cnf = inspect_psx_disc.read_entry(disc_iso, system_entry)
-    system_path = output / "SYSTEM.CNF"
-    system_path.write_bytes(system_cnf)
 
     header = inspect_psx_disc.parse_psx_exe_header(boot_exe)
     manifest = {
@@ -224,17 +218,13 @@ def extract_game(cue_path: Path, output: Path) -> dict:
             "mode": track.mode,
             "bin": str(bin_path.resolve()),
         },
-        "filesystem": str(filesystem_output),
+        "filesystem": str(output),
         "track_count": len(cue_tracks),
         "track_manifest": track_manifest,
-        "system_cnf": str(system_path),
         "boot_entry": boot_entry.path,
-        "boot_executable": str(boot_path),
         "boot_header": header,
         "extracted_files": extracted_files,
     }
-    manifest_path = output / "game.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest
 
 
@@ -253,34 +243,13 @@ def main() -> int:
     try:
         cue_paths = [cue.resolve() for cue in args.cue]
         output = args.output if args.output else cue_paths[0].parent / "extracted"
+        aggregate_manifest = output / "game.json"
+        if aggregate_manifest.is_file():
+            aggregate_manifest.unlink()
         manifests = []
         for index, cue_path in enumerate(cue_paths, start=1):
             disc_output = output / f"disc{index}"
             manifests.append(extract_game(cue_path, disc_output))
-        (output / "game.json").write_text(
-            json.dumps(
-                {
-                    "format": "AnyPS1 extraction",
-                    "disc_count": len(cue_paths),
-                    "discs": [
-                        {
-                            "number": index,
-                            "volume_id": manifest["volume_id"],
-                            "cue": manifest["cue"],
-                            "filesystem": manifest["filesystem"],
-                            "system_cnf": manifest["system_cnf"],
-                            "boot_entry": manifest["boot_entry"],
-                            "boot_executable": manifest["boot_executable"],
-                            "boot_header": manifest["boot_header"],
-                            "extracted_files": manifest["extracted_files"],
-                        }
-                        for index, manifest in enumerate(manifests, start=1)
-                    ],
-                },
-                indent=2,
-            ) + "\n",
-            encoding="utf-8",
-        )
         for manifest in manifests:
             print(f"Volume: {manifest['volume_id']}")
             print(f"Boot executable: {manifest['boot_entry']}")

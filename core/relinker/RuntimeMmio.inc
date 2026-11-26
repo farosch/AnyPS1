@@ -106,6 +106,13 @@
 
     void dma_channel_store(std::uint32_t channel, std::uint32_t offset, std::uint32_t value)
     {
+        if (std::getenv("ANYPS1_DMA_TRACE") != nullptr) {
+            std::fprintf(stderr, "DMA channel=%u offset=0x%X value=0x%08X pc=0x%08X\n",
+                static_cast<unsigned>(channel),
+                static_cast<unsigned>(offset),
+                static_cast<unsigned>(value),
+                static_cast<unsigned>(pc_));
+        }
         if (channel >= 7) {
             return;
         }
@@ -371,6 +378,13 @@
         }
         if (physical >= 0x1F801800 && physical < 0x1F801804) {
             const std::uint32_t offset = physical - 0x1F801800;
+            if (std::getenv("ANYPS1_CDROM_TRACE") != nullptr) {
+                std::fprintf(stderr, "CDROM store offset=0x%X value=0x%08X index=%u pc=0x%08X\n",
+                    static_cast<unsigned>(offset),
+                    static_cast<unsigned>(value),
+                    static_cast<unsigned>(cdrom_index),
+                    static_cast<unsigned>(pc_));
+            }
             if (offset == 0) {
                 cdrom_index = value & 3;
             } else if (offset == 1) {

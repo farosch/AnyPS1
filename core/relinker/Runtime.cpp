@@ -127,6 +127,15 @@ public:
                 static_cast<unsigned>(pc_ & 0xFFFFFFFF),
                 static_cast<unsigned>(instruction));
         }
+        if (std::getenv("ANYPS1_WAIT_TRACE") != nullptr
+            && pc_ >= 0x800859CC && pc_ <= 0x800859E8) {
+            std::fprintf(stderr,
+                "WAIT pc=0x%08X v0=0x%08X v1=0x%08X a1=0x%08X\n",
+                static_cast<unsigned>(pc_),
+                static_cast<unsigned>(regs_[2]),
+                static_cast<unsigned>(regs_[3]),
+                static_cast<unsigned>(regs_[5]));
+        }
         std::uint32_t next_pc = pc_ + 4;
         std::uint32_t scheduled_target = 0;
         bool schedule_delay = false;
@@ -518,6 +527,7 @@ public:
     void tick_frame()
     {
         assert_interrupt(0);
+        ++kernel_frame_counter;
         hblank_active = !hblank_active;
         timer_gate_active[0] = hblank_active;
         timer_gate_active[1] = hblank_active;
@@ -678,6 +688,7 @@ private:
     std::array<bool, 3> timer_gate_active{};
     std::array<bool, 3> timer_irq_active{};
     bool hblank_active = false;
+    std::uint32_t kernel_frame_counter = 0;
     std::uint32_t joy_stat = 0x00000005;
     std::uint32_t joy_ctrl = 0;
     std::uint32_t joy_mode = 0;
@@ -765,14 +776,24 @@ bool run_psx(const RunOptions& options, RuntimeSnapshot* snapshot)
         for (std::filesystem::path directory = input_path.parent_path();
              !directory.empty();
              directory = directory.parent_path()) {
+            std::vector<std::filesystem::path> candidates;
             for (const std::filesystem::directory_entry& entry :
                  std::filesystem::directory_iterator(directory)) {
-                if (entry.is_regular_file()
-                    && entry.path().extension() == ".bin"
-                    && entry.path().filename().string().find("(Track") == std::string::npos) {
-                    cdrom_bin = entry.path().string();
+                if (entry.is_regular_file() && entry.path().extension() == ".bin") {
+                    candidates.push_back(entry.path());
+                }
+            }
+            std::sort(candidates.begin(), candidates.end());
+            for (const std::filesystem::path& candidate : candidates) {
+                const std::string filename = candidate.filename().string();
+                if (filename.find("Track 1") != std::string::npos
+                    || filename.find("Track1") != std::string::npos) {
+                    cdrom_bin = candidate.string();
                     break;
                 }
+            }
+            if (cdrom_bin.empty() && !candidates.empty()) {
+                cdrom_bin = candidates.front().string();
             }
             if (!cdrom_bin.empty()) {
                 break;

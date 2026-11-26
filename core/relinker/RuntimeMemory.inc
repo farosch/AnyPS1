@@ -88,8 +88,26 @@
                 std::uint32_t handle = regs_[4] & 0xFu;
                 bios_event_flags[handle] &= ~0x2000u;
                 regs_[2] = 1;
+            } else if (function == 0x3A || function == 0x3B) {
+                ++kernel_frame_counter;
+                regs_[2] = kernel_frame_counter;
+                if (timer_count[1] >= 0xFFFF) {
+                    timer_count[1] = 0;
+                } else {
+                    ++timer_count[1];
+                }
             } else if (function == 0x18) {
                 regs_[2] = 0;
+            } else if (function == 0x19) {
+                const std::uint32_t address = regs_[4] & 0x1FFFFFFF;
+                const std::uint32_t increment = regs_[5];
+                if (in_ram(address) && in_ram(address + 3)) {
+                    write_ram32(address, read_ram32(address) + increment);
+                }
+                regs_[2] = regs_[4];
+            } else if (function == 0x35 || function == 0x5B || function == 0x72) {
+                ++kernel_frame_counter;
+                regs_[2] = kernel_frame_counter;
             } else {
                 regs_[2] = 0;
             }
@@ -106,7 +124,25 @@
                     std::memset(ram_.data() + destination, 0, size);
                 }
                 regs_[2] = 0;
-            } else if (function == 10 || function == 12) {
+            } else if (function == 10) {
+                regs_[2] = kernel_frame_counter;
+                ++timer_count[1];
+                if (timer_count[1] >= 0x10000) {
+                    timer_count[1] = 0;
+                }
+                pc_ = regs_[31];
+                return true;
+            } else if (function == 0xA) {
+                std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
+                std::uint32_t source = regs_[5] & 0x1FFFFFFF;
+                std::uint32_t size = regs_[6];
+                if (destination + size <= ram_.size() && source + size <= ram_.size()) {
+                    std::memmove(ram_.data() + destination, ram_.data() + source, size);
+                    regs_[2] = destination | 0x80000000;
+                } else {
+                    regs_[2] = 0;
+                }
+            } else if (function == 12) {
                 std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
                 std::uint32_t source = regs_[5] & 0x1FFFFFFF;
                 std::uint32_t size = regs_[6];

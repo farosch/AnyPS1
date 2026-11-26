@@ -15,7 +15,7 @@ from analyze_psx_exe import (
     disassemble_range,
     identify_calls,
 )
-from extract_psx_game import parse_cue, safe_output_path
+from extract_psx_game import parse_cue, prepare_extraction_output, safe_output_path
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -94,6 +94,25 @@ class MipsDisassemblerTest(unittest.TestCase):
 
 
 class GameExtractionTest(unittest.TestCase):
+    def test_prepare_output_removes_legacy_extraction_wrappers(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "filesystem").mkdir()
+            (root / "filesystem" / "SYSTEM.CNF").write_text("old")
+            (root / "boot").mkdir()
+            (root / "boot" / "SCUS_000.00").write_bytes(b"old")
+            (root / "SYSTEM.CNF").write_text("old")
+            (root / "game.json").write_text("{}")
+
+            prepare_extraction_output(root)
+
+            self.assertTrue(root.is_dir())
+            self.assertFalse((root / "filesystem").exists())
+            self.assertFalse((root / "boot").exists())
+            self.assertFalse((root / "SYSTEM.CNF").exists())
+            self.assertFalse((root / "game.json").exists())
+
     def test_parse_multitrack_cue(self):
         root = FIXTURES / "cue" / "multitrack"
         tracks = parse_cue(root / "Game.cue")
