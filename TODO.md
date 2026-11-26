@@ -22,7 +22,7 @@
 - [x] Complete gouraud shading interpolation and PS1 semi-transparent blending/mask writes.
 - [x] Implement drawing-area clipping, offsets, texture-window masking, and mask-bit behavior.
 - [x] Implement GPU block/linked-list DMA dispatch and GP0 reset/readback/VRAM transfer hooks.
-- [ ] Complete VRAM wrapping, interlaced display, 16/15/24-bit display modes, and GPU readback FIFO timing.
+- [x] Complete VRAM wrapping, interlaced display toggling, 15/16/24-bit display modes, and GPU readback FIFO completion/wrapping.
 - [ ] Verify GPU linked-list DMA and GPU block/VRAM transfer behavior in real boot traces; no GP0/GP1 or DMA channel writes were observed in four available 300M-instruction runs.
 - [x] Verify block-DMA-to-GP0 behavior with a fixture: MADR/BCR/CHCR reaches GP0 packets.
 - [ ] All FFVII discs show DMA2 CHCR=0x401 and GP0/GP1 startup writes; linked-list payload and remaining real-frame validation require implementation.

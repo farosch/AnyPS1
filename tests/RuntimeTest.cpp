@@ -89,7 +89,8 @@ void test_gpu(const std::filesystem::path& fixtures)
     require(snapshot.gpu_vram_write_count >= 1, "GPU textured/VRAM writes");
     require(snapshot.gpu_tex_window == 0x00123456, "GP0 texture window");
     require(snapshot.gpu_status != 0, "GPU status");
-    require(snapshot.display_x == 0x123, "GP1 display x");
+    require(snapshot.display_x == 0, "GP1 display x reset");
+    require(snapshot.display_depth == 24, "GP1 24-bit display mode");
 }
 
 void test_dma(const std::filesystem::path& fixtures)

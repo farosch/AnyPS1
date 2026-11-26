@@ -346,6 +346,8 @@
     {
         x = (gpu_draw_offset_x & 0x8000) ? x - (0x10000u - gpu_draw_offset_x) : x + gpu_draw_offset_x;
         y = (gpu_draw_offset_y & 0x8000) ? y - (0x10000u - gpu_draw_offset_y) : y + gpu_draw_offset_y;
+        x &= 1023u;
+        y &= 511u;
         if (x >= gpu_draw_x1 && x <= gpu_draw_x2 && y >= gpu_draw_y1 && y <= gpu_draw_y2
             && x < 1024 && y < 512) {
             if (gpu_mask_keep && (vram_[y * 1024 + x] & 0x8000u) != 0) {
@@ -642,14 +644,18 @@
         }
         if (gp0_transfer_remaining != 0) {
             for (std::uint32_t pixel = 0; pixel < 2 && gp0_transfer_remaining != 0; ++pixel) {
-                const std::uint16_t value = static_cast<std::uint16_t>(
+                std::uint16_t value = static_cast<std::uint16_t>(
                     pixel == 0 ? word & 0xFFFF : word >> 16
                 );
                 gp0_transfer_x = (gp0_transfer_start_x + gp0_transfer_cursor % gp0_transfer_width) & 1023u;
                 gp0_transfer_y = (gp0_transfer_start_y + gp0_transfer_cursor / gp0_transfer_width) & 511u;
                 if (gp0_transfer_y < 512 && gp0_transfer_x < 1024) {
-                    vram_[gp0_transfer_y * 1024 + gp0_transfer_x] = value;
-                    ++gpu_vram_write_count;
+                    std::uint16_t* destination = &vram_[gp0_transfer_y * 1024 + gp0_transfer_x];
+                    if (!gpu_mask_keep || (*destination & 0x8000u) == 0) {
+                        if (gpu_mask_set) value |= 0x8000u;
+                        *destination = value;
+                        ++gpu_vram_write_count;
+                    }
                 }
                 ++gp0_transfer_cursor;
                 --gp0_transfer_remaining;
@@ -926,6 +932,7 @@
             display_y = 0;
             display_width = 320;
             display_height = 240;
+            display_depth = 15;
         } else if (command == 0x01) {
             gp0_param_count = 0;
             gp0_expected = 0;
@@ -947,6 +954,7 @@
             gpu_status = (gpu_status & ~0x0007FFFFu) | (parameter & 0x0007FFFFu);
             const std::uint32_t width_code = parameter & 3;
             const std::uint32_t height = (parameter >> 2) & 1;
+            display_depth = (parameter & 0x10u) ? 24 : ((parameter & 0x04u) ? 16 : 15);
             display_width = (width_code == 1) ? 368 : ((width_code == 2) ? 512 : ((width_code == 3) ? 640 : 256));
             if (height == 0) {
                 display_height = display_height <= 256 ? 240 : display_height;

@@ -535,6 +535,7 @@ public:
         result.gpu_write_count = static_cast<std::uint32_t>(gpu_write_count);
         result.gpu_vram_write_count = static_cast<std::uint32_t>(gpu_vram_write_count);
         result.gpuread = gpuread;
+        result.gpu_read_remaining = gpu_read_remaining;
         result.gpu_draw_x1 = gpu_draw_x1;
         result.gpu_draw_y1 = gpu_draw_y1;
         result.gpu_draw_x2 = gpu_draw_x2;
@@ -549,6 +550,7 @@ public:
         result.display_y = display_y;
         result.display_width = display_width;
         result.display_height = display_height;
+        result.display_depth = display_depth;
         result.dma_madr = dma_madr;
         result.dma_bcr = dma_bcr;
         result.dma_chcr = dma_chcr;
@@ -724,6 +726,7 @@ private:
     std::uint32_t display_y = 0;
     std::uint32_t display_width = 320;
     std::uint32_t display_height = 240;
+    std::uint32_t display_depth = 15;
     std::uint32_t gpu_status = 0x1F400000;
     std::uint64_t gpu_write_count = 0;
     std::uint64_t gpu_vram_write_count = 0;

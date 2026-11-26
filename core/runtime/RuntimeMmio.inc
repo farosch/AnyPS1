@@ -624,20 +624,23 @@
         if (physical == 0x1F801810) {
             if (gpu_read_remaining != 0) {
                 if (gpu_read_cursor < gpu_read_width * gpu_read_height) {
-                    const std::uint32_t x = gpu_read_x + gpu_read_cursor % gpu_read_width;
-                    const std::uint32_t y = gpu_read_y + gpu_read_cursor / gpu_read_width;
+                    const std::uint32_t x = (gpu_read_x + gpu_read_cursor % gpu_read_width) & 1023u;
+                    const std::uint32_t y = (gpu_read_y + gpu_read_cursor / gpu_read_width) & 511u;
                     const std::uint16_t low = (x < 1024 && y < 512) ? vram_[y * 1024 + x] : 0;
                     ++gpu_read_cursor;
                     --gpu_read_remaining;
                     if (gpu_read_cursor < gpu_read_width * gpu_read_height) {
-                        const std::uint32_t x2 = gpu_read_x + gpu_read_cursor % gpu_read_width;
-                        const std::uint32_t y2 = gpu_read_y + gpu_read_cursor / gpu_read_width;
+                        const std::uint32_t x2 = (gpu_read_x + gpu_read_cursor % gpu_read_width) & 1023u;
+                        const std::uint32_t y2 = (gpu_read_y + gpu_read_cursor / gpu_read_width) & 511u;
                         const std::uint16_t high = (x2 < 1024 && y2 < 512) ? vram_[y2 * 1024 + x2] : 0;
                         ++gpu_read_cursor;
                         --gpu_read_remaining;
                         value = static_cast<std::uint32_t>(low) | (static_cast<std::uint32_t>(high) << 16);
                     } else {
                         value = low;
+                    }
+                    if (gpu_read_remaining == 0) {
+                        gpu_status &= ~0x08000000u;
                     }
                 } else {
                     value = 0;

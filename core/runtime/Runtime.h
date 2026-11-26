@@ -33,6 +33,7 @@ struct RuntimeSnapshot {
     std::uint32_t gpu_write_count = 0;
     std::uint32_t gpu_vram_write_count = 0;
     std::uint32_t gpuread = 0;
+    std::uint32_t gpu_read_remaining = 0;
     std::uint32_t gpu_draw_x1 = 0;
     std::uint32_t gpu_draw_y1 = 0;
     std::uint32_t gpu_draw_x2 = 0;
@@ -42,6 +43,7 @@ struct RuntimeSnapshot {
     std::uint32_t display_y = 0;
     std::uint32_t display_width = 0;
     std::uint32_t display_height = 0;
+    std::uint32_t display_depth = 15;
     std::array<std::uint32_t, 7> dma_madr{};
     std::array<std::uint32_t, 7> dma_bcr{};
     std::array<std::uint32_t, 7> dma_chcr{};
