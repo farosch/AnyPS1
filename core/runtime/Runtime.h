@@ -65,6 +65,8 @@ struct RuntimeSnapshot {
     std::uint32_t spu_control = 0;
     std::uint32_t spu_status = 0;
     std::uint32_t spu_key_on = 0;
+    std::array<std::uint16_t, 24> spu_voice_adsr_level{};
+    std::array<std::uint32_t, 24> spu_voice_adsr_phase{};
     std::array<std::uint16_t, 24> spu_voice_volume_l{};
     std::array<std::uint16_t, 24> spu_voice_volume_r{};
     std::array<std::uint32_t, 24> spu_voice_address{};

@@ -56,7 +56,7 @@
 
 ## SPU
 
-- [ ] Implement ADSR attack/decay/sustain/release rates instead of fixed phase timing.
+- [x] Implement ADSR attack/decay/sustain/release rates with ADSR1/ADSR2 register state and level/phase fixtures.
 - [x] Decode basic BRR ADPCM blocks and repeating sample addresses.
 - [ ] Add SPU voice interpolation, noise, interpolation tables, reverb, and RAM IRQ behavior.
 - [ ] Implement CD-XA mixing and 44.1 kHz host resampling.

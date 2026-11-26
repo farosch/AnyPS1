@@ -574,6 +574,8 @@ public:
         result.spu_control = spu_control;
         result.spu_status = spu_status;
         result.spu_key_on = spu_key_on;
+        result.spu_voice_adsr_level = spu_voice_adsr;
+        result.spu_voice_adsr_phase = spu_voice_phase;
         result.spu_voice_volume_l = spu_voice_volume_l;
         result.spu_voice_volume_r = spu_voice_volume_r;
         for (std::uint32_t voice = 0; voice < 24; ++voice) {
@@ -604,16 +606,43 @@ public:
         for (std::uint32_t voice = 0; voice < 24; ++voice) {
             if (spu_key_on & (1u << voice)) {
                 ++spu_voice_counter[voice];
-                if (spu_voice_phase[voice] == 1 && spu_voice_counter[voice] >= 4) {
-                    spu_voice_phase[voice] = 2;
-                    spu_voice_adsr[voice] = 0xF000;
-                } else if (spu_voice_phase[voice] == 2 && spu_voice_counter[voice] >= 8) {
-                    spu_voice_phase[voice] = 3;
-                    spu_voice_adsr[voice] = 0x8000;
+                const std::uint16_t ad = spu_voice_adsr_attack_decay[voice];
+                const std::uint16_t sr = spu_voice_adsr_sustain_release[voice];
+                if (spu_voice_phase[voice] == 1) {
+                    const std::uint32_t attack_shift = std::min(7u, (ad >> 8) & 7u);
+                    const std::uint32_t attack_rate = std::min(127u, ad & 127u);
+                    const std::uint32_t step = std::max(1u, (attack_rate >> attack_shift) + 1u);
+                    spu_voice_adsr[voice] = std::min<std::uint32_t>(
+                        0x7FFFu, spu_voice_adsr[voice] + step);
+                    if (spu_voice_adsr[voice] >= 0x7FFFu) {
+                        spu_voice_phase[voice] = 2;
+                    }
+                } else if (spu_voice_phase[voice] == 2) {
+                    const std::uint32_t sustain_level = ((sr >> 14) & 3u) * 0x2000u;
+                    const std::uint32_t decay_rate = std::min(127u, (ad >> 8) & 127u);
+                    const std::uint32_t step = std::max(1u, (decay_rate >> 4) + 1u);
+                    spu_voice_adsr[voice] = spu_voice_adsr[voice] > step
+                        ? spu_voice_adsr[voice] - step : 0;
+                    if (spu_voice_adsr[voice] <= sustain_level) {
+                        spu_voice_phase[voice] = 3;
+                    }
+                } else if (spu_voice_phase[voice] == 3) {
+                    const bool decrease = (sr & 0x20u) != 0;
+                    const std::uint32_t sustain_rate = std::min(127u, sr & 127u);
+                    const std::uint32_t step = std::max(1u, (sustain_rate >> 4) + 1u);
+                    if (decrease) {
+                        spu_voice_adsr[voice] = spu_voice_adsr[voice] > step
+                            ? spu_voice_adsr[voice] - step : 0;
+                    } else {
+                        spu_voice_adsr[voice] = std::min<std::uint32_t>(
+                            0x7FFFu, spu_voice_adsr[voice] + step);
+                    }
                 }
             } else if (spu_voice_phase[voice] == 4) {
-                spu_voice_adsr[voice] = spu_voice_adsr[voice] > 0x400
-                    ? spu_voice_adsr[voice] - 0x400 : 0;
+                const std::uint32_t release_rate = std::min(127u, spu_voice_adsr_sustain_release[voice] & 127u);
+                const std::uint32_t step = std::max(1u, (release_rate >> 3) + 1u);
+                spu_voice_adsr[voice] = spu_voice_adsr[voice] > step
+                    ? spu_voice_adsr[voice] - step : 0;
                 if (spu_voice_adsr[voice] == 0) {
                     spu_voice_phase[voice] = 0;
                 }
@@ -814,6 +843,8 @@ private:
     std::array<std::uint16_t, 24> spu_voice_volume_l{};
     std::array<std::uint16_t, 24> spu_voice_volume_r{};
     std::array<std::uint16_t, 24> spu_voice_adsr{};
+    std::array<std::uint16_t, 24> spu_voice_adsr_attack_decay{};
+    std::array<std::uint16_t, 24> spu_voice_adsr_sustain_release{};
     std::array<std::uint32_t, 24> spu_voice_address{};
     std::array<std::uint32_t, 24> spu_voice_repeat_address{};
     std::array<std::uint32_t, 24> spu_voice_phase{};

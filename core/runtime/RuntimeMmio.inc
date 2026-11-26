@@ -541,7 +541,7 @@
                 spu_key_on = value;
                 for (std::uint32_t voice = 0; voice < 24; ++voice) {
                     if (spu_key_on & (1u << voice)) {
-                        spu_voice_adsr[voice] = 0x4000;
+                        spu_voice_adsr[voice] = 0;
                         spu_voice_phase[voice] = 1;
                         spu_voice_counter[voice] = 0;
                         spu_voice_address[voice] = spu_voice_start[voice] * 8u;
@@ -562,8 +562,8 @@
                 if (voice < 24) {
                     if (voice_offset == 0) spu_voice_volume_l[voice] = value & 0xFFFF;
                     else if (voice_offset == 2) spu_voice_volume_r[voice] = value & 0xFFFF;
-                    else if (voice_offset == 4) spu_voice_adsr[voice] = value & 0xFFFF;
-                    else if (voice_offset == 6) spu_voice_adsr[voice] = value & 0xFFFF;
+                    else if (voice_offset == 4) spu_voice_adsr_attack_decay[voice] = value & 0xFFFF;
+                    else if (voice_offset == 6) spu_voice_adsr_sustain_release[voice] = value & 0xFFFF;
                     else if (voice_offset == 8) spu_voice_start[voice] = value & 0xFFFF;
                     else if (voice_offset == 14) spu_voice_repeat[voice] = value & 0xFFFF;
                 }

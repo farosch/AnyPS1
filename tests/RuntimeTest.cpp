@@ -125,11 +125,13 @@ void test_cdrom(const std::filesystem::path& fixtures)
 
 void test_spu(const std::filesystem::path& fixtures)
 {
-    const auto snapshot = run_fixture(fixtures, "runtime-spu.ps-exe", 100);
+    const auto snapshot = run_fixture(fixtures, "runtime-spu.ps-exe", 10020);
     require(snapshot.spu_voice_volume_l[0] == 0x1234, "SPU voice left volume");
     require(snapshot.spu_voice_volume_r[0] == 0x5678, "SPU voice right volume");
     require(snapshot.spu_voice_address[0] == 0x400, "SPU voice start address");
     require(snapshot.spu_key_on == 1, "SPU key-on state");
+    require(snapshot.spu_voice_adsr_level[0] > 0, "SPU ADSR attack level");
+    require(snapshot.spu_voice_adsr_phase[0] == 1, "SPU ADSR attack phase");
 }
 
 void test_timers(const std::filesystem::path& fixtures)
