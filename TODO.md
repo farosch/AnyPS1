@@ -79,6 +79,7 @@
 - [x] Add fixture-based runtime tests for MIPS instructions and load-delay behavior.
 - [x] Add fixture-based runtime tests for COP0 exceptions and the interrupt pipeline.
 - [x] Add fixture-based runtime tests for GTE commands.
+- [x] Add fixture-based GTE SQR and arithmetic-overflow coverage.
 - [x] Add fixture-based runtime tests for GP0/GP1 register and GPU command behavior.
 - [x] Add fixture-based runtime tests for DMA channels and bus arbitration.
 - [x] Add fixture-based runtime tests for CD-ROM commands, timing, and DMA.

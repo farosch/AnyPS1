@@ -666,8 +666,9 @@ public:
                     spu_voice_previous2[voice] = spu_voice_previous1[voice];
                     spu_voice_previous1[voice] = static_cast<std::int32_t>(base);
                     const std::int16_t sample = static_cast<std::int16_t>(base);
-                    left += sample * (spu_voice_volume_l[voice] & 0x3FFF) / 0x4000;
-                    right += sample * (spu_voice_volume_r[voice] & 0x3FFF) / 0x4000;
+                    const std::uint32_t envelope = (spu_voice_adsr[voice] >> 8) + 1;
+                    left += sample * (spu_voice_volume_l[voice] & 0x3FFF) * envelope / 0x4000 / 256;
+                    right += sample * (spu_voice_volume_r[voice] & 0x3FFF) * envelope / 0x4000 / 256;
                     ++spu_voice_block_sample[voice];
                     if (spu_voice_block_sample[voice] == 28) {
                         spu_voice_block_sample[voice] = 0;

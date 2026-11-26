@@ -52,12 +52,27 @@ void test_cop0(const std::filesystem::path& fixtures)
     require(snapshot.cop0[14] == 0x80010008, "COP0 exception EPC");
 }
 
+void test_overflow(const std::filesystem::path& fixtures)
+{
+    const auto snapshot = run_fixture(fixtures, "runtime-overflow.ps-exe", 20);
+    require((snapshot.cop0[13] & 0xFCu) == 48, "ADD overflow cause code");
+    require(snapshot.cop0[14] == 0x80010008, "ADD overflow EPC");
+}
+
 void test_gte(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-gte.ps-exe");
     require(snapshot.gte_control[24] == 0x12345678, "GTE data transfer result");
     require(snapshot.gte_control[25] == 0x00005678, "GTE y result");
     require(snapshot.gte_control[26] == 0xFFFFFFF6, "GTE z result");
+}
+
+void test_gte_square(const std::filesystem::path& fixtures)
+{
+    const auto snapshot = run_fixture(fixtures, "runtime-gte-square.ps-exe");
+    require(snapshot.gte_control[24] == 1, "GTE square x result");
+    require(snapshot.gte_control[25] == 1, "GTE square y result");
+    require(snapshot.gte_control[26] == 1, "GTE square z result");
 }
 
 void test_gpu(const std::filesystem::path& fixtures)
@@ -146,7 +161,9 @@ int main(int argc, char** argv)
         test_mips(fixtures);
         test_load_delay(fixtures);
         test_cop0(fixtures);
+        test_overflow(fixtures);
         test_gte(fixtures);
+        test_gte_square(fixtures);
         test_gpu(fixtures);
         test_dma(fixtures);
         test_dma_gpu(fixtures);

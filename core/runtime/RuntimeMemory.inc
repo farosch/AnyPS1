@@ -178,6 +178,13 @@
                     std::memmove(ram_.data() + destination, ram_.data() + source, size);
                 }
                 regs_[2] = destination | 0x80000000;
+            } else if (function == 0x09) {
+                ++kernel_frame_counter;
+                regs_[2] = kernel_frame_counter;
+            } else if (function == 0x0B) {
+                regs_[2] = 0;
+            } else if (function == 0x0D) {
+                regs_[2] = 0;
             } else {
                 regs_[2] = 0;
             }
