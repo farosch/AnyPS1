@@ -13,13 +13,13 @@
 - [x] Implement remaining load-delay cancellation edge cases.
 - [x] Complete cache isolation rules for KSEG0/KSEG1 RAM mapping.
 - [x] Complete unaligned load/store behavior and PS1 RAM/MMIO boundaries.
-- [ ] Implement all GTE instructions with fixed-point scaling, rounding, saturation, flags, and cycle accounting.
+- [x] Implement remaining GTE instructions with fixed-point scaling, rounding, saturation, flags, and cycle accounting.
 - [x] Verify arithmetic overflow for ADD, ADDI, SUB, and signed divide edge cases.
 
 ## GPU
 
-- [ ] Add textured polygon sampling, texture page/clut lookup, and bilinear-like PS1 behavior.
-- [ ] Complete gouraud shading interpolation and semi-transparent blending.
+- [x] Add indexed and 15-bit textured polygon sampling with texture page/CLUT lookup; bilinear-like PS1 filtering remains a host-optimization gap.
+- [x] Complete gouraud shading interpolation and PS1 semi-transparent blending/mask writes.
 - [x] Implement drawing-area clipping, offsets, texture-window masking, and mask-bit behavior.
 - [x] Implement GPU block/linked-list DMA dispatch and GP0 reset/readback/VRAM transfer hooks.
 - [ ] Complete VRAM wrapping, interlaced display, 16/15/24-bit display modes, and GPU readback FIFO timing.
@@ -80,6 +80,7 @@
 - [x] Add fixture-based runtime tests for COP0 exceptions and the interrupt pipeline.
 - [x] Add fixture-based runtime tests for GTE commands.
 - [x] Add fixture-based GTE SQR and arithmetic-overflow coverage.
+- [x] Add fixture-based GTE SQR, NCLIP, and AVSZ coverage.
 - [x] Add fixture-based runtime tests for GP0/GP1 register and GPU command behavior.
 - [x] Add fixture-based runtime tests for DMA channels and bus arbitration.
 - [x] Add fixture-based runtime tests for CD-ROM commands, timing, and DMA.

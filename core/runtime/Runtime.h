@@ -28,6 +28,7 @@ struct RuntimeSnapshot {
     std::array<std::uint32_t, 32> cop0{};
     std::array<std::int32_t, 32> gte_data{};
     std::array<std::uint32_t, 32> gte_control{};
+    std::uint64_t gte_cycle_count = 0;
     std::uint32_t gpu_status = 0;
     std::uint32_t gpu_write_count = 0;
     std::uint32_t gpu_vram_write_count = 0;

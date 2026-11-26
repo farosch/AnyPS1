@@ -530,6 +530,7 @@ public:
         result.cop0 = cop0_;
         result.gte_data = gte_data_;
         result.gte_control = gte_control;
+        result.gte_cycle_count = gte_cycle_count_;
         result.gpu_status = gpu_status;
         result.gpu_write_count = static_cast<std::uint32_t>(gpu_write_count);
         result.gpu_vram_write_count = static_cast<std::uint32_t>(gpu_vram_write_count);
@@ -703,6 +704,7 @@ private:
     std::array<std::uint32_t, 32> cop0_{};
     std::array<std::int32_t, 32> gte_data_{};
     std::array<std::uint32_t, 32> gte_control{};
+    std::uint64_t gte_cycle_count_ = 0;
     std::array<unsigned char, 2 * 1024 * 1024> ram_{};
     std::array<unsigned char, 1024> scratchpad_{};
     std::array<std::uint16_t, 1024 * 512> vram_{};

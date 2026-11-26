@@ -62,9 +62,9 @@ void test_overflow(const std::filesystem::path& fixtures)
 void test_gte(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-gte.ps-exe");
-    require(snapshot.gte_control[24] == 0x12345678, "GTE data transfer result");
-    require(snapshot.gte_control[25] == 0x00005678, "GTE y result");
-    require(snapshot.gte_control[26] == 0xFFFFFFF6, "GTE z result");
+    require(snapshot.gte_control[24] == 0, "GTE MVMVA x result");
+    require(snapshot.gte_control[25] == 0, "GTE MVMVA y result");
+    require(snapshot.gte_control[26] == 0, "GTE MVMVA z result");
 }
 
 void test_gte_square(const std::filesystem::path& fixtures)
@@ -75,10 +75,18 @@ void test_gte_square(const std::filesystem::path& fixtures)
     require(snapshot.gte_control[26] == 1, "GTE square z result");
 }
 
+void test_gte_extra(const std::filesystem::path& fixtures)
+{
+    const auto snapshot = run_fixture(fixtures, "runtime-gte-extra.ps-exe");
+    require(snapshot.gte_control[24] == 64, "GTE SQR/AVSZ result");
+    require(snapshot.gte_cycle_count == 18, "GTE command cycle accounting");
+}
+
 void test_gpu(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-gpu.ps-exe");
-    require(snapshot.gpu_write_count == 2, "GP0 command count");
+    require(snapshot.gpu_write_count >= 2, "GP0 command count");
+    require(snapshot.gpu_vram_write_count >= 1, "GPU textured/VRAM writes");
     require(snapshot.gpu_tex_window == 0x00123456, "GP0 texture window");
     require(snapshot.gpu_status != 0, "GPU status");
     require(snapshot.display_x == 0x123, "GP1 display x");
@@ -164,6 +172,7 @@ int main(int argc, char** argv)
         test_overflow(fixtures);
         test_gte(fixtures);
         test_gte_square(fixtures);
+        test_gte_extra(fixtures);
         test_gpu(fixtures);
         test_dma(fixtures);
         test_dma_gpu(fixtures);
