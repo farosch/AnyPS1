@@ -571,6 +571,8 @@ public:
         result.cdrom_response_count = cdrom_response_count;
         result.cdrom_params = cdrom_params;
         result.cdrom_read_active = cdrom_read_active;
+        result.cdrom_motor_on = cdrom_motor_on;
+        result.cdrom_second_response_pending = cdrom_second_response_pending;
         result.spu_control = spu_control;
         result.spu_status = spu_status;
         result.spu_key_on = spu_key_on;
@@ -599,6 +601,7 @@ public:
     void tick_frame()
     {
         assert_interrupt(0);
+        cdrom_tick();
         ++kernel_frame_counter;
         hblank_active = !hblank_active;
         timer_gate_active[0] = hblank_active;
@@ -837,6 +840,8 @@ private:
     std::uint32_t cdrom_lba = 0;
     std::uint32_t cdrom_sector_size = 2352;
     bool cdrom_read_active = false;
+    bool cdrom_motor_on = false;
+    bool cdrom_second_response_pending = false;
     std::array<unsigned char, 512 * 1024> spu_ram{};
     std::array<std::uint32_t, 24> spu_voice_start{};
     std::array<std::uint32_t, 24> spu_voice_repeat{};

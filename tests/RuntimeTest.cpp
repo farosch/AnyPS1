@@ -121,6 +121,7 @@ void test_cdrom(const std::filesystem::path& fixtures)
     require(snapshot.cdrom_read_active, "CD-ROM ReadN active state");
     require(snapshot.cdrom_status == 0x23, "CD-ROM ReadN status");
     require(snapshot.cdrom_sector_size == 2352, "CD-ROM sector size");
+    require(snapshot.cdrom_motor_on, "CD-ROM motor state");
 }
 
 void test_spu(const std::filesystem::path& fixtures)

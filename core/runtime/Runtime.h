@@ -62,6 +62,8 @@ struct RuntimeSnapshot {
     std::uint32_t cdrom_response_count = 0;
     std::array<unsigned char, 16> cdrom_params{};
     bool cdrom_read_active = false;
+    bool cdrom_motor_on = false;
+    bool cdrom_second_response_pending = false;
     std::uint32_t spu_control = 0;
     std::uint32_t spu_status = 0;
     std::uint32_t spu_key_on = 0;

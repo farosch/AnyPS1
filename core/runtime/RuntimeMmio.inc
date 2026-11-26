@@ -382,6 +382,21 @@
         }
     }
 
+    void cdrom_tick()
+    {
+        if (!cdrom_second_response_pending) {
+            return;
+        }
+        cdrom_second_response_pending = false;
+        cdrom_response_count = 1;
+        cdrom_response_cursor = 0;
+        cdrom_response[0] = cdrom_status;
+        cdrom_interrupt = 2;
+        if ((cdrom_interrupt_enable & 2) != 0) {
+            assert_interrupt(2);
+        }
+    }
+
     void cdrom_execute(std::uint32_t command)
     {
         cdrom_param_count = 0;
@@ -401,23 +416,31 @@
             break;
         case 0x06:
             cdrom_read_active = true;
+            cdrom_motor_on = true;
             cdrom_status |= 0x21;
             cdrom_set_response(cdrom_status);
+            cdrom_second_response_pending = true;
             break;
         case 0x1B:
             cdrom_read_active = true;
+            cdrom_motor_on = true;
             cdrom_status |= 0x20;
             cdrom_set_response(cdrom_status);
+            cdrom_second_response_pending = true;
             break;
         case 0x08:
+            cdrom_read_active = false;
             cdrom_set_response(cdrom_status);
+            cdrom_second_response_pending = true;
             break;
         case 0x09:
             cdrom_read_active = false;
+            cdrom_motor_on = false;
             cdrom_set_response(cdrom_status);
             cdrom_status = 0;
             break;
         case 0x0A:
+            cdrom_motor_on = true;
             cdrom_set_response(cdrom_status);
             cdrom_status |= 0x20;
             break;
@@ -451,6 +474,12 @@
         case 0x1A:
             cdrom_set_response(cdrom_status);
             cdrom_response_count = 1;
+            break;
+        case 0x0F:
+            cdrom_motor_on = true;
+            cdrom_status |= 0x21;
+            cdrom_set_response(cdrom_status);
+            cdrom_second_response_pending = true;
             break;
         default:
             cdrom_set_response(cdrom_status);

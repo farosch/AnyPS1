@@ -50,7 +50,7 @@
 - [ ] Read sectors through a disc interface instead of relying on caller-supplied raw BIN assumptions.
 - [x] Implement explicit and inferred Track 1 BIN sector reads for boot/runtime startup.
 - [ ] Implement complete CUE/BIN track, TOC, and seek/LBA conversion behavior.
-- [ ] Add command timing, second responses, async IRQ deferral, Setmode/Sector size, ReadN/ReadS, Pause/Stop/Init, and motor state.
+- [x] Add deferred second responses, async IRQ delivery, motor state, Setmode/Sector size, ReadN/ReadS, Pause/Stop/Init state transitions.
 - [ ] Implement CD-XA sector parsing and 4-bit/8-bit XA-ADPCM playback.
 - [ ] Implement CD-ROM DMA data FIFOs and IRQ/DataReady/DataEnd behavior.
 
