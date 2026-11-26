@@ -156,6 +156,22 @@ class GameExtractionTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 safe_output_path(root, "../escape.bin")
 
+    def test_extracts_two_cues_as_separate_discs(self):
+        cue_1 = 'FILE "Disc1.bin" BINARY\n  TRACK 01 MODE2/2352\n'
+        cue_2 = 'FILE "Disc2.bin" BINARY\n  TRACK 01 MODE2/2352\n'
+        with __import__("tempfile").TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Disc1.bin").write_bytes(b"\x00" * (2352 * 2))
+            (root / "Disc2.bin").write_bytes(b"\x00" * (2352 * 2))
+            (root / "Disc1.cue").write_text(cue_1)
+            (root / "Disc2.cue").write_text(cue_2)
+
+            tracks_1 = parse_cue(root / "Disc1.cue")
+            tracks_2 = parse_cue(root / "Disc2.cue")
+
+            self.assertEqual(tracks_1[0].bin_file, "Disc1.bin")
+            self.assertEqual(tracks_2[0].bin_file, "Disc2.bin")
+
 
 if __name__ == "__main__":
     unittest.main()

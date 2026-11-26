@@ -1,7 +1,6 @@
 import argparse
 import json
 import re
-import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -160,16 +159,12 @@ def extract_game(cue_path: Path, output: Path) -> dict:
     output.mkdir(parents=True, exist_ok=True)
     filesystem_output = output / "filesystem"
     boot_output = output / "boot"
-    tracks_output = output / "tracks"
     filesystem_output.mkdir(parents=True, exist_ok=True)
     boot_output.mkdir(parents=True, exist_ok=True)
-    tracks_output.mkdir(parents=True, exist_ok=True)
 
     cue_tracks = parse_cue(cue_path)
-    copied_bins = set()
     track_manifest = []
     for cue_track in cue_tracks:
-        source_bin = cue_path.parent / cue_track.bin_file
         track_manifest.append(
             {
                 "number": cue_track.number,
@@ -180,10 +175,6 @@ def extract_game(cue_path: Path, output: Path) -> dict:
                 "file_start_lba": cue_track.file_start_lba,
             }
         )
-        if cue_track.bin_file not in copied_bins:
-            track_dir = tracks_output / cue_track.bin_file
-            shutil.copyfile(source_bin, track_dir)
-            copied_bins.add(cue_track.bin_file)
 
     disc_iso = output / "disc.iso"
     convert_data_track(track, bin_path, disc_iso)
@@ -233,9 +224,7 @@ def extract_game(cue_path: Path, output: Path) -> dict:
         },
         "disc_iso": str(disc_iso),
         "filesystem": str(filesystem_output),
-        "tracks": str(tracks_output),
         "track_count": len(cue_tracks),
-        "bin_count": len(copied_bins),
         "track_manifest": track_manifest,
         "system_cnf": str(system_path),
         "boot_entry": boot_entry.path,
@@ -252,7 +241,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Extract a PS1 CUE/BIN game into the AnyPS1 reference layout"
     )
-    parser.add_argument("cue", type=Path)
+    parser.add_argument("cue", nargs="+", type=Path)
     parser.add_argument(
         "--output",
         type=Path,
@@ -261,12 +250,45 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        output = args.output if args.output else args.cue.resolve().parent / "extracted"
-        manifest = extract_game(args.cue, output)
-        print(f"Volume: {manifest['volume_id']}")
-        print(f"Boot executable: {manifest['boot_entry']}")
-        print(f"Extracted files: {manifest['extracted_files']}")
-        print(f"Output: {args.output or output}")
+        cue_paths = [cue.resolve() for cue in args.cue]
+        if len(cue_paths) == 1:
+            output = args.output if args.output else cue_paths[0].parent / "extracted"
+            manifest = extract_game(cue_paths[0], output)
+            manifests = [manifest]
+        else:
+            output = args.output if args.output else cue_paths[0].parent / "extracted"
+            manifests = []
+            for index, cue_path in enumerate(cue_paths, start=1):
+                disc_output = output / f"disc{index}"
+                manifests.append(extract_game(cue_path, disc_output))
+            (output / "game.json").write_text(
+                json.dumps(
+                    {
+                        "format": "AnyPS1 multi-disc extraction",
+                        "cue_count": len(cue_paths),
+                        "discs": [
+                            {
+                                "number": index,
+                                "volume_id": manifest["volume_id"],
+                                "cue": manifest["cue"],
+                                "disc_iso": manifest["disc_iso"],
+                                "filesystem": manifest["filesystem"],
+                                "boot_entry": manifest["boot_entry"],
+                                "boot_executable": manifest["boot_executable"],
+                                "extracted_files": manifest["extracted_files"],
+                            }
+                            for index, manifest in enumerate(manifests, start=1)
+                        ],
+                    },
+                    indent=2,
+                ) + "\n",
+                encoding="utf-8",
+            )
+        for manifest in manifests:
+            print(f"Volume: {manifest['volume_id']}")
+            print(f"Boot executable: {manifest['boot_entry']}")
+            print(f"Extracted files: {manifest['extracted_files']}")
+        print(f"Output: {output}")
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
