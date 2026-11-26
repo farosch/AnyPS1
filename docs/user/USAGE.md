@@ -10,6 +10,8 @@ The relinker is currently a scaffold and does not yet convert executable images.
 
 ```sh
 anyps1 <input.ps-exe> <output.elf>
+anyps1 --target linux <input.ps-exe> <output.elf>
+anyps1 --target windows <input.ps-exe> <output.exe>
 ```
 
 The first relinker stage writes an ELF32 MIPS layout artifact for the PS-X code

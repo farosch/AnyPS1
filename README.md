@@ -33,6 +33,8 @@ python3 tools/extract_psx_game.py "/path/to/Game.cue"
 
 ```sh
 anyps1 "/path/to/PS-X.EXE" "/path/to/output.elf"
+anyps1 --target linux "/path/to/PS-X.EXE" "/path/to/output.elf"
+anyps1 --target windows "/path/to/PS-X.EXE" "/path/to/output.exe"
 ```
 
 The first stage validates the PS-X header and writes an ELF32 MIPS layout

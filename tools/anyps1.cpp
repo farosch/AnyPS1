@@ -20,10 +20,38 @@ int main(int argc, char** argv)
             return 1;
         }
     }
+    if (argc == 5 && std::string(argv[1]) == "--target") {
+        anyps1::TargetPlatform target;
+        const std::string target_name = argv[2];
+        if (target_name == "linux") {
+            target = anyps1::TargetPlatform::Linux;
+        } else if (target_name == "windows") {
+            target = anyps1::TargetPlatform::Windows;
+        } else {
+            std::cerr << "Error: --target must be linux or windows\n";
+            return 2;
+        }
+        anyps1::RelinkOptions options;
+        options.input = argv[3];
+        options.output = argv[4];
+        options.target = target;
+        try {
+            if (!anyps1::relink(options)) {
+                return 1;
+            }
+            std::cout << "PS-X EXE layout artifact written to " << options.output << "\n";
+        } catch (const std::exception& error) {
+            std::cerr << "Error: " << error.what() << "\n";
+            return 1;
+        }
+        return 0;
+    }
     if (argc != 3) {
         std::cerr
             << "Usage:\n"
             << "  anyps1 <input.ps-exe> <output.elf>\n"
+            << "  anyps1 --target linux <input.ps-exe> <output.elf>\n"
+            << "  anyps1 --target windows <input.ps-exe> <output.exe>\n"
             << "  anyps1 --run <input.ps-exe> <instruction-limit>\n";
         return 2;
     }

@@ -29,6 +29,7 @@ int main()
 {
     const char* input_path = "/tmp/anyps1-relinker-test.ps-exe";
     const char* output_path = "/tmp/anyps1-relinker-test.elf";
+    const char* windows_output_path = "/tmp/anyps1-relinker-test.exe";
     try {
         std::ofstream input(input_path, std::ios::binary | std::ios::trunc);
         std::vector<unsigned char> exe(2080, 0);
@@ -61,6 +62,30 @@ int main()
             throw std::runtime_error("runtime stopped");
         }
 
+        anyps1::RelinkOptions windows_options;
+        windows_options.input = input_path;
+        windows_options.output = windows_output_path;
+        windows_options.target = anyps1::TargetPlatform::Windows;
+        if (!anyps1::relink(windows_options)) {
+            throw std::runtime_error("Windows relink failed");
+        }
+        std::ifstream windows_artifact(windows_output_path, std::ios::binary);
+        std::array<unsigned char, 132> windows_header{};
+        windows_artifact.read(reinterpret_cast<char*>(windows_header.data()), windows_header.size());
+        if (windows_header[0] != 'M' || windows_header[1] != 'Z') {
+            throw std::runtime_error("invalid PE DOS magic");
+        }
+        std::uint32_t pe_offset = static_cast<std::uint32_t>(windows_header[60])
+            | (static_cast<std::uint32_t>(windows_header[61]) << 8)
+            | (static_cast<std::uint32_t>(windows_header[62]) << 16)
+            | (static_cast<std::uint32_t>(windows_header[63]) << 24);
+        if (pe_offset != 128) {
+            throw std::runtime_error("invalid PE offset");
+        }
+        if (windows_header[128] != 'P' || windows_header[129] != 'E') {
+            throw std::runtime_error("invalid PE signature");
+        }
+
         std::ifstream artifact(output_path, std::ios::binary);
         std::array<unsigned char, 52> header{};
         artifact.read(reinterpret_cast<char*>(header.data()), header.size());
@@ -76,10 +101,12 @@ int main()
 
         std::remove(input_path);
         std::remove(output_path);
+        std::remove(windows_output_path);
         return 0;
     } catch (const std::exception& error) {
         std::remove(input_path);
         std::remove(output_path);
+        std::remove(windows_output_path);
         std::cerr << "Relinker test failed: " << error.what() << "\n";
         return 1;
     }

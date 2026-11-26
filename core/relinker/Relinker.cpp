@@ -46,6 +46,108 @@ std::uint32_t read32(const std::vector<unsigned char>& data, std::size_t offset)
         | (static_cast<std::uint32_t>(data[offset + 3]) << 24);
 }
 
+void write_pe_layout(
+    const RelinkOptions& options,
+    const std::vector<unsigned char>& data,
+    std::uint32_t load_address,
+    std::uint32_t file_size
+)
+{
+    std::ofstream output(options.output, std::ios::binary | std::ios::trunc);
+    if (!output) {
+        throw std::runtime_error("cannot open output artifact: " + options.output);
+    }
+
+    const std::uint32_t dos_header_size = 128;
+    const std::uint32_t pe_offset = dos_header_size;
+    const std::uint32_t coff_header_size = 20;
+    const std::uint32_t optional_header_size = 224;
+    const std::uint32_t section_header_size = 40;
+    const std::uint32_t headers_end = pe_offset + 4 + coff_header_size + optional_header_size + section_header_size;
+    const std::uint32_t raw_offset = (headers_end + 511) & ~511u;
+    const std::uint32_t raw_size = (file_size + 511) & ~511u;
+
+    unsigned char dos[64]{};
+    dos[0] = 'M';
+    dos[1] = 'Z';
+    dos[60] = static_cast<unsigned char>(pe_offset);
+    dos[61] = static_cast<unsigned char>(pe_offset >> 8);
+    dos[62] = static_cast<unsigned char>(pe_offset >> 16);
+    dos[63] = static_cast<unsigned char>(pe_offset >> 24);
+    output.write(reinterpret_cast<const char*>(dos), sizeof(dos));
+    output.write(reinterpret_cast<const char*>(dos), 64);
+
+    output.write("PE\0\0", 4);
+    write16(output, 0x0166);
+    write16(output, 1);
+    write32(output, 0);
+    write32(output, 0);
+    write32(output, 0);
+    write16(output, optional_header_size);
+    write16(output, 0x0102);
+
+    write16(output, 0x10B);
+    write16(output, 0);
+    write32(output, file_size);
+    write32(output, 0);
+    write32(output, 0);
+    write32(output, 0x1000);
+    write32(output, 0x00400000);
+    write32(output, 0x1000);
+    write32(output, 0x200);
+    write16(output, 6);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write32(output, raw_offset + raw_size);
+    write32(output, raw_offset);
+    write32(output, 0);
+    write16(output, 3);
+    write16(output, 0);
+    write32(output, 0x100000);
+    write32(output, 0x1000);
+    write32(output, 0x100000);
+    write32(output, 0x1000);
+    write32(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    for (int index = 0; index < 16; ++index) {
+        write32(output, 0);
+        write32(output, 0);
+    }
+
+    output.write(".text\0\0\0", 8);
+    write32(output, file_size);
+    write32(output, 0x1000);
+    write32(output, raw_size);
+    write32(output, raw_offset);
+    write32(output, 0);
+    write32(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write32(output, 0x60000020);
+
+    while (output.tellp() >= 0 && static_cast<std::uint32_t>(output.tellp()) < raw_offset) {
+        output.put('\0');
+    }
+    output.write(
+        reinterpret_cast<const char*>(data.data() + PSX_HEADER_SIZE),
+        static_cast<std::streamsize>(file_size)
+    );
+    while (static_cast<std::uint32_t>(output.tellp()) < raw_offset + raw_size) {
+        output.put('\0');
+    }
+    if (!output) {
+        throw std::runtime_error("failed while writing Windows layout artifact");
+    }
+}
+
 }
 
 bool relink(const RelinkOptions& options)
@@ -85,6 +187,11 @@ bool relink(const RelinkOptions& options)
     }
     if (initial_pc != 0 && (initial_pc < load_address || initial_pc >= load_address + file_size)) {
         throw std::runtime_error("PS-X EXE entry point is outside the executable image");
+    }
+
+    if (options.target == TargetPlatform::Windows) {
+        write_pe_layout(options, data, load_address, file_size);
+        return true;
     }
 
     std::string section_names;
