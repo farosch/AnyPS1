@@ -23,3 +23,9 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
+## Extract a PS1 game
+
+```sh
+python3 tools/extract_psx_game.py "/path/to/Game.cue"
+```
+

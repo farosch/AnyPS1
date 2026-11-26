@@ -11,6 +11,28 @@ PAYLOAD_OFFSET = 24
 PAYLOAD_SIZE = 2048
 
 
+_disc_layout_cache: dict[Path, tuple[int, int]] = {}
+
+
+def detect_sector_layout(image: Path) -> tuple[int, int]:
+    if image in _disc_layout_cache:
+        return _disc_layout_cache[image]
+
+    layouts = (
+        (2352, 24),
+        (2352, 16),
+        (2048, 0),
+    )
+    with image.open("rb") as stream:
+        for sector_size, payload_offset in layouts:
+            stream.seek(16 * sector_size + payload_offset)
+            sector = stream.read(PAYLOAD_SIZE)
+            if len(sector) >= 6 and sector[:6] == b"\x01CD001":
+                _disc_layout_cache[image] = (sector_size, payload_offset)
+                return sector_size, payload_offset
+    raise ValueError("disc image has no ISO 9660 primary volume descriptor")
+
+
 @dataclass(frozen=True)
 class IsoEntry:
     path: str
@@ -20,8 +42,9 @@ class IsoEntry:
 
 
 def read_sector(image: Path, lba: int) -> bytes:
+    sector_size, payload_offset = detect_sector_layout(image)
     with image.open("rb") as stream:
-        stream.seek(lba * SECTOR_SIZE + PAYLOAD_OFFSET)
+        stream.seek(lba * sector_size + payload_offset)
         data = stream.read(PAYLOAD_SIZE)
     if len(data) != PAYLOAD_SIZE:
         raise ValueError(f"incomplete disc sector {lba}")
@@ -98,6 +121,13 @@ def inspect_disc(image: Path) -> tuple[str, list[IsoEntry]]:
     root_size = read_both_endian32(primary, 166)
     entries = list(walk_directory(image, root_lba, root_size))
     return volume_id, entries
+
+
+def primary_volume_size(image: Path) -> int:
+    primary = read_sector(image, 16)
+    if primary[0] != 1 or primary[1:6] != b"CD001":
+        raise ValueError("disc has no ISO 9660 primary volume descriptor")
+    return read_both_endian32(primary, 80)
 
 
 def read_entry(image: Path, entry: IsoEntry) -> bytes:

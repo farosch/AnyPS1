@@ -15,6 +15,7 @@ from analyze_psx_exe import (
     disassemble_range,
     identify_calls,
 )
+from extract_psx_game import parse_cue, safe_output_path
 
 
 class PsxExeHeaderTest(unittest.TestCase):
@@ -106,6 +107,30 @@ class MipsDisassemblerTest(unittest.TestCase):
         self.assertEqual(bios["A0"][0].target, 0xA0000040)
         self.assertEqual(len(hardware["GPU"]), 1)
         self.assertEqual(hardware["GPU"][0].resolved_address, 0x1F801810)
+
+
+class GameExtractionTest(unittest.TestCase):
+    def test_parse_multitrack_cue(self):
+        cue = b'FILE "Game.bin" BINARY\r\n  TRACK 01 MODE2/2352\r\nFILE "Audio.bin" BINARY\r\n  TRACK 02 AUDIO\r\n'
+        with __import__("tempfile").TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "Game.bin").write_bytes(b"")
+            (root / "Audio.bin").write_bytes(b"")
+            (root / "Game.cue").write_bytes(cue)
+
+            tracks = parse_cue(root / "Game.cue")
+
+            self.assertEqual(len(tracks), 2)
+            self.assertEqual(tracks[0].number, 1)
+            self.assertEqual(tracks[0].mode, "MODE2/2352")
+            self.assertEqual(tracks[1].number, 2)
+            self.assertEqual(tracks[1].mode, "AUDIO")
+
+    def test_rejects_parent_traversal_path(self):
+        with __import__("tempfile").TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaises(ValueError):
+                safe_output_path(root, "../escape.bin")
 
 
 if __name__ == "__main__":
