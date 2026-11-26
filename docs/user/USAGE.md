@@ -38,10 +38,12 @@ The resulting layout is:
 
 ```text
 extracted/
-  disc.iso
-  filesystem/
-  SYSTEM.CNF
-  boot/
+  disc1/
+    disc.iso
+    filesystem/
+    SYSTEM.CNF
+    boot/
+    game.json
   game.json
 ```
 

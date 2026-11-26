@@ -251,39 +251,36 @@ def main() -> int:
 
     try:
         cue_paths = [cue.resolve() for cue in args.cue]
-        if len(cue_paths) == 1:
-            output = args.output if args.output else cue_paths[0].parent / "extracted"
-            manifest = extract_game(cue_paths[0], output)
-            manifests = [manifest]
-        else:
-            output = args.output if args.output else cue_paths[0].parent / "extracted"
-            manifests = []
-            for index, cue_path in enumerate(cue_paths, start=1):
-                disc_output = output / f"disc{index}"
-                manifests.append(extract_game(cue_path, disc_output))
-            (output / "game.json").write_text(
-                json.dumps(
-                    {
-                        "format": "AnyPS1 multi-disc extraction",
-                        "cue_count": len(cue_paths),
-                        "discs": [
-                            {
-                                "number": index,
-                                "volume_id": manifest["volume_id"],
-                                "cue": manifest["cue"],
-                                "disc_iso": manifest["disc_iso"],
-                                "filesystem": manifest["filesystem"],
-                                "boot_entry": manifest["boot_entry"],
-                                "boot_executable": manifest["boot_executable"],
-                                "extracted_files": manifest["extracted_files"],
-                            }
-                            for index, manifest in enumerate(manifests, start=1)
-                        ],
-                    },
-                    indent=2,
-                ) + "\n",
-                encoding="utf-8",
-            )
+        output = args.output if args.output else cue_paths[0].parent / "extracted"
+        manifests = []
+        for index, cue_path in enumerate(cue_paths, start=1):
+            disc_output = output / f"disc{index}"
+            manifests.append(extract_game(cue_path, disc_output))
+        (output / "game.json").write_text(
+            json.dumps(
+                {
+                    "format": "AnyPS1 extraction",
+                    "disc_count": len(cue_paths),
+                    "discs": [
+                        {
+                            "number": index,
+                            "volume_id": manifest["volume_id"],
+                            "cue": manifest["cue"],
+                            "disc_iso": manifest["disc_iso"],
+                            "filesystem": manifest["filesystem"],
+                            "system_cnf": manifest["system_cnf"],
+                            "boot_entry": manifest["boot_entry"],
+                            "boot_executable": manifest["boot_executable"],
+                            "boot_header": manifest["boot_header"],
+                            "extracted_files": manifest["extracted_files"],
+                        }
+                        for index, manifest in enumerate(manifests, start=1)
+                    ],
+                },
+                indent=2,
+            ) + "\n",
+            encoding="utf-8",
+        )
         for manifest in manifests:
             print(f"Volume: {manifest['volume_id']}")
             print(f"Boot executable: {manifest['boot_entry']}")
