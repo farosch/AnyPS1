@@ -9,4 +9,4 @@ build-*/
 *.dll
 *.so
 *.dylib
-
+/references/
