@@ -13,6 +13,7 @@ The implementation decodes PS-X EXE structures, analyzes references and entry po
 ## Layout
 
 - `core/relinker`: executable decoding and relinking implementation
+- `core/anyps1.cpp`: main command-line and runtime application
 - `core/libs`: platform and system-library compatibility modules
 - `tools`: command-line and analysis utilities
 - `cmake`: CMake helpers and dependency integration

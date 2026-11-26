@@ -17,7 +17,7 @@ add_subdirectory(3rdparty/SDL)
 add_subdirectory(core/relinker)
 
 add_executable(anyps1
-    tools/anyps1.cpp
+    core/anyps1.cpp
 )
 
 target_include_directories(anyps1 PRIVATE core)
