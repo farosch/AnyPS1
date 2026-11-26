@@ -292,11 +292,26 @@ public:
                 break;
             case 0x10:
             case 0x11:
+                {
+                    std::uint32_t cop0_rs = rs;
+                    std::uint32_t cop0_rt = rt;
+                    std::uint32_t cop0_rd = rd;
+                    if (cop0_rs == 0) {
+                        regs_[cop0_rt] = cop0_[cop0_rd];
+                    } else if (cop0_rs == 4) {
+                        cop0_[cop0_rd] = regs_[cop0_rt];
+                    } else {
+                        unsupported_ = "unsupported COP0 operation";
+                        return false;
+                    }
+                }
                 break;
             case 0x12:
-                break;
+                unsupported_ = "COP2/GTE instruction is not implemented";
+                return false;
             case 0x13:
-                break;
+                unsupported_ = "COP3 instruction is not implemented";
+                return false;
             default:
                 unsupported_ = "unsupported MIPS opcode";
                 return false;
@@ -331,6 +346,7 @@ public:
 
 private:
     std::array<std::uint32_t, 32> regs_{};
+    std::array<std::uint32_t, 32> cop0_{};
     std::array<unsigned char, 2 * 1024 * 1024> ram_{};
     std::array<unsigned char, 1024> scratchpad_{};
     std::uint32_t pc_ = 0;
