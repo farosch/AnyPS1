@@ -16,7 +16,7 @@ The implementation decodes PS-X EXE structures, analyzes references and entry po
 - `core/libs`: platform and system-library compatibility modules
 - `tools`: command-line and analysis utilities
 - `cmake`: CMake helpers and dependency integration
-- `RUNTIME_GAPS.md`: known runtime gaps
+- `TODO.md`: known implementation gaps and validation work
 - `demo`: web or native demonstrations
 - `tests`: integration and unit tests
 - `3rdparty`: third-party dependencies managed as submodules

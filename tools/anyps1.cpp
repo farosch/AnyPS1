@@ -6,6 +6,19 @@
 
 int main(int argc, char** argv)
 {
+    if (argc == 5 && std::string(argv[1]) == "--run-disc") {
+        anyps1::RunOptions options;
+        options.input = argv[2];
+        options.cdrom_bin = argv[3];
+        options.max_instructions = std::stoull(argv[4]);
+        try {
+            if (!anyps1::run_psx(options)) return 1;
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "Error: " << error.what() << "\n";
+            return 1;
+        }
+    }
     if (argc == 4 && std::string(argv[1]) == "--run-video") {
         anyps1::RunOptions options;
         options.input = argv[2];

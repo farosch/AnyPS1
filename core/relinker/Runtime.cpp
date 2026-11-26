@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cstdio>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <cstdlib>
@@ -36,7 +37,11 @@ std::uint32_t sign16(std::uint32_t value)
 
 class PsxCpu {
 public:
-    explicit PsxCpu(const std::vector<unsigned char>& exe)
+    explicit PsxCpu(
+        const std::vector<unsigned char>& exe,
+        const std::string& cdrom_bin = {},
+        const std::string& bios = {}
+    )
     {
         if (exe.size() < 2048 || std::memcmp(exe.data(), "PS-X EXE", 8) != 0) {
             throw std::runtime_error("input is not a PS-X EXE");
@@ -54,6 +59,26 @@ public:
             throw std::runtime_error("PS-X executable section is truncated");
         }
         std::memcpy(ram_.data() + (load_address_ & 0x001FFFFF), exe.data() + 2048, file_size_);
+        if (!cdrom_bin.empty()) {
+            std::ifstream disc(cdrom_bin, std::ios::binary);
+            cdrom_data.assign(
+                std::istreambuf_iterator<char>(disc),
+                std::istreambuf_iterator<char>()
+            );
+            if (!disc && cdrom_data.empty()) {
+                throw std::runtime_error("cannot open CD-ROM BIN: " + cdrom_bin);
+            }
+        }
+        if (!bios.empty()) {
+            std::ifstream image(bios, std::ios::binary);
+            bios_rom.assign(
+                std::istreambuf_iterator<char>(image),
+                std::istreambuf_iterator<char>()
+            );
+            if (!image && bios_rom.empty()) {
+                throw std::runtime_error("cannot open PS1 BIOS: " + bios);
+            }
+        }
         regs_[29] = sp_base_ + sp_offset_;
         ram_[0x474] = 0x00;
         ram_[0x475] = 0xF0;
@@ -63,13 +88,6 @@ public:
         ram_[0x1FF001] = 0x80;
         ram_[0x1FF004] = 0x08;
         ram_[0x1FF005] = 0x20;
-        write_ram32(0x00100000, 0);
-        write_ram32(0x00100004, 0);
-        write_ram32(0x00100008, 0);
-        write_ram32(0x00A9B30, 0x80001000);
-        write_ram32(0x00A9B34, 0x80001004);
-        write_ram32(0x00A9B38, 0x80001008);
-        write_ram32(0x003D374, 0);
     }
 
     bool step()
@@ -91,6 +109,12 @@ public:
             return true;
         }
         if (pc_ <= 0x00000100) {
+            if (cop0_[14] != 0) {
+                pc_ = cop0_[14];
+                cop0_[12] = (cop0_[12] & ~0x0Fu) | ((cop0_[12] >> 2) & 0x0Fu);
+                cop0_[14] = 0;
+                return true;
+            }
             if (regs_[31] == 0) {
                 return false;
             }
@@ -99,8 +123,8 @@ public:
         }
 
         if (!in_ram(pc_) && pc_ != 0) {
-            unsupported_ = "PC outside PS1 RAM";
-            return false;
+            raise_exception(4);
+            return true;
         }
 
         std::uint32_t instruction = read_ram32(pc_);
@@ -187,8 +211,32 @@ public:
             case 0x21:
                 regs_[rd] = regs_[rs] + regs_[rt];
                 break;
+            case 0x20:
+                {
+                    const std::int64_t sum =
+                        static_cast<std::int64_t>(static_cast<std::int32_t>(regs_[rs]))
+                        + static_cast<std::int64_t>(static_cast<std::int32_t>(regs_[rt]));
+                    if (sum < -2147483648LL || sum > 2147483647LL) {
+                        raise_exception(12);
+                    } else {
+                        regs_[rd] = static_cast<std::uint32_t>(static_cast<std::int32_t>(sum));
+                    }
+                }
+                break;
             case 0x23:
                 regs_[rd] = regs_[rs] - regs_[rt];
+                break;
+            case 0x22:
+                {
+                    const std::int64_t difference =
+                        static_cast<std::int64_t>(static_cast<std::int32_t>(regs_[rs]))
+                        - static_cast<std::int64_t>(static_cast<std::int32_t>(regs_[rt]));
+                    if (difference < -2147483648LL || difference > 2147483647LL) {
+                        raise_exception(12);
+                    } else {
+                        regs_[rd] = static_cast<std::uint32_t>(static_cast<std::int32_t>(difference));
+                    }
+                }
                 break;
             case 0x24:
                 regs_[rd] = regs_[rs] & regs_[rt];
@@ -256,7 +304,18 @@ public:
                 break;
             case 0x08:
             case 0x09:
-                regs_[rt] = regs_[rs] + sign16(immediate);
+                if (opcode == 0x08) {
+                    const std::int64_t sum =
+                        static_cast<std::int64_t>(static_cast<std::int32_t>(regs_[rs]))
+                        + static_cast<std::int64_t>(static_cast<std::int32_t>(sign16(immediate)));
+                    if (sum < -2147483648LL || sum > 2147483647LL) {
+                        raise_exception(12);
+                    } else {
+                        regs_[rt] = static_cast<std::uint32_t>(static_cast<std::int32_t>(sum));
+                    }
+                } else {
+                    regs_[rt] = regs_[rs] + sign16(immediate);
+                }
                 break;
             case 0x0A:
                 regs_[rt] = static_cast<std::int32_t>(regs_[rs]) < static_cast<std::int32_t>(sign16(immediate));
@@ -337,7 +396,14 @@ public:
                     if (cop0_rs == 0) {
                         regs_[cop0_rt] = cop0_[cop0_rd];
                     } else if (cop0_rs == 4) {
-                        cop0_[cop0_rd] = regs_[cop0_rt];
+                        if (cop0_rd == 12) {
+                            cop0_[12] = regs_[cop0_rt] & 0x003FFFFFu;
+                        } else if (cop0_rd == 13) {
+                            cop0_[13] = (cop0_[13] & ~0x300u)
+                                | (regs_[cop0_rt] & 0x300u);
+                        } else {
+                            cop0_[cop0_rd] = regs_[cop0_rt];
+                        }
                     } else if (cop0_rs == 16) {
                         cop0_[12] = ((cop0_[12] & ~0x0Fu) | ((cop0_[12] >> 2) & 0x0Fu));
                     } else {
@@ -401,17 +467,32 @@ public:
     void tick_frame()
     {
         interrupt_status |= 1;
+        for (std::uint32_t voice = 0; voice < 24; ++voice) {
+            if (spu_key_on & (1u << voice)) {
+                ++spu_voice_counter[voice];
+                if (spu_voice_phase[voice] == 1 && spu_voice_counter[voice] >= 4) {
+                    spu_voice_phase[voice] = 2;
+                    spu_voice_adsr[voice] = 0xF000;
+                } else if (spu_voice_phase[voice] == 2 && spu_voice_counter[voice] >= 8) {
+                    spu_voice_phase[voice] = 3;
+                    spu_voice_adsr[voice] = 0x8000;
+                }
+            } else if (spu_voice_phase[voice] == 4) {
+                spu_voice_adsr[voice] = spu_voice_adsr[voice] > 0x400
+                    ? spu_voice_adsr[voice] - 0x400 : 0;
+                if (spu_voice_adsr[voice] == 0) {
+                    spu_voice_phase[voice] = 0;
+                }
+            }
+        }
         for (std::uint32_t event = 0; event < bios_events.size(); ++event) {
             if (bios_events[event] & 2
+                && bios_event_classes[event] == 0xF0000001
                 && bios_event_specs[event] == 1
                 && bios_event_modes[event] == 0x2000) {
                 bios_event_flags[event] = 0x4000;
             }
         }
-        write_ram32(0x00100000, read_ram32(0x00100000) + 1);
-        write_ram32(0x00100004, read_ram32(0x00100004) + 1);
-        write_ram32(0x00100008, read_ram32(0x00100008));
-        write_ram32(0x003D374, read_ram32(0x003D374) + 1);
         for (std::uint32_t timer = 0; timer < timer_count.size(); ++timer) {
             const std::uint32_t increment = (timer == 2 && (timer_mode[timer] & 0x200) != 0) ? 0 : 1;
             timer_count[timer] += increment;
@@ -445,12 +526,37 @@ public:
             std::int32_t right = 0;
             for (std::uint32_t voice = 0; voice < 24; ++voice) {
                 if ((spu_key_on & (1u << voice)) != 0) {
-                    const std::uint32_t address =
-                        (spu_voice_start[voice] * 8u + voice * 16u) & (spu_ram.size() - 1);
-                    const std::int16_t sample =
-                        static_cast<std::int16_t>(spu_ram[address] | (spu_ram[address + 1] << 8));
+                    const std::uint32_t block_address = spu_voice_address[voice] & (spu_ram.size() - 1);
+                    const std::uint32_t block_flags = spu_ram[block_address];
+                    const std::uint32_t shift = block_flags & 15;
+                    const std::uint32_t filter = (block_flags >> 4) & 3;
+                    const std::uint32_t sample_index = spu_voice_block_sample[voice];
+                    const std::uint32_t nibble_index = sample_index & 1;
+                    const std::uint32_t nibble =
+                        (spu_ram[block_address + 2 + (sample_index >> 1)]
+                            >> (nibble_index ? 4 : 0)) & 15;
+                    std::int32_t raw = nibble & 8
+                        ? static_cast<std::int32_t>(nibble | 0xFFFFFFF0)
+                        : static_cast<std::int32_t>(nibble);
+                    std::int64_t base = (static_cast<std::int64_t>(raw) << std::min(shift, 12u));
+                    static const std::int32_t f1[4]{0, 60, 115, 98};
+                    static const std::int32_t f2[4]{0, 0, -52, -55};
+                    base += (spu_voice_previous1[voice] * f1[filter] + spu_voice_previous2[voice] * f2[filter]) / 64;
+                    base = std::clamp<std::int64_t>(base, -32768, 32767);
+                    spu_voice_previous2[voice] = spu_voice_previous1[voice];
+                    spu_voice_previous1[voice] = static_cast<std::int32_t>(base);
+                    const std::int16_t sample = static_cast<std::int16_t>(base);
                     left += sample * (spu_voice_volume_l[voice] & 0x3FFF) / 0x4000;
                     right += sample * (spu_voice_volume_r[voice] & 0x3FFF) / 0x4000;
+                    ++spu_voice_block_sample[voice];
+                    if (spu_voice_block_sample[voice] == 28) {
+                        spu_voice_block_sample[voice] = 0;
+                        spu_voice_address[voice] += 16;
+                        if (spu_ram[block_address] & 1) {
+                            spu_voice_address[voice] =
+                                spu_voice_repeat_address[voice] ? spu_voice_repeat_address[voice] : block_address;
+                        }
+                    }
                 }
             }
             left = std::clamp(left, -32768, 32767);
@@ -479,6 +585,7 @@ private:
     std::array<unsigned char, 2 * 1024 * 1024> ram_{};
     std::array<unsigned char, 1024> scratchpad_{};
     std::array<std::uint16_t, 1024 * 512> vram_{};
+    std::vector<unsigned char> bios_rom;
     std::array<std::uint32_t, 16> gp0_params_{};
     std::uint32_t gp0_param_count = 0;
     std::uint32_t gp0_expected = 0;
@@ -498,6 +605,29 @@ private:
     std::uint32_t gpu_status = 0x1C000000;
     std::uint64_t gpu_write_count = 0;
     std::uint64_t gpu_vram_write_count = 0;
+    std::uint32_t gpuread = 0;
+    std::array<std::uint32_t, 4> gpu_read_fifo{};
+    std::uint32_t gpu_read_count = 0;
+    std::uint32_t gpu_read_cursor = 0;
+    std::uint32_t gpu_read_remaining = 0;
+    std::uint32_t gpu_read_x = 0;
+    std::uint32_t gpu_read_y = 0;
+    std::uint32_t gpu_read_width = 0;
+    std::uint32_t gpu_read_height = 0;
+    std::uint32_t gpu_draw_x1 = 0;
+    std::uint32_t gpu_draw_y1 = 0;
+    std::uint32_t gpu_draw_x2 = 1024;
+    std::uint32_t gpu_draw_y2 = 512;
+    std::uint32_t gpu_tex_window_x = 0;
+    std::uint32_t gpu_tex_window_y = 0;
+    std::uint32_t gpu_tex_window_mask_x = 0;
+    std::uint32_t gpu_tex_window_mask_y = 0;
+    std::uint32_t gpu_tex_window_offset_x = 0;
+    std::uint32_t gpu_tex_window_offset_y = 0;
+    std::uint32_t gpu_draw_offset_x = 0;
+    std::uint32_t gpu_draw_offset_y = 0;
+    std::uint32_t gpu_mask_set = 0;
+    std::uint32_t gpu_mask_keep = 0;
     std::uint32_t spu_dma_word = 0;
     std::array<std::uint32_t, 7> dma_madr{};
     std::array<std::uint32_t, 7> dma_bcr{};
@@ -518,6 +648,7 @@ private:
     std::uint32_t joy_rx_count = 0;
     std::uint32_t joy_rx_cursor = 0;
     std::array<std::uint32_t, 16> bios_events{};
+    std::array<std::uint32_t, 16> bios_event_classes{};
     std::array<std::uint32_t, 16> bios_event_specs{};
     std::array<std::uint32_t, 16> bios_event_modes{};
     std::array<std::uint32_t, 16> bios_event_flags{};
@@ -530,12 +661,23 @@ private:
     std::array<unsigned char, 32> cdrom_response{};
     std::uint32_t cdrom_response_count = 0;
     std::uint32_t cdrom_response_cursor = 0;
+    std::vector<unsigned char> cdrom_data;
+    std::uint32_t cdrom_lba = 0;
+    std::uint32_t cdrom_sector_size = 2352;
+    bool cdrom_read_active = false;
     std::array<unsigned char, 512 * 1024> spu_ram{};
     std::array<std::uint32_t, 24> spu_voice_start{};
     std::array<std::uint32_t, 24> spu_voice_repeat{};
     std::array<std::uint16_t, 24> spu_voice_volume_l{};
     std::array<std::uint16_t, 24> spu_voice_volume_r{};
     std::array<std::uint16_t, 24> spu_voice_adsr{};
+    std::array<std::uint32_t, 24> spu_voice_address{};
+    std::array<std::uint32_t, 24> spu_voice_repeat_address{};
+    std::array<std::uint32_t, 24> spu_voice_phase{};
+    std::array<std::uint32_t, 24> spu_voice_counter{};
+    std::array<std::int32_t, 24> spu_voice_previous1{};
+    std::array<std::int32_t, 24> spu_voice_previous2{};
+    std::array<std::uint32_t, 24> spu_voice_block_sample{};
     std::uint32_t spu_control = 0;
     std::uint32_t spu_status = 0;
     std::uint32_t spu_main_volume_l = 0;
@@ -578,7 +720,37 @@ bool run_psx(const RunOptions& options)
         std::istreambuf_iterator<char>(input),
         std::istreambuf_iterator<char>()
     };
-    PsxCpu cpu(exe);
+    std::string cdrom_bin = options.cdrom_bin;
+    if (cdrom_bin.empty()) {
+        std::filesystem::path input_path(options.input);
+        for (std::filesystem::path directory = input_path.parent_path();
+             !directory.empty();
+             directory = directory.parent_path()) {
+            for (const std::filesystem::directory_entry& entry :
+                 std::filesystem::directory_iterator(directory)) {
+                if (entry.is_regular_file()
+                    && entry.path().extension() == ".bin"
+                    && entry.path().filename().string().find("(Track") == std::string::npos) {
+                    cdrom_bin = entry.path().string();
+                    break;
+                }
+            }
+            if (!cdrom_bin.empty()) {
+                break;
+            }
+            if (directory == directory.parent_path()) {
+                break;
+            }
+        }
+    }
+    std::string bios = options.bios;
+    if (bios.empty()) {
+        std::filesystem::path bios_candidate("references/firmware-psx-bios/scph5501.bin");
+        if (std::filesystem::is_regular_file(bios_candidate)) {
+            bios = bios_candidate.string();
+        }
+    }
+    PsxCpu cpu(exe, cdrom_bin, bios);
     std::unique_ptr<HostVideo> video;
     std::unique_ptr<HostAudio> audio = std::make_unique<HostAudio>();
     if (options.video) {

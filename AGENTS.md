@@ -7,7 +7,7 @@ AnyPS1 converts PlayStation 1 executable images into native Linux or Windows pro
 - Functions must never fail silently; report or return errors through the
   appropriate exception, return value, log, or caller-visible result.
 - Put third-party code under `3rdparty/<name>` as a submodule.
-- Keep known format and platform gaps in `RUNTIME_GAPS.md`.
+- Keep known format and platform gaps in `TODO.md`.
 - Use Conventional Commit subjects.
 - Build and test changes with CMake and CTest.
 
@@ -32,5 +32,5 @@ AnyPS1 converts PlayStation 1 executable images into native Linux or Windows pro
 3. Add or update checked-in fixtures for tests that consume executable, disc,
    header, CUE, or other external file data.
 4. Build and run tests before submitting changes.
-5. Document format or platform gaps in `RUNTIME_GAPS.md`.
+5. Document format or platform gaps in `TODO.md`.
 

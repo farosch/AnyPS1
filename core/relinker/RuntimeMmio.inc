@@ -39,8 +39,24 @@
                 gp0_store(read_ram32(address | 0x80000000));
             } else if (channel == 4) {
                 spu_dma_write(address);
+            } else if (channel == 1) {
+            } else if (channel == 3 && cdrom_read_active) {
+                const std::uint64_t disc_offset =
+                    static_cast<std::uint64_t>(cdrom_lba) * 2352ULL;
+                const std::uint64_t sector_offset =
+                    disc_offset + 24ULL + static_cast<std::uint64_t>(index) * 4ULL;
+                if (sector_offset + 4 <= cdrom_data.size()) {
+                    write_ram32(address,
+                        static_cast<std::uint32_t>(cdrom_data[sector_offset])
+                        | (static_cast<std::uint32_t>(cdrom_data[sector_offset + 1]) << 8)
+                        | (static_cast<std::uint32_t>(cdrom_data[sector_offset + 2]) << 16)
+                        | (static_cast<std::uint32_t>(cdrom_data[sector_offset + 3]) << 24));
+                }
             }
             address = (address + 4) & 0x00FFFFFF;
+        }
+        if (channel == 3 && cdrom_read_active) {
+            ++cdrom_lba;
         }
         dma_chcr[channel] &= ~0x01000000u;
         interrupt_status |= (1u << 3);
@@ -89,6 +105,12 @@
     {
         if (address < ram_.size()) {
             spu_dma_word = read_ram32(address | 0x80000000);
+            std::uint32_t spu_offset = spu_dma_address * 8u;
+            for (std::uint32_t byte = 0; byte < 4; ++byte) {
+                spu_ram[(spu_offset + byte) & (spu_ram.size() - 1)]
+                    = static_cast<unsigned char>(spu_dma_word >> (byte * 8));
+            }
+            spu_dma_address = (spu_dma_address + 1) & 0x7FFF;
         }
     }
 
@@ -100,10 +122,39 @@
         if (byte == 0x01) {
             joy_rx[joy_rx_count++] = 0xFF;
         } else if (byte == 0x42) {
-            joy_rx[joy_rx_count++] = 0x41;
+            if ((joy_ctrl & 0x2000) != 0) {
+                joy_rx[joy_rx_count++] = 0x73;
+                joy_rx[joy_rx_count++] = 0x5A;
+                joy_rx[joy_rx_count++] = 0x01;
+                joy_rx[joy_rx_count++] = 0x02;
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
+                joy_rx[joy_rx_count++] = 0x80;
+                joy_rx[joy_rx_count++] = 0x80;
+            } else {
+                joy_rx[joy_rx_count++] = 0x41;
+                joy_rx[joy_rx_count++] = 0x5A;
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
+            }
+        } else if (byte == 0x43) {
+            joy_rx[joy_rx_count++] = 0xF3;
             joy_rx[joy_rx_count++] = 0x5A;
-            joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
-            joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
+            joy_rx[joy_rx_count++] = 0x01;
+            joy_rx[joy_rx_count++] = 0x02;
+        } else if (byte == 0x44) {
+            joy_ctrl |= 0x2000;
+            joy_rx[joy_rx_count++] = 0xF3;
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = 0x01;
+            joy_rx[joy_rx_count++] = 0x02;
+        } else if (byte == 0x81) {
+            joy_rx[joy_rx_count++] = 0xFF;
+        } else if (byte == 0x52) {
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = 0x5D;
+            joy_rx[joy_rx_count++] = 0x00;
+            joy_rx[joy_rx_count++] = 0x00;
         }
         joy_stat |= 0x00000004;
     }
@@ -129,15 +180,30 @@
             cdrom_set_response(cdrom_status);
             break;
         case 0x02:
+            if (cdrom_params[0] != 0 && cdrom_params[0] <= 0x99) {
+                const std::uint32_t minute = (cdrom_params[0] >> 4) * 10 + (cdrom_params[0] & 15);
+                const std::uint32_t second = (cdrom_params[1] >> 4) * 10 + (cdrom_params[1] & 15);
+                const std::uint32_t frame = (cdrom_params[2] >> 4) * 10 + (cdrom_params[2] & 15);
+                cdrom_lba = minute * 60 * 75 + second * 75 + frame;
+                cdrom_status |= 1;
+            }
             cdrom_set_response(cdrom_status);
             break;
         case 0x06:
-            cdrom_set_response(cdrom_status, 0);
+            cdrom_read_active = true;
+            cdrom_status |= 0x20;
+            cdrom_set_response(cdrom_status);
+            break;
+        case 0x1B:
+            cdrom_read_active = true;
+            cdrom_status |= 0x20;
+            cdrom_set_response(cdrom_status);
             break;
         case 0x08:
             cdrom_set_response(cdrom_status);
             break;
         case 0x09:
+            cdrom_read_active = false;
             cdrom_set_response(cdrom_status);
             cdrom_status = 0;
             break;
@@ -145,11 +211,14 @@
             cdrom_set_response(cdrom_status);
             cdrom_status |= 0x20;
             break;
-        case 0x0C:
-            cdrom_status |= 1;
+        case 0x0E:
+            if (cdrom_params[0] & 0x20) cdrom_sector_size = 2340;
+            else if (cdrom_params[0] & 0x80) cdrom_sector_size = 2336;
+            else cdrom_sector_size = 2048;
             cdrom_set_response(cdrom_status);
             break;
-        case 0x0E:
+        case 0x0C:
+            cdrom_status |= 1;
             cdrom_set_response(cdrom_status);
             break;
         case 0x14:
@@ -259,10 +328,20 @@
                 for (std::uint32_t voice = 0; voice < 24; ++voice) {
                     if (spu_key_on & (1u << voice)) {
                         spu_voice_adsr[voice] = 0x4000;
+                        spu_voice_phase[voice] = 1;
+                        spu_voice_counter[voice] = 0;
+                        spu_voice_address[voice] = spu_voice_start[voice] * 8u;
+                        spu_voice_repeat_address[voice] = spu_voice_repeat[voice] * 8u;
                     }
                 }
             } else if (offset == 0xD90) {
                 spu_key_off = value;
+                for (std::uint32_t voice = 0; voice < 24; ++voice) {
+                    if (spu_key_off & (1u << voice)) {
+                        spu_voice_phase[voice] = 4;
+                        spu_key_on &= ~(1u << voice);
+                    }
+                }
             } else if (offset < 0x180) {
                 const std::uint32_t voice = offset / 16;
                 const std::uint32_t voice_offset = offset % 16;
@@ -345,7 +424,29 @@
             return true;
         }
         if (physical == 0x1F801810) {
-            value = 0;
+            if (gpu_read_remaining != 0) {
+                if (gpu_read_cursor < gpu_read_width * gpu_read_height) {
+                    const std::uint32_t x = gpu_read_x + gpu_read_cursor % gpu_read_width;
+                    const std::uint32_t y = gpu_read_y + gpu_read_cursor / gpu_read_width;
+                    const std::uint16_t low = (x < 1024 && y < 512) ? vram_[y * 1024 + x] : 0;
+                    ++gpu_read_cursor;
+                    --gpu_read_remaining;
+                    if (gpu_read_cursor < gpu_read_width * gpu_read_height) {
+                        const std::uint32_t x2 = gpu_read_x + gpu_read_cursor % gpu_read_width;
+                        const std::uint32_t y2 = gpu_read_y + gpu_read_cursor / gpu_read_width;
+                        const std::uint16_t high = (x2 < 1024 && y2 < 512) ? vram_[y2 * 1024 + x2] : 0;
+                        ++gpu_read_cursor;
+                        --gpu_read_remaining;
+                        value = static_cast<std::uint32_t>(low) | (static_cast<std::uint32_t>(high) << 16);
+                    } else {
+                        value = low;
+                    }
+                } else {
+                    value = 0;
+                }
+            } else {
+                value = gpuread;
+            }
             return true;
         }
         if (physical == 0x1F801814) {

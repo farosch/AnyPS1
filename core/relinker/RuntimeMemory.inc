@@ -36,8 +36,9 @@
                 for (; handle < bios_events.size(); ++handle) {
                     if (bios_events[handle] == 0) {
                         bios_events[handle] = 1;
-                        bios_event_specs[handle] = regs_[4];
-                        bios_event_modes[handle] = regs_[5];
+                        bios_event_classes[handle] = regs_[4];
+                        bios_event_specs[handle] = regs_[5];
+                        bios_event_modes[handle] = regs_[6];
                         bios_event_flags[handle] = 0x1000;
                         break;
                     }
@@ -126,15 +127,22 @@
     bool in_ram(std::uint32_t address) const
     {
         address &= 0x1FFFFFFF;
+        if (address >= 0x1FC00000 && address - 0x1FC00000 < bios_rom.size()) {
+            return true;
+        }
         return address < ram_.size();
     }
 
     std::uint32_t read_ram32(std::uint32_t address) const
     {
         address &= 0x1FFFFFFF;
-        if (address == 0x00A9B30) return 0x80001000;
-        if (address == 0x00A9B34) return 0x80001004;
-        if (address == 0x00A9B38) return 0x80001008;
+        if (address >= 0x1FC00000 && address - 0x1FC00000 + 4 <= bios_rom.size()) {
+            const std::uint32_t offset = address - 0x1FC00000;
+            return static_cast<std::uint32_t>(bios_rom[offset])
+                | (static_cast<std::uint32_t>(bios_rom[offset + 1]) << 8)
+                | (static_cast<std::uint32_t>(bios_rom[offset + 2]) << 16)
+                | (static_cast<std::uint32_t>(bios_rom[offset + 3]) << 24);
+        }
         return static_cast<std::uint32_t>(ram_[address])
             | (static_cast<std::uint32_t>(ram_[address + 1]) << 8)
             | (static_cast<std::uint32_t>(ram_[address + 2]) << 16)
@@ -257,8 +265,8 @@
     bool load_half(std::uint32_t address, std::uint32_t reg, bool unsigned_value)
     {
         if (address & 1) {
-            unsupported_ = "unaligned 16-bit load";
-            return false;
+            raise_exception(4);
+            return true;
         }
         if (in_ram(address) && in_ram(address + 1)) {
             std::uint32_t value = ram_[address & 0x1FFFFFFF]
@@ -282,8 +290,8 @@
     bool load_word(std::uint32_t address, std::uint32_t reg)
     {
         if (address & 3) {
-            unsupported_ = "unaligned 32-bit load";
-            return false;
+            raise_exception(4);
+            return true;
         }
         if (in_ram(address) && in_ram(address + 3)) {
             pending_load_register_ = reg;
@@ -314,8 +322,8 @@
     bool store_half(std::uint32_t address, std::uint32_t value)
     {
         if (address & 1) {
-            unsupported_ = "unaligned 16-bit store";
-            return false;
+            raise_exception(5);
+            return true;
         }
         if (in_ram(address) && in_ram(address + 1)) {
             ram_[address & 0x1FFFFFFF] = static_cast<unsigned char>(value);
@@ -328,13 +336,10 @@
     bool store_word(std::uint32_t address, std::uint32_t value)
     {
         if (address & 3) {
-            unsupported_ = "unaligned 32-bit store";
-            return false;
-        }
-        address &= 0x1FFFFFFF;
-        if (address == 0x00A9B30 || address == 0x00A9B34 || address == 0x00A9B38) {
+            raise_exception(5);
             return true;
         }
+        address &= 0x1FFFFFFF;
         if (in_ram(address) && in_ram(address + 3)) {
             address &= 0x1FFFFFFF;
             ram_[address] = static_cast<unsigned char>(value);

@@ -191,6 +191,16 @@
                 gp0_expected = (opcode & 0x04) != 0 ? 3 : 2;
             } else if (opcode == 0xA0) {
                 gp0_expected = 2;
+            } else if (opcode == 0xC0) {
+                gp0_expected = 2;
+            } else if (opcode == 0x80) {
+                gp0_expected = 3;
+            } else if (opcode == 0xE1) {
+                gp0_expected = 1;
+            } else if (opcode == 0xE2) {
+                gp0_expected = 1;
+            } else if (opcode == 0xE3 || opcode == 0xE4 || opcode == 0xE5 || opcode == 0xE6) {
+                gp0_expected = 1;
             } else if (opcode == 0xE1) {
                 gp0_expected = 1;
             } else if (opcode == 0xE3 || opcode == 0xE4) {
@@ -283,6 +293,51 @@
             gp0_transfer_cursor = 0;
             gp0_transfer_remaining = gp0_transfer_width * gp0_transfer_height;
             gpu_status &= ~0x04000000u;
+        } else if (opcode == 0xC0) {
+            gpu_read_x = gp0_params_[0] & 0xFFFF;
+            gpu_read_y = gp0_params_[0] >> 16;
+            gpu_read_width = gp0_params_[1] & 0xFFFF;
+            gpu_read_height = gp0_params_[1] >> 16;
+            gpu_read_remaining = gpu_read_width * gpu_read_height;
+            gpu_read_cursor = 0;
+            gpu_status |= 0x08000000u;
+        } else if (opcode == 0x80) {
+            const std::uint32_t source_x = gp0_params_[0] & 0xFFFF;
+            const std::uint32_t source_y = gp0_params_[0] >> 16;
+            const std::uint32_t destination_x = gp0_params_[1] & 0xFFFF;
+            const std::uint32_t destination_y = gp0_params_[1] >> 16;
+            const std::uint32_t width = gp0_params_[2] & 0xFFFF;
+            const std::uint32_t height = gp0_params_[2] >> 16;
+            for (std::uint32_t y = 0; y < height; ++y) {
+                for (std::uint32_t x = 0; x < width; ++x) {
+                    if ((source_x + x) < 1024 && (source_y + y) < 512
+                        && (destination_x + x) < 1024 && (destination_y + y) < 512) {
+                        vram_[(destination_y + y) * 1024 + destination_x + x]
+                            = vram_[(source_y + y) * 1024 + source_x + x];
+                    }
+                }
+            }
+        } else if (opcode == 0xE1) {
+            gpu_status = (gpu_status & ~0x7FFu) | (gp0_params_[0] & 0x7FFu);
+        } else if (opcode == 0xE2) {
+            gpu_tex_window_x = gp0_params_[0] & 0x1F;
+            gpu_tex_window_y = (gp0_params_[0] >> 5) & 0x1F;
+            gpu_tex_window_mask_x = (gp0_params_[0] >> 10) & 0x1F;
+            gpu_tex_window_mask_y = (gp0_params_[0] >> 15) & 0x1F;
+            gpu_tex_window_offset_x = (gp0_params_[0] >> 20) & 0x1F;
+            gpu_tex_window_offset_y = (gp0_params_[0] >> 25) & 0x1F;
+        } else if (opcode == 0xE3) {
+            gpu_draw_x1 = gp0_params_[0] & 0xFFFF;
+            gpu_draw_y1 = gp0_params_[0] >> 16;
+        } else if (opcode == 0xE4) {
+            gpu_draw_x2 = gp0_params_[0] & 0xFFFF;
+            gpu_draw_y2 = gp0_params_[0] >> 16;
+        } else if (opcode == 0xE5) {
+            gpu_draw_offset_x = gp0_params_[0] & 0xFFFF;
+            gpu_draw_offset_y = gp0_params_[0] >> 16;
+        } else if (opcode == 0xE6) {
+            gpu_mask_set = gp0_params_[0] & 1;
+            gpu_mask_keep = (gp0_params_[0] >> 1) & 1;
         }
 
         gp0_param_count = 0;
@@ -321,6 +376,31 @@
                 display_height = display_height <= 256 ? 240 : display_height;
             } else {
                 display_height = 480;
+            }
+        } else if (command == 0x09) {
+            gpu_status = (gpu_status & ~0x02000000u) | ((parameter & 1) ? 0 : 0x02000000u);
+        } else if (command == 0x10) {
+            switch (parameter) {
+            case 0x02:
+                gpuread = gpu_tex_window_x
+                    | (gpu_tex_window_y << 5)
+                    | (gpu_tex_window_mask_x << 10)
+                    | (gpu_tex_window_mask_y << 15)
+                    | (gpu_tex_window_offset_x << 20)
+                    | (gpu_tex_window_offset_y << 25);
+                break;
+            case 0x03:
+                gpuread = gpu_draw_x1 | (gpu_draw_y1 << 16);
+                break;
+            case 0x04:
+                gpuread = gpu_draw_x2 | (gpu_draw_y2 << 16);
+                break;
+            case 0x05:
+                gpuread = gpu_draw_offset_x | (gpu_draw_offset_y << 16);
+                break;
+            default:
+                gpuread = 0;
+                break;
             }
         }
     }
