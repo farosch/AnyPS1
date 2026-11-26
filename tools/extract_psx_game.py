@@ -2,6 +2,7 @@ import argparse
 import json
 import re
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -176,7 +177,8 @@ def extract_game(cue_path: Path, output: Path) -> dict:
             }
         )
 
-    disc_iso = output / "disc.iso"
+    temporary_directory = tempfile.TemporaryDirectory(prefix="anyps1-")
+    disc_iso = Path(temporary_directory.name) / "disc.iso"
     convert_data_track(track, bin_path, disc_iso)
 
     volume_id, entries = inspect_psx_disc.inspect_disc(disc_iso)
@@ -222,7 +224,6 @@ def extract_game(cue_path: Path, output: Path) -> dict:
             "mode": track.mode,
             "bin": str(bin_path.resolve()),
         },
-        "disc_iso": str(disc_iso),
         "filesystem": str(filesystem_output),
         "track_count": len(cue_tracks),
         "track_manifest": track_manifest,
@@ -266,7 +267,6 @@ def main() -> int:
                             "number": index,
                             "volume_id": manifest["volume_id"],
                             "cue": manifest["cue"],
-                            "disc_iso": manifest["disc_iso"],
                             "filesystem": manifest["filesystem"],
                             "system_cnf": manifest["system_cnf"],
                             "boot_entry": manifest["boot_entry"],

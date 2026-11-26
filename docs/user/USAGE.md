@@ -41,7 +41,6 @@ The resulting layout is:
 ```text
 extracted/
   disc1/
-    disc.iso
     filesystem/
     SYSTEM.CNF
     boot/
