@@ -3,11 +3,14 @@
 #include <array>
 #include <cstdint>
 
+struct SDL_Gamepad;
 struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_Texture;
 
 namespace anyps1 {
+
+struct ControllerState;
 
 class HostVideo {
 public:
@@ -19,6 +22,8 @@ public:
 
     bool poll_events();
     std::uint16_t pad_state() const;
+    ControllerState controller_state() const;
+    void apply_controller_rumble(std::uint32_t small, std::uint32_t large);
     void present();
     void present_vram(
         const std::array<std::uint16_t, 1024 * 512>& vram,
@@ -33,6 +38,7 @@ private:
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
     SDL_Texture* texture = nullptr;
+    SDL_Gamepad* gamepad = nullptr;
 };
 
 }

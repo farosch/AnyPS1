@@ -165,12 +165,18 @@
         if ((address & 0xFF000000u) == 0x1F000000u) {
             return false;
         }
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
         const std::uint32_t physical = address & 0x1FFFFFFF;
         return physical < ram_.size();
     }
 
     std::uint32_t read_ram32(std::uint32_t address) const
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
         address &= 0x1FFFFFFF;
         return static_cast<std::uint32_t>(ram_[address])
             | (static_cast<std::uint32_t>(ram_[address + 1]) << 8)
@@ -180,6 +186,9 @@
 
     void write_ram32(std::uint32_t address, std::uint32_t value)
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
         address &= 0x1FFFFFFF;
         ram_[address] = static_cast<unsigned char>(value);
         ram_[address + 1] = static_cast<unsigned char>(value >> 8);
@@ -273,6 +282,17 @@
 
     bool load_byte(std::uint32_t address, std::uint32_t reg, bool unsigned_value)
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
+        const std::uint32_t physical = address & 0x1FFFFFFF;
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            pending_load_register_ = reg;
+            pending_load_value_ = 0;
+            pending_load_valid_ = true;
+            return true;
+        }
         if (in_ram(address)) {
             std::uint32_t value = ram_[address & 0x1FFFFFFF];
             pending_load_register_ = reg;
@@ -293,6 +313,17 @@
 
     bool load_half(std::uint32_t address, std::uint32_t reg, bool unsigned_value)
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
+        const std::uint32_t physical = address & 0x1FFFFFFF;
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            pending_load_register_ = reg;
+            pending_load_value_ = 0;
+            pending_load_valid_ = true;
+            return true;
+        }
         if (address & 1) {
             raise_exception(4);
             return true;
@@ -318,6 +349,17 @@
 
     bool load_word(std::uint32_t address, std::uint32_t reg)
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
+        const std::uint32_t physical = address & 0x1FFFFFFF;
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            pending_load_register_ = reg;
+            pending_load_value_ = 0;
+            pending_load_valid_ = true;
+            return true;
+        }
         if (address & 3) {
             raise_exception(4);
             return true;
@@ -341,6 +383,14 @@
 
     bool store_byte(std::uint32_t address, std::uint32_t value)
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
+        const std::uint32_t physical = address & 0x1FFFFFFF;
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            return true;
+        }
         if (in_ram(address)) {
             ram_[address & 0x1FFFFFFF] = static_cast<unsigned char>(value);
             return true;
@@ -350,6 +400,14 @@
 
     bool store_half(std::uint32_t address, std::uint32_t value)
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
+        const std::uint32_t physical = address & 0x1FFFFFFF;
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            return true;
+        }
         if (address & 1) {
             raise_exception(5);
             return true;
@@ -364,6 +422,14 @@
 
     bool store_word(std::uint32_t address, std::uint32_t value)
     {
+        if (address >= 0x80200000u && address < 0x80210000u) {
+            address = 0x801FF000u | (address & 0xFFFu);
+        }
+        const std::uint32_t physical = address & 0x1FFFFFFF;
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            return true;
+        }
         if (address & 3) {
             raise_exception(5);
             return true;

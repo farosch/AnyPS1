@@ -1,4 +1,5 @@
 #include "HostVideo.h"
+#include "Relinker.h"
 
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -9,7 +10,7 @@ namespace anyps1 {
 
 HostVideo::HostVideo()
 {
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         throw std::runtime_error(std::string("SDL initialization failed: ") + SDL_GetError());
     }
     window = SDL_CreateWindow("AnyPS1", 640, 480, SDL_WINDOW_RESIZABLE);
@@ -37,10 +38,19 @@ HostVideo::HostVideo()
         throw std::runtime_error(std::string("SDL texture creation failed: ") + SDL_GetError());
     }
     clear();
+    int gamepad_count = 0;
+    SDL_JoystickID* gamepads = SDL_GetGamepads(&gamepad_count);
+    if (gamepads && gamepad_count > 0) {
+        gamepad = SDL_OpenGamepad(gamepads[0]);
+    }
+    SDL_free(gamepads);
 }
 
 HostVideo::~HostVideo()
 {
+    if (gamepad) {
+        SDL_CloseGamepad(gamepad);
+    }
     if (texture) {
         SDL_DestroyTexture(texture);
     }
@@ -70,18 +80,59 @@ std::uint16_t HostVideo::pad_state() const
     std::uint16_t state = 0xFFFF;
     if (keys[SDL_SCANCODE_LEFT]) state &= ~0x0080;
     if (keys[SDL_SCANCODE_RIGHT]) state &= ~0x0020;
-    if (keys[SDL_SCANCODE_UP]) state &= ~0x1000;
-    if (keys[SDL_SCANCODE_DOWN]) state &= ~0x4000;
-    if (keys[SDL_SCANCODE_RETURN]) state &= ~0x0800;
-    if (keys[SDL_SCANCODE_ESCAPE]) state &= ~0xF800;
-    if (keys[SDL_SCANCODE_SPACE]) state &= ~0x8000;
-    if (keys[SDL_SCANCODE_Z]) state &= ~0x0040;
-    if (keys[SDL_SCANCODE_X]) state &= ~0x0010;
-    if (keys[SDL_SCANCODE_A]) state &= ~0x0008;
-    if (keys[SDL_SCANCODE_S]) state &= ~0x0004;
-    if (keys[SDL_SCANCODE_Q]) state &= ~0x0002;
-    if (keys[SDL_SCANCODE_W]) state &= ~0x0001;
+    if (keys[SDL_SCANCODE_UP]) state &= ~0x0010;
+    if (keys[SDL_SCANCODE_DOWN]) state &= ~0x0040;
+    if (keys[SDL_SCANCODE_RETURN]) state &= ~0x0008;
+    if (keys[SDL_SCANCODE_ESCAPE]) state &= ~0x0001;
+    if (keys[SDL_SCANCODE_Z]) state &= ~0x4000;
+    if (keys[SDL_SCANCODE_X]) state &= ~0x8000;
+    if (keys[SDL_SCANCODE_C]) state &= ~0x2000;
+    if (keys[SDL_SCANCODE_V]) state &= ~0x1000;
+    if (keys[SDL_SCANCODE_Q]) state &= ~0x0400;
+    if (keys[SDL_SCANCODE_E]) state &= ~0x0800;
+    if (keys[SDL_SCANCODE_A]) state &= ~0x0100;
+    if (keys[SDL_SCANCODE_D]) state &= ~0x0200;
+    if (keys[SDL_SCANCODE_F]) state &= ~0x0002;
+    if (keys[SDL_SCANCODE_G]) state &= ~0x0004;
     return state;
+}
+
+ControllerState HostVideo::controller_state() const
+{
+    ControllerState result;
+    result.digital = pad_state();
+    if (!gamepad) {
+        return result;
+    }
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_LEFT)) result.digital &= ~0x0080;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) result.digital &= ~0x0020;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP)) result.digital &= ~0x0010;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN)) result.digital &= ~0x0040;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_START)) result.digital &= ~0x0008;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_BACK)) result.digital &= ~0x0001;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH)) result.digital &= ~0x4000;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_EAST)) result.digital &= ~0x2000;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_WEST)) result.digital &= ~0x8000;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_NORTH)) result.digital &= ~0x1000;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) result.digital &= ~0x0400;
+    if (SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) result.digital &= ~0x0800;
+
+    const Sint16 left_x = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+    const Sint16 left_y = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+    const Sint16 right_x = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX);
+    const Sint16 right_y = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY);
+    result.left_x = static_cast<std::uint8_t>((static_cast<int>(left_x) + 32768) / 257);
+    result.left_y = static_cast<std::uint8_t>((static_cast<int>(left_y) + 32768) / 257);
+    result.right_x = static_cast<std::uint8_t>((static_cast<int>(right_x) + 32768) / 257);
+    result.right_y = static_cast<std::uint8_t>((static_cast<int>(right_y) + 32768) / 257);
+    return result;
+}
+
+void HostVideo::apply_controller_rumble(std::uint32_t small, std::uint32_t large)
+{
+    if (gamepad) {
+        SDL_RumbleGamepad(gamepad, static_cast<Uint16>(small), static_cast<Uint16>(large), 100);
+    }
 }
 
 void HostVideo::clear()

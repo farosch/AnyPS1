@@ -16,6 +16,96 @@ namespace {
 
 constexpr std::uint32_t PSX_HEADER_SIZE = 2048;
 
+void trim(std::string& value)
+{
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) {
+        value.clear();
+        return;
+    }
+    const auto last = value.find_last_not_of(" \t\r\n");
+    value = value.substr(first, last - first + 1);
+}
+
+std::string system_cnf_boot(const std::filesystem::path& system_cnf)
+{
+    std::ifstream input(system_cnf);
+    std::string line;
+    while (std::getline(input, line)) {
+        trim(line);
+        if (line.rfind("BOOT", 0) == 0) {
+            const auto separator = line.find('=');
+            if (separator != std::string::npos) {
+                std::string boot = line.substr(separator + 1);
+                trim(boot);
+                if (boot.size() >= 7
+                    && boot.compare(0, 7, "cdrom:\\") == 0) {
+                    boot = boot.substr(7);
+                }
+                const auto version = boot.find(';');
+                if (version != std::string::npos) {
+                    boot.erase(version);
+                }
+                return boot;
+            }
+        }
+    }
+    return {};
+}
+
+bool is_psx_exe(const std::filesystem::path& path)
+{
+    std::ifstream input(path, std::ios::binary);
+    std::array<unsigned char, 8> magic{};
+    input.read(reinterpret_cast<char*>(magic.data()), magic.size());
+    return input.gcount() == static_cast<std::streamsize>(magic.size())
+        && std::memcmp(magic.data(), "PS-X EXE", magic.size()) == 0;
+}
+
+std::filesystem::path find_extracted_boot(const std::filesystem::path& root)
+{
+    std::vector<std::filesystem::path> system_cnf_files;
+    if (std::filesystem::is_regular_file(root / "SYSTEM.CNF")) {
+        system_cnf_files.push_back(root / "SYSTEM.CNF");
+    }
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file() && entry.path().filename() == "SYSTEM.CNF") {
+            system_cnf_files.push_back(entry.path());
+        }
+    }
+    for (const auto& system_cnf : system_cnf_files) {
+        const std::string boot = system_cnf_boot(system_cnf);
+        if (!boot.empty()) {
+            std::filesystem::path candidate = system_cnf.parent_path() / boot;
+            if (std::filesystem::is_regular_file(candidate)) {
+                return candidate;
+            }
+            candidate = system_cnf.parent_path() / boot.substr(boot.find_last_of("/\\") + 1);
+            if (std::filesystem::is_regular_file(candidate)) {
+                return candidate;
+            }
+        }
+    }
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file() && is_psx_exe(entry.path())) {
+            return entry.path();
+        }
+    }
+    throw std::runtime_error("extracted game has no boot PS-X EXE");
+}
+
+std::filesystem::path resolve_relink_input(const RelinkOptions& options)
+{
+    const std::filesystem::path input(options.input);
+    if (std::filesystem::is_regular_file(input)) {
+        return input;
+    }
+    if (std::filesystem::is_directory(input)) {
+        return find_extracted_boot(input);
+    }
+    throw std::runtime_error("input extracted game path does not exist: " + options.input);
+}
+
 void create_output_parent(const std::string& output)
 {
     const std::filesystem::path output_path(output);
@@ -165,15 +255,28 @@ bool relink(const RelinkOptions& options)
     if (options.input.empty()) {
         throw std::invalid_argument("input path is empty");
     }
-    if (options.output.empty()) {
-        throw std::invalid_argument("output path is empty");
+    RelinkOptions resolved = options;
+    const std::filesystem::path input_path(options.input);
+    resolved.input = resolve_relink_input(options).string();
+    if (resolved.output.empty()) {
+        std::filesystem::path output_root;
+        if (std::filesystem::is_directory(input_path)) {
+            output_root = input_path;
+        } else {
+            output_root = input_path.parent_path();
+            if (output_root.empty()) {
+                output_root = ".";
+            }
+        }
+        resolved.output = (output_root
+            / (options.target == TargetPlatform::Windows ? "game.exe" : "game.elf")).string();
     }
 
-    create_output_parent(options.output);
+    create_output_parent(resolved.output);
 
-    std::ifstream input(options.input, std::ios::binary);
+    std::ifstream input(resolved.input, std::ios::binary);
     if (!input) {
-        throw std::runtime_error("cannot open input PS-X EXE: " + options.input);
+        throw std::runtime_error("cannot open input PS-X EXE: " + resolved.input);
     }
     const std::vector<unsigned char> data{
         std::istreambuf_iterator<char>(input),
@@ -201,8 +304,8 @@ bool relink(const RelinkOptions& options)
         throw std::runtime_error("PS-X EXE entry point is outside the executable image");
     }
 
-    if (options.target == TargetPlatform::Windows) {
-        write_pe_layout(options, data, load_address, file_size);
+    if (resolved.target == TargetPlatform::Windows) {
+        write_pe_layout(resolved, data, load_address, file_size);
         return true;
     }
 
@@ -221,9 +324,9 @@ bool relink(const RelinkOptions& options)
     const std::uint32_t text_offset = (section_header_offset + section_header_size * section_count + 15) & ~15u;
     const std::uint32_t shstr_offset = text_offset + file_size;
 
-    std::ofstream output(options.output, std::ios::binary | std::ios::trunc);
+    std::ofstream output(resolved.output, std::ios::binary | std::ios::trunc);
     if (!output) {
-        throw std::runtime_error("cannot open output artifact: " + options.output);
+        throw std::runtime_error("cannot open output artifact: " + resolved.output);
     }
 
     const unsigned char elf_ident[16]{

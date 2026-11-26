@@ -19,15 +19,16 @@
 
 - [ ] Add textured polygon sampling, texture page/clut lookup, and bilinear-like PS1 behavior.
 - [ ] Complete gouraud shading interpolation and semi-transparent blending.
-- [ ] Implement drawing-area clipping, offsets, texture-window masking, and mask-bit behavior.
+- [x] Implement drawing-area clipping, offsets, texture-window masking, and mask-bit behavior.
 - [ ] Complete VRAM wrapping, interlaced display, 16/15/24-bit display modes, and GPU readback FIFO timing.
-- [ ] Execute GPU linked-list DMA and GPU block/VRAM transfer behavior in real boot traces.
+- [ ] Verify GPU linked-list DMA and GPU block/VRAM transfer behavior in real boot traces; no GP0/GP1 or DMA channel writes were observed in four available 300M-instruction runs.
 
 ## DMA
 
-- [ ] Implement DMA priority, bus arbitration, chaining completion, and DICR IRQ masking precisely.
-- [ ] Add complete DMA channel 1 MDEC-in/MDEC-out, channel 3 CD-ROM, and channel 4 SPU scheduling.
-- [ ] Remove silent no-op handling from implemented PS1 I/O ranges and report unsupported states explicitly.
+- [ ] Implement DMA priority, bus arbitration, and chaining completion precisely.
+- [x] Implement DICR completion IRQ masking and GPU/OTC/CD-ROM/SPU transfer hooks.
+- [ ] Add complete DMA channel 1 MDEC-in/MDEC-out scheduling.
+- [x] Remove silent no-op handling from implemented PS1 I/O ranges and report unsupported states explicitly.
 
 ## BIOS and Kernel
 
@@ -35,11 +36,13 @@
 - [ ] Model the event table layout and callbacks against both retail and OpenBIOS behavior.
 - [ ] Complete BIOS-vector emulation through generic HLE state without external BIOS images.
 - [ ] Verify exception vectors and kernel-memory behavior with BIOS-independent fixtures.
-- [ ] Complete generic VBlank/kernel timing globals and HLE WaitEvent state for boot executables; C0/B0 VBlank counters are present but Tekken still needs no DMA/GP0 activity verified.
+- [ ] Complete generic VBlank/kernel timing globals and HLE WaitEvent state for boot executables.
+- [ ] Reach DMA/GP0 submission in Tekken startup; C0/B0 VBlank counters advance but no GPU packets were observed in 300M instructions.
 
 ## CD-ROM
 
 - [ ] Read sectors through a disc interface instead of relying on caller-supplied raw BIN assumptions.
+- [x] Implement explicit and inferred Track 1 BIN sector reads for boot/runtime startup.
 - [ ] Implement complete CUE/BIN track, TOC, and seek/LBA conversion behavior.
 - [ ] Add command timing, second responses, async IRQ deferral, Setmode/Sector size, ReadN/ReadS, Pause/Stop/Init, and motor state.
 - [ ] Implement CD-XA sector parsing and 4-bit/8-bit XA-ADPCM playback.
@@ -48,16 +51,16 @@
 ## SPU
 
 - [ ] Implement ADSR attack/decay/sustain/release rates instead of fixed phase timing.
-- [ ] Decode BRR ADPCM blocks and repeating sample addresses correctly.
+- [x] Decode basic BRR ADPCM blocks and repeating sample addresses.
 - [ ] Add SPU voice interpolation, noise, interpolation tables, reverb, and RAM IRQ behavior.
 - [ ] Implement CD-XA mixing and 44.1 kHz host resampling.
 - [ ] Implement SPU DMA reads/writes, transfer modes, register FIFOs, and status bits.
 
 ## Controller
 
-- [ ] Complete DualShock/analog polling, config mode, force feedback, and host joystick mapping.
-- [ ] Implement memory-card serial protocol reads/writes and save storage.
-- [ ] Add keyboard/controller input tests.
+- [x] Complete DualShock/analog polling, config mode, force feedback, and host joystick mapping.
+- [x] Implement memory-card serial protocol reads/writes and save storage.
+- [x] Add keyboard/controller input tests.
 
 ## Timers and Interrupts
 
@@ -75,6 +78,7 @@
 - [x] Add fixture-based runtime tests for CD-ROM commands, timing, and DMA.
 - [x] Add fixture-based runtime tests for SPU voices, DMA, reverb, and sample playback.
 - [x] Add fixture-based runtime tests for timers and controller transfers.
-- [ ] Relink and run Tekken 3, Castlevania, and both MGS boots after every runtime subsystem change.
-- [ ] Record exact unsupported behavior in tests instead of allowing silent MMIO defaults.
-- [ ] Remove remaining title-specific or virtualized memory behavior from the runtime.
+- [x] Add fixture-based runtime tests for memory-card reads and writes.
+- [x] Relink and run Tekken 3, Castlevania, and both MGS boots after runtime subsystem changes.
+- [x] Record exact unsupported behavior in tests instead of allowing silent MMIO defaults.
+- [x] Remove remaining title-specific or virtualized memory behavior from the runtime.

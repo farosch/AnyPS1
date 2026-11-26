@@ -39,7 +39,8 @@ class PsxCpu {
 public:
     explicit PsxCpu(
         const std::vector<unsigned char>& exe,
-        const std::string& cdrom_bin = {}
+        const std::string& cdrom_bin = {},
+        const std::string& memory_card_path = {}
     )
     {
         if (exe.size() < 2048 || std::memcmp(exe.data(), "PS-X EXE", 8) != 0) {
@@ -68,7 +69,22 @@ public:
                 throw std::runtime_error("cannot open CD-ROM BIN: " + cdrom_bin);
             }
         }
-        regs_[29] = sp_base_ + sp_offset_;
+        if (!memory_card_path.empty()) {
+            std::ifstream card(memory_card_path, std::ios::binary);
+            std::vector<unsigned char> data{
+                std::istreambuf_iterator<char>(card),
+                std::istreambuf_iterator<char>()
+            };
+            if (!data.empty()) {
+                if (data.size() != memory_card.size()) {
+                    throw std::runtime_error("invalid memory card size: " + memory_card_path);
+                }
+                std::memcpy(memory_card.data(), data.data(), data.size());
+            }
+        }
+        std::uint32_t initial_sp = sp_base_ + sp_offset_;
+        initial_sp = 0x80000000u + (ram_.size() - 0x1000u);
+        regs_[29] = initial_sp;
         ram_[0x474] = 0x00;
         ram_[0x475] = 0xF0;
         ram_[0x476] = 0x1F;
@@ -81,6 +97,11 @@ public:
 
     bool step()
     {
+        if (pc_ >= 0x80000080 && pc_ < 0x80000100 && cop0_[14] != 0) {
+            pc_ = cop0_[14] + (in_delay_slot_ ? 0 : 4);
+            cop0_[13] &= ~0x0400u;
+            return true;
+        }
         if (execute_bios_vector()) {
             return true;
         }
@@ -100,9 +121,7 @@ public:
         }
         if (pc_ <= 0x00000100) {
             if (cop0_[14] != 0) {
-                pc_ = cop0_[14];
-                cop0_[12] = (cop0_[12] & ~0x0Fu) | ((cop0_[12] >> 2) & 0x0Fu);
-                cop0_[14] = 0;
+                pc_ = cop0_[14] + (in_delay_slot_ ? 0 : 4);
                 return true;
             }
             if (regs_[31] == 0) {
@@ -126,15 +145,6 @@ public:
             std::fprintf(stderr, "0x%08X: %08X\n",
                 static_cast<unsigned>(pc_ & 0xFFFFFFFF),
                 static_cast<unsigned>(instruction));
-        }
-        if (std::getenv("ANYPS1_WAIT_TRACE") != nullptr
-            && pc_ >= 0x800859CC && pc_ <= 0x800859E8) {
-            std::fprintf(stderr,
-                "WAIT pc=0x%08X v0=0x%08X v1=0x%08X a1=0x%08X\n",
-                static_cast<unsigned>(pc_),
-                static_cast<unsigned>(regs_[2]),
-                static_cast<unsigned>(regs_[3]),
-                static_cast<unsigned>(regs_[5]));
         }
         std::uint32_t next_pc = pc_ + 4;
         std::uint32_t scheduled_target = 0;
@@ -190,9 +200,23 @@ public:
                 lo_ = regs_[rs];
                 break;
             case 0x0C:
-                raise_exception(8);
+                if (regs_[4] == 1) {
+                    cop0_[12] &= ~1u;
+                } else if (regs_[4] == 2) {
+                    cop0_[12] |= 1u;
+                    ++kernel_frame_counter;
+                    ++timer_count[1];
+                    if (timer_count[1] >= 0x10000) {
+                        timer_count[1] = 0;
+                    }
+                } else {
+                    raise_exception(8);
+                }
                 break;
             case 0x0D:
+                if (instruction == 0x0000004D) {
+                    break;
+                }
                 raise_exception(9);
                 break;
             case 0x18:
@@ -405,6 +429,7 @@ public:
                         }
                     } else if (cop0_rs == 16) {
                         cop0_[12] = ((cop0_[12] & ~0x0Fu) | ((cop0_[12] >> 2) & 0x0Fu));
+                        in_delay_slot_ = false;
                     } else {
                         unsupported_ = "unsupported COP0 operation";
                         return false;
@@ -462,6 +487,19 @@ public:
     {
         return pc_;
     }
+
+    bool save_memory_card(const std::string& path) const
+    {
+        std::ofstream card(path, std::ios::binary | std::ios::trunc);
+        if (!card) {
+            return false;
+        }
+        card.write(reinterpret_cast<const char*>(memory_card.data()), memory_card.size());
+        return static_cast<bool>(card);
+    }
+
+    std::uint32_t joy_motor_small() const { return joy_motor_small_; }
+    std::uint32_t joy_motor_large() const { return joy_motor_large_; }
 
     RuntimeSnapshot snapshot() const
     {
@@ -521,6 +559,12 @@ public:
         result.joy_baud = joy_baud;
         result.joy_rx_count = joy_rx_count;
         result.joy_rx = joy_rx;
+        result.joy_analog_mode = joy_analog_mode;
+        result.joy_config_mode = joy_config_mode;
+        result.joy_motor_small = joy_motor_small_;
+        result.joy_motor_large = joy_motor_large_;
+        result.memory_card = memory_card;
+        result.memory_card_write_count = memory_card_write_count;
         return result;
     }
 
@@ -563,6 +607,13 @@ public:
     void set_pad_state(std::uint16_t state)
     {
         pad_state = state;
+        controller_state.digital = state;
+    }
+
+    void set_controller_state(const ControllerState& state)
+    {
+        pad_state = state.digital;
+        controller_state = state;
     }
 
     void render_audio(HostAudio& audio)
@@ -574,9 +625,10 @@ public:
             for (std::uint32_t voice = 0; voice < 24; ++voice) {
                 if ((spu_key_on & (1u << voice)) != 0) {
                     const std::uint32_t block_address = spu_voice_address[voice] & (spu_ram.size() - 1);
-                    const std::uint32_t block_flags = spu_ram[block_address];
-                    const std::uint32_t shift = block_flags & 15;
-                    const std::uint32_t filter = (block_flags >> 4) & 3;
+                    const std::uint32_t block_header = spu_ram[block_address];
+                    const std::uint32_t block_flags = spu_ram[block_address + 1];
+                    const std::uint32_t shift = std::min(block_header & 15, 12u);
+                    const std::uint32_t filter = (block_header >> 4) & 3;
                     const std::uint32_t sample_index = spu_voice_block_sample[voice];
                     const std::uint32_t nibble_index = sample_index & 1;
                     const std::uint32_t nibble =
@@ -599,7 +651,7 @@ public:
                     if (spu_voice_block_sample[voice] == 28) {
                         spu_voice_block_sample[voice] = 0;
                         spu_voice_address[voice] += 16;
-                        if (spu_ram[block_address] & 1) {
+                        if (block_flags & 1) {
                             spu_voice_address[voice] =
                                 spu_voice_repeat_address[voice] ? spu_voice_repeat_address[voice] : block_address;
                         }
@@ -648,7 +700,7 @@ private:
     std::uint32_t display_y = 0;
     std::uint32_t display_width = 320;
     std::uint32_t display_height = 240;
-    std::uint32_t gpu_status = 0x1C000000;
+    std::uint32_t gpu_status = 0x1F400000;
     std::uint64_t gpu_write_count = 0;
     std::uint64_t gpu_vram_write_count = 0;
     std::uint32_t gpuread = 0;
@@ -694,9 +746,20 @@ private:
     std::uint32_t joy_mode = 0;
     std::uint32_t joy_baud = 0;
     std::uint16_t pad_state = 0xFFFF;
+    ControllerState controller_state;
     std::array<unsigned char, 8> joy_rx{};
     std::uint32_t joy_rx_count = 0;
     std::uint32_t joy_rx_cursor = 0;
+    bool joy_analog_mode = false;
+    bool joy_config_mode = false;
+    std::uint32_t joy_motor_small_ = 0;
+    std::uint32_t joy_motor_large_ = 0;
+    std::uint32_t joy_motor_phase = 0;
+    std::array<unsigned char, 128 * 1024> memory_card{};
+    std::uint32_t memory_card_address = 0;
+    std::uint32_t memory_card_phase = 0;
+    std::uint32_t memory_card_write_count = 0;
+    bool memory_card_writing = false;
     std::array<std::uint32_t, 16> bios_events{};
     std::array<std::uint32_t, 16> bios_event_classes{};
     std::array<std::uint32_t, 16> bios_event_specs{};
@@ -803,7 +866,12 @@ bool run_psx(const RunOptions& options, RuntimeSnapshot* snapshot)
             }
         }
     }
-    PsxCpu cpu(exe, cdrom_bin);
+    PsxCpu cpu(exe, cdrom_bin, options.memory_card);
+    auto save_memory_card = [&]() {
+        if (!options.memory_card.empty() && !cpu.save_memory_card(options.memory_card)) {
+            throw std::runtime_error("cannot write memory card: " + options.memory_card);
+        }
+    };
     std::unique_ptr<HostVideo> video;
     std::unique_ptr<HostAudio> audio = std::make_unique<HostAudio>();
     if (options.video) {
@@ -812,9 +880,14 @@ bool run_psx(const RunOptions& options, RuntimeSnapshot* snapshot)
     for (std::uint64_t instructions = 0; instructions < options.max_instructions; ++instructions) {
         if (video && (instructions % 10000 == 0)) {
             if (!video->poll_events()) {
+                save_memory_card();
                 return true;
             }
-            cpu.set_pad_state(video->pad_state());
+            cpu.set_controller_state(video->controller_state());
+            video->apply_controller_rumble(
+                cpu.joy_motor_small(),
+                cpu.joy_motor_large()
+            );
             cpu.tick_frame();
             video->present_vram(
                 cpu.frame_vram(),
@@ -833,6 +906,7 @@ bool run_psx(const RunOptions& options, RuntimeSnapshot* snapshot)
                 *snapshot = cpu.snapshot();
             }
             if (const char* reason = cpu.unsupported()) {
+                save_memory_card();
                 throw std::runtime_error(
                     std::string(reason) + " at 0x"
                     + [] (std::uint64_t value) {
@@ -842,12 +916,14 @@ bool run_psx(const RunOptions& options, RuntimeSnapshot* snapshot)
                     }(cpu.pc())
                 );
             }
+            save_memory_card();
             return true;
         }
     }
     if (snapshot != nullptr) {
         *snapshot = cpu.snapshot();
     }
+    save_memory_card();
     std::cout << "instruction limit reached\n";
     return true;
 }

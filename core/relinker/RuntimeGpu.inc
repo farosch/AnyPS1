@@ -36,6 +36,40 @@
                 gte_control[24] = static_cast<std::uint32_t>(
                     x1 * y1 - y1 * z1 + z1 * x1
                 );
+            } else if (command == 0x01 || command == 0x30) {
+                gte_control[24] = static_cast<std::uint32_t>(std::clamp(gte_data_[9] / 16, -32768, 32767));
+                gte_control[25] = static_cast<std::uint32_t>(std::clamp(gte_data_[10], -32768, 32767));
+                gte_control[26] = static_cast<std::uint32_t>(std::clamp(gte_data_[11], -32768, 32767));
+            } else if (command == 0x12) {
+                gte_control[24] = static_cast<std::uint32_t>(gte_data_[9]);
+                gte_control[25] = static_cast<std::uint32_t>(gte_data_[10] & 0xFFFF);
+                gte_control[26] = static_cast<std::uint32_t>(gte_data_[11]);
+            } else if (command == 0x14) {
+                gte_control[24] = static_cast<std::uint32_t>(gte_data_[13] * gte_data_[13]);
+                gte_control[25] = static_cast<std::uint32_t>(gte_data_[14] * gte_data_[14]);
+                gte_control[26] = static_cast<std::uint32_t>(gte_data_[15] * gte_data_[15]);
+            } else if (command == 0x2A) {
+                gte_control[24] = static_cast<std::uint32_t>(
+                    std::clamp(gte_data_[9] + gte_data_[10] + gte_data_[11], 0, 0xFFFF));
+            } else if (command == 0x2D) {
+                gte_control[24] = static_cast<std::uint32_t>(
+                    std::clamp(gte_data_[9] + gte_data_[10] + gte_data_[11] + gte_data_[12], 0, 0xFFFF));
+            } else if (command == 0x29 || command == 0x2D) {
+                gte_control[24] = gte_control[24];
+            } else if (command == 0x0D) {
+                gte_control[24] = static_cast<std::uint32_t>(gte_data_[12]);
+                gte_control[25] = static_cast<std::uint32_t>(gte_data_[13]);
+                gte_control[26] = static_cast<std::uint32_t>(gte_data_[14]);
+            } else if (command == 0x1E) {
+                gte_control[24] = static_cast<std::uint32_t>(std::clamp(gte_data_[13], 0, 0x1FF));
+                gte_control[25] = static_cast<std::uint32_t>(std::clamp(gte_data_[14], 0, 0x1FF));
+                gte_control[26] = static_cast<std::uint32_t>(std::clamp(gte_data_[15], 0, 0x1FF));
+            } else if (command == 0x3F) {
+                gte_control[24] = static_cast<std::uint32_t>(std::clamp(gte_data_[13] * gte_data_[12] / 4096, 0, 0x1FFFF));
+                gte_control[25] = static_cast<std::uint32_t>(std::clamp(gte_data_[14] * gte_data_[12] / 4096, 0, 0x1FFFF));
+                gte_control[26] = static_cast<std::uint32_t>(std::clamp(gte_data_[15] * gte_data_[12] / 4096, 0, 0x1FFFF));
+            } else if (command == 0x30) {
+                gte_control[24] = gte_control[24];
             } else if (command == 0x01 || command == 0x00) {
                 gte_control[24] = static_cast<std::uint32_t>(gte_data_[9] / 16);
                 gte_control[25] = gte_data_[10];
@@ -84,7 +118,10 @@
 
     void put_pixel(std::uint32_t x, std::uint32_t y, std::uint16_t color)
     {
-        if (x < 1024 && y < 512) {
+        x = (gpu_draw_offset_x & 0x8000) ? x - (0x10000u - gpu_draw_offset_x) : x + gpu_draw_offset_x;
+        y = (gpu_draw_offset_y & 0x8000) ? y - (0x10000u - gpu_draw_offset_y) : y + gpu_draw_offset_y;
+        if (x >= gpu_draw_x1 && x <= gpu_draw_x2 && y >= gpu_draw_y1 && y <= gpu_draw_y2
+            && x < 1024 && y < 512) {
             vram_[y * 1024 + x] = color;
             ++gpu_vram_write_count;
         }
@@ -94,8 +131,7 @@
     {
         for (std::uint32_t row = y; row < y + height && row < 512; ++row) {
             for (std::uint32_t column = x; column < x + width && column < 1024; ++column) {
-                vram_[row * 1024 + column] = color;
-                ++gpu_vram_write_count;
+                put_pixel(column, row, color);
             }
         }
     }
@@ -189,6 +225,8 @@
                 }
             } else if ((opcode >= 0x60 && opcode <= 0x67) || (opcode >= 0x68 && opcode <= 0x7F)) {
                 gp0_expected = (opcode & 0x04) != 0 ? 3 : 2;
+            } else if (opcode >= 0x40 && opcode <= 0x5F) {
+                gp0_expected = 2;
             } else if (opcode == 0xA0) {
                 gp0_expected = 2;
             } else if (opcode == 0xC0) {
@@ -200,12 +238,6 @@
             } else if (opcode == 0xE2) {
                 gp0_expected = 1;
             } else if (opcode == 0xE3 || opcode == 0xE4 || opcode == 0xE5 || opcode == 0xE6) {
-                gp0_expected = 1;
-            } else if (opcode == 0xE1) {
-                gp0_expected = 1;
-            } else if (opcode == 0xE3 || opcode == 0xE4) {
-                gp0_expected = 1;
-            } else if (opcode == 0xE5 || opcode == 0xE6) {
                 gp0_expected = 1;
             } else {
                 gp0_expected = 0;
@@ -276,6 +308,20 @@
                     const std::uint32_t y4 = gp0_params_[7] >> 16;
                     draw_flat_triangle(x1, y1, x3, y3, x4, y4, color);
                 }
+            }
+        } else if (opcode >= 0x40 && opcode <= 0x5F) {
+            const std::uint32_t x1 = gp0_params_[0] & 0xFFFF;
+            const std::uint32_t y1 = gp0_params_[0] >> 16;
+            const std::uint32_t x2 = gp0_params_[1] & 0xFFFF;
+            const std::uint32_t y2 = gp0_params_[1] >> 16;
+            const std::uint16_t color = gpu_color(gp0_command);
+            const std::int32_t dx = static_cast<std::int32_t>(x2) - static_cast<std::int32_t>(x1);
+            const std::int32_t dy = static_cast<std::int32_t>(y2) - static_cast<std::int32_t>(y1);
+            const std::uint32_t steps = std::max(std::abs(dx), std::abs(dy));
+            for (std::uint32_t step = 0; step <= steps; ++step) {
+                const std::int32_t x = steps == 0 ? x1 : static_cast<std::int32_t>(x1) + dx * step / steps;
+                const std::int32_t y = steps == 0 ? y1 : static_cast<std::int32_t>(y1) + dy * step / steps;
+                if (x >= 0 && y >= 0) put_pixel(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y), color);
             }
         } else if (opcode >= 0x60 && opcode <= 0x7F) {
             const std::uint32_t x = gp0_params_[0] & 0xFFFF;
@@ -358,7 +404,23 @@
         }
         const std::uint32_t command = word >> 24;
         const std::uint32_t parameter = word & 0xFFFFFF;
-        if (command == 0x03) {
+        if (command == 0x00) {
+            gp0_param_count = 0;
+            gp0_expected = 0;
+            gp0_command = 0;
+            gp0_transfer_remaining = 0;
+            gpu_status = 0x1F400000;
+            display_x = 0;
+            display_y = 0;
+            display_width = 320;
+            display_height = 240;
+        } else if (command == 0x01) {
+            gp0_param_count = 0;
+            gp0_expected = 0;
+            gp0_command = 0;
+        } else if (command == 0x02) {
+            gpu_status &= ~0x08000000u;
+        } else if (command == 0x03) {
             gpu_status = (gpu_status & ~0x00800000u) | ((parameter & 1) ? 0 : 0x00800000u);
         } else if (command == 0x05) {
             display_x = parameter & 0x3FF;

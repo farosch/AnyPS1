@@ -71,6 +71,8 @@ void test_gpu(const std::filesystem::path& fixtures)
 void test_dma(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-dma.ps-exe");
+    std::cerr << "DMA OTC first=" << snapshot.dma_otc_first
+              << " last=" << snapshot.dma_otc_last << "\n";
     require(snapshot.dma_madr[6] == 0x00000100, "DMA OTC base address");
     require(snapshot.dma_bcr[6] == 2, "DMA OTC block count");
     require(snapshot.dma_otc_first == 0x000000FC, "DMA OTC first chain value");
@@ -108,9 +110,18 @@ void test_controller(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-controller.ps-exe");
     require(snapshot.joy_ctrl == 0x2000, "controller transfer control");
-    require(snapshot.joy_rx_count == 4, "controller receive data count");
-    require(snapshot.joy_rx[0] == 0x41 && snapshot.joy_rx[1] == 0x5A,
-        "controller handshake response");
+    require(snapshot.joy_config_mode, "controller config mode");
+    require(snapshot.joy_analog_mode, "DualShock analog mode");
+    require(snapshot.joy_rx_count == 8, "DualShock receive data count");
+    require(snapshot.joy_rx[0] == 0x73 && snapshot.joy_rx[1] == 0x5A,
+        "DualShock analog handshake response");
+}
+
+void test_memory_card(const std::filesystem::path& fixtures)
+{
+    const auto snapshot = run_fixture(fixtures, "runtime-memory-card.ps-exe");
+    require(snapshot.memory_card_write_count == 1, "memory card write count");
+    require(snapshot.memory_card[0] == 0xAA, "memory card first write byte");
 }
 
 }
@@ -133,6 +144,7 @@ int main(int argc, char** argv)
         test_spu(fixtures);
         test_timers(fixtures);
         test_controller(fixtures);
+        test_memory_card(fixtures);
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Runtime test failed: " << error.what() << "\n";

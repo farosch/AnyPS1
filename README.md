@@ -41,17 +41,18 @@ ctest --test-dir build --output-on-failure
 python3 tools/extract_psx_game.py "/path/to/Game.cue"
 ```
 
-## Relink a PS-X EXE
+## Relink an extracted PS1 game
 
 ```sh
-anyps1 "/path/to/PS-X.EXE" "/path/to/output.elf"
-anyps1 --target linux "/path/to/PS-X.EXE" "/path/to/output.elf"
-anyps1 --target windows "/path/to/PS-X.EXE" "/path/to/output.exe"
+anyps1 "/path/to/extracted/game"
+anyps1 --target linux "/path/to/extracted/game"
+anyps1 --target windows "/path/to/extracted/game"
 ```
 
-The first stage validates the PS-X header and writes an ELF32 MIPS layout
-artifact. It does not yet translate MIPS instructions or produce a runnable
-native Linux or Windows game executable.
+The relinker accepts an extracted game directory or disc directory. It locates
+the boot executable from `SYSTEM.CNF` (or, as a fallback, a PS-X executable
+header), then writes `game.elf` or `game.exe` directly inside the directory
+pointed to by the command.
 
 ## Run an extracted PS-X executable in the first runtime
 
@@ -73,10 +74,19 @@ The resulting layout is:
 ```text
 extracted/
   disc1/
-    filesystem/
     SYSTEM.CNF
-    boot/
-    game.json
-  game.json
+    SCUS_941.63
+    ... other extracted files
+  disc2/
+    SYSTEM.CNF
+    SCUS_941.64
+    ... other extracted files
+```
+
+Relinking a directory writes `game.elf` or `game.exe` into the directory itself:
+
+```sh
+anyps1 "/path/to/extracted"
+anyps1 --target windows "/path/to/extracted/disc1"
 ```
 

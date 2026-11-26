@@ -14,18 +14,24 @@ int main(int argc, char** argv)
         std::cerr << "Usage: anyps1_relinker_test <fixture.ps-exe>\n";
         return 1;
     }
-    const char* input_path = argv[1];
-    const char* output_path = "/tmp/anyps1-relinker-test.elf";
-    const char* windows_output_path = "/tmp/anyps1-relinker-test.exe";
-    const char* nested_output_path = "/tmp/anyps1-relinker-test/nested/output.elf";
+    const char* fixture_path = argv[1];
+    const char* game_root = "/tmp/anyps1-relinker-test";
+    const char* input_path = "/tmp/anyps1-relinker-test/SCUS_941.63";
+    const char* output_path = "/tmp/anyps1-relinker-test/game.elf";
+    const char* windows_output_path = "/tmp/anyps1-relinker-test/game.exe";
     try {
-        if (!std::filesystem::is_regular_file(input_path)) {
+        if (!std::filesystem::is_regular_file(fixture_path)) {
             throw std::runtime_error("missing relinker fixture");
         }
+        std::filesystem::remove_all(game_root);
+        std::filesystem::create_directories(game_root);
+        std::filesystem::copy_file(fixture_path, input_path);
+        std::ofstream system_cnf(std::filesystem::path(game_root) / "SYSTEM.CNF");
+        system_cnf << "BOOT=cdrom:\\SCUS_941.63;1\n";
+        system_cnf.close();
 
         anyps1::RelinkOptions options;
-        options.input = input_path;
-        options.output = output_path;
+        options.input = game_root;
         if (!anyps1::relink(options)) {
             throw std::runtime_error("relink failed");
         }
@@ -37,20 +43,10 @@ int main(int argc, char** argv)
         }
 
         anyps1::RelinkOptions windows_options;
-        windows_options.input = input_path;
-        windows_options.output = windows_output_path;
+        windows_options.input = game_root;
         windows_options.target = anyps1::TargetPlatform::Windows;
         if (!anyps1::relink(windows_options)) {
             throw std::runtime_error("Windows relink failed");
-        }
-        anyps1::RelinkOptions nested_options;
-        nested_options.input = input_path;
-        nested_options.output = nested_output_path;
-        if (!anyps1::relink(nested_options)) {
-            throw std::runtime_error("nested output relink failed");
-        }
-        if (!std::filesystem::is_regular_file(nested_output_path)) {
-            throw std::runtime_error("nested output directory was not created");
         }
         std::ifstream windows_artifact(windows_output_path, std::ios::binary);
         std::array<unsigned char, 132> windows_header{};

@@ -122,12 +122,15 @@
             dma_bcr[channel] = value;
         } else if (offset == 8) {
             dma_chcr[channel] = value;
-            if ((value & 0x01000000) != 0 && channel == 2) {
-                dma_gpu_linked(dma_madr[channel]);
-            } else if ((value & 0x01000000) == 0 && (value & 0x1) != 0) {
-                dma_block(channel);
-            } else if (channel == 6 && (value & 0x01000201) == 0x01000201) {
+            if (channel == 6
+                && (value & 0x01000201u) == 0x01000201u) {
                 dma_otc(dma_madr[channel], dma_bcr[channel]);
+            } else if ((value & 0x01000000) != 0 && channel == 2 && (value & 0x400) != 0) {
+                dma_gpu_linked(dma_madr[channel]);
+            } else if ((value & 0x01000000) != 0 && channel == 2) {
+                dma_block(channel);
+            } else if ((value & 0x01000000) != 0 && (value & 0x1) != 0) {
+                dma_block(channel);
             }
         }
     }
@@ -156,7 +159,9 @@
                         | (static_cast<std::uint32_t>(cdrom_data[sector_offset + 3]) << 24));
                 }
             }
-            address = (address + 4) & 0x00FFFFFF;
+            address = ((dma_chcr[channel] & 0x40000000u) != 0)
+                ? (address - 4) & 0x00FFFFFF
+                : (address + 4) & 0x00FFFFFF;
         }
         if (channel == 3 && cdrom_read_active) {
             ++cdrom_lba;
@@ -220,31 +225,116 @@
         const unsigned char byte = static_cast<unsigned char>(command);
         joy_rx_count = 0;
         joy_rx_cursor = 0;
-        if (byte == 0x01) {
+        if (joy_motor_phase == 1) {
+            joy_motor_small_ = byte;
+            joy_motor_phase = 2;
+            joy_rx[joy_rx_count++] = 0xFF;
+        } else if (joy_motor_phase == 2) {
+            joy_motor_large_ = byte;
+            joy_motor_phase = 0;
+            joy_rx[joy_rx_count++] = 0xFF;
+        } else if (joy_config_mode && byte == 0x01) {
+            joy_analog_mode = true;
+            joy_rx[joy_rx_count++] = 0xF3;
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = 0x01;
+            joy_rx[joy_rx_count++] = 0x02;
+        } else if (joy_config_mode && byte == 0x02) {
+            joy_analog_mode = false;
+            joy_rx[joy_rx_count++] = 0xF3;
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = 0x01;
+            joy_rx[joy_rx_count++] = 0x02;
+        } else if (byte == 0x01) {
             joy_rx[joy_rx_count++] = 0xFF;
         } else if (byte == 0x42) {
-            joy_rx[joy_rx_count++] = 0x41;
-            joy_rx[joy_rx_count++] = 0x5A;
-            joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
-            joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
+            if (joy_analog_mode) {
+                joy_rx[joy_rx_count++] = 0x73;
+                joy_rx[joy_rx_count++] = 0x5A;
+                joy_rx[joy_rx_count++] = 0x01;
+                joy_rx[joy_rx_count++] = 0x02;
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
+                joy_rx[joy_rx_count++] = controller_state.right_x;
+                joy_rx[joy_rx_count++] = controller_state.right_y;
+                joy_motor_small_ = controller_state.right_x;
+                joy_motor_phase = 1;
+            } else {
+                joy_rx[joy_rx_count++] = 0x41;
+                joy_rx[joy_rx_count++] = 0x5A;
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
+                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
+            }
         } else if (byte == 0x43) {
             joy_rx[joy_rx_count++] = 0xF3;
             joy_rx[joy_rx_count++] = 0x5A;
             joy_rx[joy_rx_count++] = 0x01;
             joy_rx[joy_rx_count++] = 0x02;
         } else if (byte == 0x44) {
+            joy_config_mode = true;
             joy_ctrl |= 0x2000;
+            joy_rx[joy_rx_count++] = 0xF3;
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = 0x01;
+            joy_rx[joy_rx_count++] = 0x02;
+        } else if (byte == 0x45) {
+            joy_config_mode = false;
+            joy_rx[joy_rx_count++] = 0xF3;
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = 0x01;
+            joy_rx[joy_rx_count++] = 0x02;
+        } else if (byte == 0x46) {
             joy_rx[joy_rx_count++] = 0xF3;
             joy_rx[joy_rx_count++] = 0x5A;
             joy_rx[joy_rx_count++] = 0x01;
             joy_rx[joy_rx_count++] = 0x02;
         } else if (byte == 0x81) {
             joy_rx[joy_rx_count++] = 0xFF;
+            memory_card_phase = 1;
         } else if (byte == 0x52) {
             joy_rx[joy_rx_count++] = 0x5A;
             joy_rx[joy_rx_count++] = 0x5D;
             joy_rx[joy_rx_count++] = 0x00;
             joy_rx[joy_rx_count++] = 0x00;
+            if (memory_card_phase == 1) {
+                memory_card_phase = 2;
+                memory_card_writing = false;
+            }
+        } else if (byte == 0x57) {
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = 0x5D;
+            joy_rx[joy_rx_count++] = 0x00;
+            joy_rx[joy_rx_count++] = 0x00;
+            if (memory_card_phase == 1) {
+                memory_card_phase = 2;
+                memory_card_writing = true;
+            }
+        } else if (memory_card_phase == 2) {
+            memory_card_address = static_cast<std::uint32_t>(byte) << 8;
+            memory_card_phase = 3;
+            joy_rx[joy_rx_count++] = 0x5A;
+        } else if (memory_card_phase == 3) {
+            memory_card_address |= byte;
+            memory_card_address *= 128u;
+            memory_card_phase = 4;
+            joy_rx[joy_rx_count++] = 0x5C;
+            joy_rx[joy_rx_count++] = 0x5D;
+        } else if (memory_card_phase == 4) {
+            if (memory_card_writing) {
+                if (memory_card_address < memory_card.size()) {
+                    memory_card[memory_card_address++] = byte;
+                    ++memory_card_write_count;
+                }
+                joy_rx[joy_rx_count++] = 0x5C;
+                joy_rx[joy_rx_count++] = 0x5D;
+            } else {
+                if (memory_card_address < memory_card.size()) {
+                    joy_rx[joy_rx_count++] = memory_card[memory_card_address++];
+                } else {
+                    joy_rx[joy_rx_count++] = 0xFF;
+                }
+            }
+            memory_card_phase = 0;
         }
         joy_stat |= 0x00000004;
     }
@@ -347,6 +437,10 @@
             }
             return true;
         }
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            return true;
+        }
         if (physical == 0x1F801810) {
             gp0_store(value);
             return true;
@@ -369,7 +463,7 @@
             return true;
         }
         if (physical == 0x1F80104A) {
-            joy_ctrl = value;
+            joy_ctrl = value & 0xFFFF;
             return true;
         }
         if (physical == 0x1F80104E) {
@@ -378,13 +472,6 @@
         }
         if (physical >= 0x1F801800 && physical < 0x1F801804) {
             const std::uint32_t offset = physical - 0x1F801800;
-            if (std::getenv("ANYPS1_CDROM_TRACE") != nullptr) {
-                std::fprintf(stderr, "CDROM store offset=0x%X value=0x%08X index=%u pc=0x%08X\n",
-                    static_cast<unsigned>(offset),
-                    static_cast<unsigned>(value),
-                    static_cast<unsigned>(cdrom_index),
-                    static_cast<unsigned>(pc_));
-            }
             if (offset == 0) {
                 cdrom_index = value & 3;
             } else if (offset == 1) {
@@ -494,7 +581,13 @@
             return true;
         }
         if (physical >= 0x1F801000 && physical < 0x1F803000) {
-            return true;
+            char detail[96];
+            std::snprintf(detail, sizeof(detail),
+                "store to unsupported PS1 MMIO 0x%08X (PC 0x%08X)",
+                static_cast<unsigned>(address),
+                static_cast<unsigned>(pc_));
+            unsupported_ = detail;
+            return false;
         }
         char detail[96];
         std::snprintf(detail, sizeof(detail),
@@ -514,6 +607,11 @@
             for (std::uint32_t index = 0; index < size && offset + index < scratchpad_.size(); ++index) {
                 value |= static_cast<std::uint32_t>(scratchpad_[offset + index]) << (index * 8);
             }
+            return true;
+        }
+        if (physical == 0x1F801020 || physical == 0x1F801024
+            || physical == 0x1F801060 || physical == 0x1F801064) {
+            value = 0;
             return true;
         }
         if (physical == 0x1F801810) {
@@ -624,8 +722,8 @@
             return true;
         }
         if (physical >= 0x1F801000 && physical < 0x1F803000) {
-            value = 0;
-            return true;
+            unsupported_ = "load from unsupported PS1 MMIO";
+            return false;
         }
         return false;
     }

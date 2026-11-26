@@ -22,8 +22,17 @@ bool relink(const RelinkOptions& options);
 struct RunOptions {
     std::string input;
     std::string cdrom_bin;
+    std::string memory_card;
     std::uint64_t max_instructions = 1000000;
     bool video = false;
+};
+
+struct ControllerState {
+    std::uint16_t digital = 0xFFFF;
+    std::uint8_t left_x = 0x80;
+    std::uint8_t left_y = 0x80;
+    std::uint8_t right_x = 0x80;
+    std::uint8_t right_y = 0x80;
 };
 
 struct RuntimeSnapshot {
@@ -73,6 +82,12 @@ struct RuntimeSnapshot {
     std::uint32_t joy_baud = 0;
     std::uint32_t joy_rx_count = 0;
     std::array<unsigned char, 8> joy_rx{};
+    bool joy_analog_mode = false;
+    bool joy_config_mode = false;
+    std::uint32_t joy_motor_small = 0;
+    std::uint32_t joy_motor_large = 0;
+    std::array<unsigned char, 128 * 1024> memory_card{};
+    std::uint32_t memory_card_write_count = 0;
 };
 
 bool run_psx(const RunOptions& options, RuntimeSnapshot* snapshot = nullptr);
