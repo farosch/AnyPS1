@@ -1,6 +1,10 @@
 build/
 build-*/
 .cache/
+.agents/
+.venv/
+__pycache__/
+*.py[cod]
 *.a
 *.o
 *.obj
