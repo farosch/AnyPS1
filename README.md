@@ -45,7 +45,11 @@ native Linux or Windows game executable.
 
 ```sh
 anyps1 --run "/path/to/PS-X.EXE" 1000000
+anyps1 --run-video "/path/to/PS-X.EXE" 1000000
 ```
+
+The video mode opens an SDL host window and presents the generic PS1 frame
+surface. PS1 GPU rasterization is implemented separately from the SDL host layer.
 
 This generic interpreter provides 2 MiB main RAM, scratchpad and MMIO handling,
 BIOS-vector returns, and MIPS I startup instructions. It is not yet a complete

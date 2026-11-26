@@ -21,6 +21,7 @@ bool relink(const RelinkOptions& options);
 struct RunOptions {
     std::string input;
     std::uint64_t max_instructions = 1000000;
+    bool video = false;
 };
 
 bool run_psx(const RunOptions& options);

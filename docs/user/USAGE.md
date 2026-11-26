@@ -22,6 +22,7 @@ support yet.
 
 ```sh
 anyps1 --run <input.ps-exe> <instruction-limit>
+anyps1 --run-video <input.ps-exe> <instruction-limit>
 ```
 
 The native host executable uses the initial interpreter stage. It supports PS1

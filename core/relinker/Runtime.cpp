@@ -1,4 +1,5 @@
 #include "Relinker.h"
+#include "HostVideo.h"
 
 #include <array>
 #include <cstdint>
@@ -6,6 +7,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <cstdlib>
 #include <stdexcept>
 #include <vector>
@@ -628,7 +630,17 @@ bool run_psx(const RunOptions& options)
         std::istreambuf_iterator<char>()
     };
     PsxCpu cpu(exe);
+    std::unique_ptr<HostVideo> video;
+    if (options.video) {
+        video = std::make_unique<HostVideo>();
+    }
     for (std::uint64_t instructions = 0; instructions < options.max_instructions; ++instructions) {
+        if (video && (instructions % 10000 == 0)) {
+            if (!video->poll_events()) {
+                return true;
+            }
+            video->present();
+        }
         if (!cpu.step()) {
             if (const char* reason = cpu.unsupported()) {
                 throw std::runtime_error(

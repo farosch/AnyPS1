@@ -6,6 +6,21 @@
 
 int main(int argc, char** argv)
 {
+    if (argc == 4 && std::string(argv[1]) == "--run-video") {
+        anyps1::RunOptions options;
+        options.input = argv[2];
+        options.max_instructions = std::stoull(argv[3]);
+        options.video = true;
+        try {
+            if (!anyps1::run_psx(options)) {
+                return 1;
+            }
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "Error: " << error.what() << "\n";
+            return 1;
+        }
+    }
     if (argc == 4 && std::string(argv[1]) == "--run") {
         anyps1::RunOptions options;
         options.input = argv[2];
@@ -52,7 +67,8 @@ int main(int argc, char** argv)
             << "  anyps1 <input.ps-exe> <output.elf>\n"
             << "  anyps1 --target linux <input.ps-exe> <output.elf>\n"
             << "  anyps1 --target windows <input.ps-exe> <output.exe>\n"
-            << "  anyps1 --run <input.ps-exe> <instruction-limit>\n";
+            << "  anyps1 --run <input.ps-exe> <instruction-limit>\n"
+            << "  anyps1 --run-video <input.ps-exe> <instruction-limit>\n";
         return 2;
     }
 
