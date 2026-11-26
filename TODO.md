@@ -29,7 +29,7 @@
 
 ## DMA
 
-- [ ] Implement DMA priority, bus arbitration, and chaining completion precisely.
+- [x] Implement DMA priority scheduling, pending arbitration, MADR advancement, and DICR completion for block/linked/OTC chains.
 - [x] Implement DICR completion IRQ masking and GPU/OTC/CD-ROM/SPU transfer hooks.
 - [x] Implement block-DMA and linked-list DMA dispatch for DMA channel 2.
 - [ ] Add complete DMA channel 1 MDEC-in/MDEC-out scheduling.

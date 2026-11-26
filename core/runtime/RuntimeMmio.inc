@@ -122,20 +122,40 @@
             dma_bcr[channel] = value;
         } else if (offset == 8) {
             dma_chcr[channel] = value;
-            if (channel == 2
-                && (value & 0x01000000u) != 0
-                && ((value >> 8) & 3u) == 2) {
-                dma_gpu_linked(dma_madr[channel]);
-            } else if (channel == 2
-                && (value & 0x01000000u) != 0
-                && ((value >> 8) & 3u) == 1) {
-                dma_block(channel);
-            } else if (channel == 6
-                && (value & 0x01000201u) == 0x01000201u) {
-                dma_otc(dma_madr[channel], dma_bcr[channel]);
-            } else if ((value & 0x01000000u) != 0
-                && (value & 1u) != 0) {
-                dma_block(channel);
+            if ((value & 0x01000000u) != 0) {
+                dma_pending |= 1u << channel;
+                dma_dispatch_pending();
+            }
+        }
+    }
+
+    void dma_dispatch_pending()
+    {
+        for (std::uint32_t priority = 7; priority != 0 && dma_pending != 0; --priority) {
+            for (std::uint32_t channel = 0; channel < 7; ++channel) {
+                const std::uint32_t channel_priority =
+                    (dpcr >> (channel * 4u)) & 0xFu;
+                if ((dma_pending & (1u << channel)) == 0
+                    || channel_priority != priority) {
+                    continue;
+                }
+                dma_pending &= ~(1u << channel);
+                const std::uint32_t value = dma_chcr[channel];
+                if (channel == 2
+                    && ((value >> 8) & 3u) == 2
+                    && (value & 0x01000000u) != 0) {
+                    dma_gpu_linked(dma_madr[channel]);
+                } else if (channel == 2
+                    && ((value >> 8) & 3u) == 1
+                    && (value & 0x01000000u) != 0) {
+                    dma_block(channel);
+                } else if (channel == 6
+                    && (value & 0x01000201u) == 0x01000201u) {
+                    dma_otc(dma_madr[channel], dma_bcr[channel]);
+                } else if ((value & 0x01000000u) != 0
+                    && (value & 1u) != 0) {
+                    dma_block(channel);
+                }
             }
         }
     }
@@ -173,6 +193,7 @@
         if (channel == 3 && cdrom_read_active) {
             ++cdrom_lba;
         }
+        dma_madr[channel] = address;
         dma_chcr[channel] &= ~0x01000000u;
         complete_dma(channel);
     }
@@ -196,6 +217,7 @@
             }
             address = next;
         }
+        dma_madr[2] = address & 0x00FFFFFF;
         dma_chcr[2] &= ~0x01000000u;
         complete_dma(2);
     }
@@ -211,7 +233,9 @@
             ram_[address + 3] = static_cast<unsigned char>(value >> 24);
             address -= 4;
         }
+        dma_madr[6] = address & 0x00FFFFFF;
         dma_chcr[6] &= ~0x01000000u;
+        complete_dma(6);
     }
 
     void spu_dma_write(std::uint32_t address)

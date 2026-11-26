@@ -98,16 +98,18 @@ void test_dma(const std::filesystem::path& fixtures)
     const auto snapshot = run_fixture(fixtures, "runtime-dma.ps-exe");
     std::cerr << "DMA OTC first=" << snapshot.dma_otc_first
               << " last=" << snapshot.dma_otc_last << "\n";
-    require(snapshot.dma_madr[6] == 0x00000100, "DMA OTC base address");
+    require(snapshot.dma_madr[6] == 0x000000F8, "DMA OTC completed chain address");
     require(snapshot.dma_bcr[6] == 2, "DMA OTC block count");
     require(snapshot.dma_otc_first == 0x000000FC, "DMA OTC first chain value");
     require(snapshot.dma_otc_last == 0x00FFFFFF, "DMA OTC terminal chain value");
+    require(snapshot.dma_dpcr == 0x07654321, "DMA priority DPCR default");
+    require(snapshot.dma_pending == 0, "DMA pending mask cleared after arbitration");
 }
 
 void test_dma_gpu(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-dma-gpu.ps-exe", 100);
-    require(snapshot.dma_madr[2] == 0x00010100, "DMA GPU base address");
+    require(snapshot.dma_madr[2] == 0x00010104, "DMA GPU advanced address");
     require(snapshot.dma_bcr[2] == 1, "DMA GPU block count");
     require(snapshot.gpu_write_count >= 1, "DMA GPU GP0 packet writes");
 }

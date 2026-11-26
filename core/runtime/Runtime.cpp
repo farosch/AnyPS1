@@ -554,6 +554,8 @@ public:
         result.dma_madr = dma_madr;
         result.dma_bcr = dma_bcr;
         result.dma_chcr = dma_chcr;
+        result.dma_dpcr = dpcr;
+        result.dma_pending = dma_pending;
         if (ram_.size() >= 0x104) {
             result.dma_otc_first = read_ram32(0x80000100);
             result.dma_otc_last = read_ram32(0x800000FC);
@@ -757,6 +759,7 @@ private:
     std::array<std::uint32_t, 7> dma_madr{};
     std::array<std::uint32_t, 7> dma_bcr{};
     std::array<std::uint32_t, 7> dma_chcr{};
+    std::uint32_t dma_pending = 0;
     std::uint32_t dpcr = 0x07654321;
     std::uint32_t dicr = 0;
     std::uint32_t interrupt_status = 0;

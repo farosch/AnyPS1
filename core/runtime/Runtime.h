@@ -47,6 +47,8 @@ struct RuntimeSnapshot {
     std::array<std::uint32_t, 7> dma_madr{};
     std::array<std::uint32_t, 7> dma_bcr{};
     std::array<std::uint32_t, 7> dma_chcr{};
+    std::uint32_t dma_dpcr = 0;
+    std::uint32_t dma_pending = 0;
     std::uint32_t dma_otc_first = 0;
     std::uint32_t dma_otc_last = 0;
     std::uint32_t interrupt_status = 0;
