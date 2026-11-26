@@ -1,6 +1,6 @@
-#include "Relinker.h"
-#include "HostVideo.h"
-#include "HostAudio.h"
+#include "runtime/Runtime.h"
+#include "host/HostVideo.h"
+#include "host/HostAudio.h"
 
 #include <array>
 #include <algorithm>

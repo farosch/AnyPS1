@@ -2,23 +2,24 @@
 
 AnyPS1 is a project for relinking PlayStation 1 game executables into native Linux or Windows programs.
 
-This repository is an initial project scaffold. The executable format decoder and platform relinker are not implemented yet.
+This repository converts PS-X EXE images and extracted PlayStation 1 discs into
+native Linux or Windows artifacts.
 
 ## Architecture
 
-AnyPS1 is organized around a relinker core, compatibility libraries, command-line tools, and target-platform integrations.
+AnyPS1 is organized around executable conversion, PS1 runtime emulation, host
+integration, command-line tools, and target-platform output.
 
 The implementation decodes PS-X EXE structures, analyzes references and entry points, and produces a target-native executable or layout artifact.
 
 ## Layout
 
 - `core/relinker`: executable decoding and relinking implementation
+- `core/runtime`: PS1 CPU and system-runtime implementation
+- `core/host`: SDL host video, audio, and controller integration
 - `core/anyps1.cpp`: main command-line and runtime application
-- `core/libs`: platform and system-library compatibility modules
 - `tools`: command-line and analysis utilities
-- `cmake`: CMake helpers and dependency integration
 - `TODO.md`: known implementation gaps and validation work
-- `demo`: web or native demonstrations
 - `tests`: integration and unit tests
 - `3rdparty`: third-party dependencies managed as submodules
 
