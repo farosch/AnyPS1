@@ -7,6 +7,103 @@
         }
     }
 
+    void assert_interrupt(std::uint32_t line)
+    {
+        if (line < 13) {
+            interrupt_status |= 1u << line;
+        }
+        update_interrupt_request();
+    }
+
+    void complete_dma(std::uint32_t channel)
+    {
+        if (channel < 7) {
+            dicr |= 1u << (24u + channel);
+            if (((dicr >> (16u + channel)) & 1u) != 0
+                && (dicr & 0x00800000u) != 0) {
+                dicr |= 0x80000000u;
+                assert_interrupt(3);
+            }
+        }
+    }
+
+    void timer_irq(std::uint32_t timer)
+    {
+        const std::uint32_t mode = timer_mode[timer];
+        if (timer_irq_active[timer] && (mode & 64) == 0) {
+            return;
+        }
+        timer_irq_active[timer] = true;
+        if ((mode & 128) != 0) {
+            timer_mode[timer] ^= 0x400;
+        } else {
+            timer_mode[timer] |= 0x400;
+        }
+        assert_interrupt(10u + timer);
+    }
+
+    void tick_timer(std::uint32_t timer)
+    {
+        const std::uint32_t mode = timer_mode[timer];
+        if ((mode & 1) != 0) {
+            const std::uint32_t sync_mode = (mode >> 1) & 3;
+            if (sync_mode == 0) {
+                timer_gate_active[timer] = false;
+            } else if (sync_mode == 1) {
+                if (timer_gate_active[timer]) {
+                    timer_count[timer] = 0;
+                }
+            } else if (sync_mode == 2) {
+                if (!timer_gate_active[timer]) {
+                    timer_count[timer] = 0;
+                    timer_gate_active[timer] = false;
+                    return;
+                }
+            } else if (sync_mode == 3) {
+                if (timer_gate_active[timer]) {
+                    timer_count[timer] = 0;
+                    timer_gate_active[timer] = false;
+                    return;
+                }
+            }
+        }
+
+        bool clocked = true;
+        if (timer == 0 && (mode & 0x100) != 0) {
+            clocked = hblank_active;
+        } else if (timer == 1 && (mode & 0x100) != 0) {
+            clocked = hblank_active;
+        } else if (timer == 2 && (mode & 0x200) != 0) {
+            clocked = true;
+        }
+        if (!clocked) {
+            return;
+        }
+
+        ++timer_count[timer];
+        if (timer_target[timer] != 0 && timer_count[timer] >= timer_target[timer]) {
+            if ((mode & 8) != 0) {
+                timer_count[timer] = 0;
+            }
+            if ((mode & 16) != 0) {
+                timer_irq(timer);
+            }
+        }
+        if (timer_count[timer] >= 0x10000) {
+            timer_count[timer] = 0;
+            if ((mode & 32) != 0) {
+                timer_irq(timer);
+            }
+        }
+    }
+
+    void tick_timers()
+    {
+        tick_timer(0);
+        tick_timer(1);
+        tick_timer(2);
+    }
+
     void dma_channel_store(std::uint32_t channel, std::uint32_t offset, std::uint32_t value)
     {
         if (channel >= 7) {
@@ -39,7 +136,6 @@
                 gp0_store(read_ram32(address | 0x80000000));
             } else if (channel == 4) {
                 spu_dma_write(address);
-            } else if (channel == 1) {
             } else if (channel == 3 && cdrom_read_active) {
                 const std::uint64_t disc_offset =
                     static_cast<std::uint64_t>(cdrom_lba) * 2352ULL;
@@ -59,8 +155,7 @@
             ++cdrom_lba;
         }
         dma_chcr[channel] &= ~0x01000000u;
-        interrupt_status |= (1u << 3);
-        update_interrupt_request();
+        complete_dma(channel);
     }
 
     void dma_gpu_linked(std::uint32_t address)
@@ -83,8 +178,7 @@
             address = next;
         }
         dma_chcr[2] &= ~0x01000000u;
-        interrupt_status |= (1u << 3);
-        update_interrupt_request();
+        complete_dma(2);
     }
 
     void dma_otc(std::uint32_t address, std::uint32_t bcr)
@@ -122,21 +216,10 @@
         if (byte == 0x01) {
             joy_rx[joy_rx_count++] = 0xFF;
         } else if (byte == 0x42) {
-            if ((joy_ctrl & 0x2000) != 0) {
-                joy_rx[joy_rx_count++] = 0x73;
-                joy_rx[joy_rx_count++] = 0x5A;
-                joy_rx[joy_rx_count++] = 0x01;
-                joy_rx[joy_rx_count++] = 0x02;
-                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
-                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
-                joy_rx[joy_rx_count++] = 0x80;
-                joy_rx[joy_rx_count++] = 0x80;
-            } else {
-                joy_rx[joy_rx_count++] = 0x41;
-                joy_rx[joy_rx_count++] = 0x5A;
-                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
-                joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
-            }
+            joy_rx[joy_rx_count++] = 0x41;
+            joy_rx[joy_rx_count++] = 0x5A;
+            joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state);
+            joy_rx[joy_rx_count++] = static_cast<unsigned char>(pad_state >> 8);
         } else if (byte == 0x43) {
             joy_rx[joy_rx_count++] = 0xF3;
             joy_rx[joy_rx_count++] = 0x5A;
@@ -167,8 +250,7 @@
         cdrom_response[1] = second;
         cdrom_interrupt = 3;
         if ((cdrom_interrupt_enable & 3) != 0) {
-            interrupt_status |= 1u << 2;
-            update_interrupt_request();
+            assert_interrupt(2);
         }
     }
 
@@ -191,7 +273,7 @@
             break;
         case 0x06:
             cdrom_read_active = true;
-            cdrom_status |= 0x20;
+            cdrom_status |= 0x21;
             cdrom_set_response(cdrom_status);
             break;
         case 0x1B:
@@ -314,16 +396,16 @@
         }
         if (physical >= 0x1F801C00 && physical < 0x1F801E80) {
             const std::uint32_t offset = physical - 0x1F801C00;
-            if (offset == 0xD88) {
+            if (offset == 0x1AA) {
                 spu_control = value;
                 spu_status = (spu_control & 0xFFFF);
-            } else if (offset == 0xD8A) {
+            } else if (offset == 0x1AE) {
                 spu_status = value;
-            } else if (offset == 0xD80) {
+            } else if (offset == 0x180) {
                 spu_main_volume_l = value & 0xFFFF;
-            } else if (offset == 0xD82) {
+            } else if (offset == 0x182) {
                 spu_main_volume_r = value & 0xFFFF;
-            } else if (offset == 0xD8C) {
+            } else if (offset == 0x188) {
                 spu_key_on = value;
                 for (std::uint32_t voice = 0; voice < 24; ++voice) {
                     if (spu_key_on & (1u << voice)) {
@@ -334,7 +416,7 @@
                         spu_voice_repeat_address[voice] = spu_voice_repeat[voice] * 8u;
                     }
                 }
-            } else if (offset == 0xD90) {
+            } else if (offset == 0x18C) {
                 spu_key_off = value;
                 for (std::uint32_t voice = 0; voice < 24; ++voice) {
                     if (spu_key_off & (1u << voice)) {
@@ -364,7 +446,7 @@
             return true;
         }
         if (physical == 0x1F801074) {
-            interrupt_mask = value & 0x7FF;
+            interrupt_mask = value & 0x1FFF;
             update_interrupt_request();
             return true;
         }
@@ -375,6 +457,7 @@
                 timer_count[timer] = value;
             } else if (offset == 4) {
                 timer_mode[timer] = value;
+                timer_irq_active[timer] = false;
                 if ((value & 4) != 0) {
                     timer_count[timer] = 0;
                 }
@@ -387,12 +470,8 @@
             if (physical == 0x1F8010F0) {
                 dpcr = value;
             } else if (physical == 0x1F8010F4) {
-                dicr = (dicr & ~0x7F000000u) | (value & 0x7F000000u);
-                if ((value & 0x00800000) != 0) {
-                    dicr &= ~(value & 0x007FFFFFu);
-                } else {
-                    dicr |= value & 0x007FFFFFu;
-                }
+                dicr &= ~0x7F000000u;
+                dicr = (dicr & 0xFF000000u) | (value & 0x00FF803Fu);
             } else {
                 const std::uint32_t channel = (physical - 0x1F801080) / 16;
                 const std::uint32_t offset = (physical - 0x1F801080) % 16;
@@ -493,10 +572,10 @@
         }
         if (physical >= 0x1F801C00 && physical < 0x1F801E80) {
             const std::uint32_t offset = physical - 0x1F801C00;
-            if (offset == 0xD88) value = spu_control;
-            else if (offset == 0xD8A) value = spu_status;
-            else if (offset == 0xD8C) value = spu_key_on;
-            else if (offset == 0xD90) value = spu_key_off;
+            if (offset == 0x1AA) value = spu_control;
+            else if (offset == 0x1AE) value = spu_status;
+            else if (offset == 0x188) value = spu_key_on;
+            else if (offset == 0x18C) value = spu_key_off;
             else value = 0;
             return true;
         }

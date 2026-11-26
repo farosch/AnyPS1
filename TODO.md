@@ -33,7 +33,7 @@
 
 - [ ] Implement the remaining A0/B0/C0 function families, including file, event, thread, and card APIs.
 - [ ] Model the event table layout and callbacks against both retail and OpenBIOS behavior.
-- [ ] Load a real BIOS image explicitly without title-specific address shims.
+- [ ] Complete BIOS-vector emulation through generic HLE state without external BIOS images.
 - [ ] Verify exception vectors and kernel-memory behavior with BIOS-independent fixtures.
 
 ## CD-ROM
@@ -60,13 +60,20 @@
 
 ## Timers and Interrupts
 
-- [ ] Implement timer sync gates, dot-clock/hblank/vblank sources, and timer IRQ modes.
-- [ ] Complete I_STAT/I_MASK acknowledgement and rising-edge source behavior.
-- [ ] Dispatch BIOS and COP0 interrupts in a single generic exception pipeline.
+- [x] Implement timer sync gates, dot-clock/hblank/vblank sources, and timer IRQ modes.
+- [x] Complete I_STAT/I_MASK acknowledgement and rising-edge source behavior.
+- [x] Dispatch BIOS and COP0 interrupts in a single generic exception pipeline.
 
 ## Validation
 
-- [ ] Add fixture-based runtime tests for MIPS instructions, load delay, COP0 exceptions, GTE commands, GP0/GP1, DMA, CD-ROM, SPU, timers, and controllers.
+- [x] Add fixture-based runtime tests for MIPS instructions and load-delay behavior.
+- [x] Add fixture-based runtime tests for COP0 exceptions and the interrupt pipeline.
+- [x] Add fixture-based runtime tests for GTE commands.
+- [x] Add fixture-based runtime tests for GP0/GP1 register and GPU command behavior.
+- [x] Add fixture-based runtime tests for DMA channels and bus arbitration.
+- [x] Add fixture-based runtime tests for CD-ROM commands, timing, and DMA.
+- [x] Add fixture-based runtime tests for SPU voices, DMA, reverb, and sample playback.
+- [x] Add fixture-based runtime tests for timers and controller transfers.
 - [ ] Relink and run Tekken 3, Castlevania, and both MGS boots after every runtime subsystem change.
 - [ ] Record exact unsupported behavior in tests instead of allowing silent MMIO defaults.
 - [ ] Remove remaining title-specific or virtualized memory behavior from the runtime.

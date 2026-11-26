@@ -126,23 +126,16 @@
 
     bool in_ram(std::uint32_t address) const
     {
-        address &= 0x1FFFFFFF;
-        if (address >= 0x1FC00000 && address - 0x1FC00000 < bios_rom.size()) {
-            return true;
+        if ((address & 0xFF000000u) == 0x1F000000u) {
+            return false;
         }
-        return address < ram_.size();
+        const std::uint32_t physical = address & 0x1FFFFFFF;
+        return physical < ram_.size();
     }
 
     std::uint32_t read_ram32(std::uint32_t address) const
     {
         address &= 0x1FFFFFFF;
-        if (address >= 0x1FC00000 && address - 0x1FC00000 + 4 <= bios_rom.size()) {
-            const std::uint32_t offset = address - 0x1FC00000;
-            return static_cast<std::uint32_t>(bios_rom[offset])
-                | (static_cast<std::uint32_t>(bios_rom[offset + 1]) << 8)
-                | (static_cast<std::uint32_t>(bios_rom[offset + 2]) << 16)
-                | (static_cast<std::uint32_t>(bios_rom[offset + 3]) << 24);
-        }
         return static_cast<std::uint32_t>(ram_[address])
             | (static_cast<std::uint32_t>(ram_[address + 1]) << 8)
             | (static_cast<std::uint32_t>(ram_[address + 2]) << 16)
@@ -339,15 +332,15 @@
             raise_exception(5);
             return true;
         }
-        address &= 0x1FFFFFFF;
-        if (in_ram(address) && in_ram(address + 3)) {
-            address &= 0x1FFFFFFF;
-            ram_[address] = static_cast<unsigned char>(value);
-            ram_[address + 1] = static_cast<unsigned char>(value >> 8);
-            ram_[address + 2] = static_cast<unsigned char>(value >> 16);
-            ram_[address + 3] = static_cast<unsigned char>(value >> 24);
+        const std::uint32_t original_address = address;
+        const std::uint32_t ram_address = address & 0x1FFFFFFF;
+        if (in_ram(ram_address) && in_ram(ram_address + 3)) {
+            ram_[ram_address] = static_cast<unsigned char>(value);
+            ram_[ram_address + 1] = static_cast<unsigned char>(value >> 8);
+            ram_[ram_address + 2] = static_cast<unsigned char>(value >> 16);
+            ram_[ram_address + 3] = static_cast<unsigned char>(value >> 24);
             return true;
         }
-        return io_store(address, value, 4);
+        return io_store(original_address, value, 4);
     }
 

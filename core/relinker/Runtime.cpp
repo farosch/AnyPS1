@@ -39,8 +39,7 @@ class PsxCpu {
 public:
     explicit PsxCpu(
         const std::vector<unsigned char>& exe,
-        const std::string& cdrom_bin = {},
-        const std::string& bios = {}
+        const std::string& cdrom_bin = {}
     )
     {
         if (exe.size() < 2048 || std::memcmp(exe.data(), "PS-X EXE", 8) != 0) {
@@ -69,16 +68,6 @@ public:
                 throw std::runtime_error("cannot open CD-ROM BIN: " + cdrom_bin);
             }
         }
-        if (!bios.empty()) {
-            std::ifstream image(bios, std::ios::binary);
-            bios_rom.assign(
-                std::istreambuf_iterator<char>(image),
-                std::istreambuf_iterator<char>()
-            );
-            if (!image && bios_rom.empty()) {
-                throw std::runtime_error("cannot open PS1 BIOS: " + bios);
-            }
-        }
         regs_[29] = sp_base_ + sp_offset_;
         ram_[0x474] = 0x00;
         ram_[0x475] = 0xF0;
@@ -95,7 +84,8 @@ public:
         if (execute_bios_vector()) {
             return true;
         }
-        if ((cop0_[12] & 1) != 0 && (cop0_[12] & cop0_[13] & 0x0400) != 0) {
+        if ((cop0_[12] & 1) != 0
+            && (cop0_[12] & cop0_[13] & 0xFF00) != 0) {
             raise_exception(0);
             return true;
         }
@@ -464,9 +454,73 @@ public:
         return pc_;
     }
 
+    RuntimeSnapshot snapshot() const
+    {
+        RuntimeSnapshot result;
+        result.pc = pc_;
+        result.registers = regs_;
+        result.cop0 = cop0_;
+        result.gte_data = gte_data_;
+        result.gte_control = gte_control;
+        result.gpu_status = gpu_status;
+        result.gpu_write_count = static_cast<std::uint32_t>(gpu_write_count);
+        result.gpu_vram_write_count = static_cast<std::uint32_t>(gpu_vram_write_count);
+        result.gpuread = gpuread;
+        result.gpu_draw_x1 = gpu_draw_x1;
+        result.gpu_draw_y1 = gpu_draw_y1;
+        result.gpu_draw_x2 = gpu_draw_x2;
+        result.gpu_draw_y2 = gpu_draw_y2;
+        result.gpu_tex_window = gpu_tex_window_x
+            | (gpu_tex_window_y << 5)
+            | (gpu_tex_window_mask_x << 10)
+            | (gpu_tex_window_mask_y << 15)
+            | (gpu_tex_window_offset_x << 20)
+            | (gpu_tex_window_offset_y << 25);
+        result.display_x = display_x;
+        result.display_y = display_y;
+        result.display_width = display_width;
+        result.display_height = display_height;
+        result.dma_madr = dma_madr;
+        result.dma_bcr = dma_bcr;
+        result.dma_chcr = dma_chcr;
+        if (ram_.size() >= 0x104) {
+            result.dma_otc_first = read_ram32(0x80000100);
+            result.dma_otc_last = read_ram32(0x800000FC);
+        }
+        result.interrupt_status = interrupt_status;
+        result.interrupt_mask = interrupt_mask;
+        result.timer_count = timer_count;
+        result.timer_target = timer_target;
+        result.timer_mode = timer_mode;
+        result.cdrom_status = cdrom_status;
+        result.cdrom_lba = cdrom_lba;
+        result.cdrom_sector_size = cdrom_sector_size;
+        result.cdrom_response_count = cdrom_response_count;
+        result.cdrom_params = cdrom_params;
+        result.cdrom_read_active = cdrom_read_active;
+        result.spu_control = spu_control;
+        result.spu_status = spu_status;
+        result.spu_key_on = spu_key_on;
+        result.spu_voice_volume_l = spu_voice_volume_l;
+        result.spu_voice_volume_r = spu_voice_volume_r;
+        for (std::uint32_t voice = 0; voice < 24; ++voice) {
+            result.spu_voice_address[voice] = spu_voice_start[voice] * 8u;
+        }
+        result.joy_stat = joy_stat;
+        result.joy_ctrl = joy_ctrl;
+        result.joy_mode = joy_mode;
+        result.joy_baud = joy_baud;
+        result.joy_rx_count = joy_rx_count;
+        result.joy_rx = joy_rx;
+        return result;
+    }
+
     void tick_frame()
     {
-        interrupt_status |= 1;
+        assert_interrupt(0);
+        hblank_active = !hblank_active;
+        timer_gate_active[0] = hblank_active;
+        timer_gate_active[1] = hblank_active;
         for (std::uint32_t voice = 0; voice < 24; ++voice) {
             if (spu_key_on & (1u << voice)) {
                 ++spu_voice_counter[voice];
@@ -493,24 +547,7 @@ public:
                 bios_event_flags[event] = 0x4000;
             }
         }
-        for (std::uint32_t timer = 0; timer < timer_count.size(); ++timer) {
-            const std::uint32_t increment = (timer == 2 && (timer_mode[timer] & 0x200) != 0) ? 0 : 1;
-            timer_count[timer] += increment;
-            if (timer_target[timer] != 0 && timer_count[timer] >= timer_target[timer]) {
-                if ((timer_mode[timer] & 8) != 0) {
-                    timer_count[timer] = 0;
-                }
-                if ((timer_mode[timer] & 32) != 0) {
-                    interrupt_status |= 1u << (10 + timer);
-                }
-            }
-            if (timer_count[timer] >= 0x10000) {
-                timer_count[timer] &= 0xFFFF;
-            }
-        }
-        if (interrupt_status & interrupt_mask & 1) {
-            cop0_[13] |= 0x0400;
-        }
+        tick_timers();
     }
 
     void set_pad_state(std::uint16_t state)
@@ -585,7 +622,6 @@ private:
     std::array<unsigned char, 2 * 1024 * 1024> ram_{};
     std::array<unsigned char, 1024> scratchpad_{};
     std::array<std::uint16_t, 1024 * 512> vram_{};
-    std::vector<unsigned char> bios_rom;
     std::array<std::uint32_t, 16> gp0_params_{};
     std::uint32_t gp0_param_count = 0;
     std::uint32_t gp0_expected = 0;
@@ -639,6 +675,9 @@ private:
     std::array<std::uint32_t, 3> timer_count{};
     std::array<std::uint32_t, 3> timer_target{};
     std::array<std::uint32_t, 3> timer_mode{};
+    std::array<bool, 3> timer_gate_active{};
+    std::array<bool, 3> timer_irq_active{};
+    bool hblank_active = false;
     std::uint32_t joy_stat = 0x00000005;
     std::uint32_t joy_ctrl = 0;
     std::uint32_t joy_mode = 0;
@@ -710,7 +749,7 @@ private:
 
 }
 
-bool run_psx(const RunOptions& options)
+bool run_psx(const RunOptions& options, RuntimeSnapshot* snapshot)
 {
     std::ifstream input(options.input, std::ios::binary);
     if (!input) {
@@ -743,14 +782,7 @@ bool run_psx(const RunOptions& options)
             }
         }
     }
-    std::string bios = options.bios;
-    if (bios.empty()) {
-        std::filesystem::path bios_candidate("references/firmware-psx-bios/scph5501.bin");
-        if (std::filesystem::is_regular_file(bios_candidate)) {
-            bios = bios_candidate.string();
-        }
-    }
-    PsxCpu cpu(exe, cdrom_bin, bios);
+    PsxCpu cpu(exe, cdrom_bin);
     std::unique_ptr<HostVideo> video;
     std::unique_ptr<HostAudio> audio = std::make_unique<HostAudio>();
     if (options.video) {
@@ -776,6 +808,9 @@ bool run_psx(const RunOptions& options)
             cpu.render_audio(*audio);
         }
         if (!cpu.step()) {
+            if (snapshot != nullptr) {
+                *snapshot = cpu.snapshot();
+            }
             if (const char* reason = cpu.unsupported()) {
                 throw std::runtime_error(
                     std::string(reason) + " at 0x"
@@ -788,6 +823,9 @@ bool run_psx(const RunOptions& options)
             }
             return true;
         }
+    }
+    if (snapshot != nullptr) {
+        *snapshot = cpu.snapshot();
     }
     std::cout << "instruction limit reached\n";
     return true;
