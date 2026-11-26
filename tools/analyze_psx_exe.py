@@ -1,5 +1,7 @@
 import argparse
 import struct
+from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -144,17 +146,269 @@ def parse_integer(value: str) -> int:
     return int(value, 0)
 
 
+@dataclass(frozen=True)
+class MemoryReference:
+    address: int
+    instruction: int
+    register: int
+    offset: int
+    operation: str
+    resolved_address: int
+
+
+@dataclass(frozen=True)
+class CallReference:
+    address: int
+    target: int
+    source: str
+
+
+def decode_fields(word: int) -> tuple[int, int, int, int, int, int]:
+    return (
+        (word >> 26) & 0x3F,
+        (word >> 21) & 0x1F,
+        (word >> 16) & 0x1F,
+        (word >> 11) & 0x1F,
+        (word >> 6) & 0x1F,
+        word & 0xFFFF,
+    )
+
+
+def control_flow_map(code: bytes, base_address: int) -> dict[str, object]:
+    leaders = {base_address}
+    instructions = {}
+    for offset in range(0, len(code) - 3, 4):
+        address = base_address + offset
+        word = struct.unpack_from("<I", code, offset)[0]
+        instructions[address] = word
+        opcode, rs, rt, rd, shamt, immediate = decode_fields(word)
+
+        if opcode in (0x02, 0x03):
+            target = ((address + 4) & 0xF0000000) | ((word & 0x03FFFFFF) << 2)
+            leaders.add(target)
+            if target >= base_address and target < base_address + len(code):
+                leaders.add(address + 8)
+        elif opcode in (0x01, 0x04, 0x05, 0x06, 0x07):
+            target = address + 4 + (sign_extend16(immediate) << 2)
+            leaders.add(target)
+            leaders.add(address + 8)
+        elif opcode == 0 and (word & 0x3F) in (0x08, 0x09):
+            leaders.add(address + 8)
+
+    blocks = {}
+    edges = defaultdict(set)
+    sorted_leaders = sorted(address for address in leaders if address in instructions)
+
+    for index, start in enumerate(sorted_leaders):
+        end_limit = sorted_leaders[index + 1] if index + 1 < len(sorted_leaders) else base_address + len(code)
+        addresses = []
+        for address in range(start, end_limit, 4):
+            if address not in instructions:
+                break
+            addresses.append(address)
+            if address + 4 >= end_limit:
+                break
+            word = instructions[address]
+            opcode = (word >> 26) & 0x3F
+            special = word & 0x3F
+            if opcode in (0x02, 0x03, 0x04, 0x05, 0x06, 0x07):
+                if address + 8 <= end_limit:
+                    break
+            if opcode == 0 and special in (0x08,):
+                break
+        if addresses:
+            blocks[start] = addresses
+
+    for start, addresses in blocks.items():
+        last = addresses[-1]
+        word = instructions[last]
+        opcode = (word >> 26) & 0x3F
+        special = word & 0x3F
+        immediate = word & 0xFFFF
+        if opcode in (0x02, 0x03):
+            target = ((last + 4) & 0xF0000000) | ((word & 0x03FFFFFF) << 2)
+            edges[start].add(target)
+            if opcode == 0x03:
+                edges[start].add(last + 8)
+        elif opcode in (0x01, 0x04, 0x05, 0x06, 0x07):
+            target = last + 4 + (sign_extend16(immediate) << 2)
+            edges[start].add(target)
+            edges[start].add(last + 8)
+        elif opcode == 0 and special in (0x08, 0x09):
+            if special == 0x09:
+                edges[start].add(last + 8)
+        elif last + 4 in instructions:
+            edges[start].add(last + 4)
+
+    return {
+        "blocks": blocks,
+        "edges": dict(edges),
+        "instructions": instructions,
+    }
+
+
+def memory_references(code: bytes, base_address: int) -> list[MemoryReference]:
+    references = []
+    register_values = {}
+
+    for offset in range(0, len(code) - 3, 4):
+        address = base_address + offset
+        word = struct.unpack_from("<I", code, offset)[0]
+        opcode, rs, rt, rd, shamt, immediate = decode_fields(word)
+
+        if opcode == 0x0F:
+            register_values[rt] = immediate << 16
+            continue
+        if opcode in (0x09, 0x0D):
+            value = register_values.get(rs)
+            if value is not None:
+                if opcode == 0x09:
+                    register_values[rt] = (value + sign_extend16(immediate)) & 0xFFFFFFFF
+                else:
+                    register_values[rt] = (value | immediate) & 0xFFFFFFFF
+        if opcode in range(0x20, 0x2F):
+            value = register_values.get(rs)
+            if value is not None:
+                operation = OP_NAMES.get(opcode)
+                if operation:
+                    resolved = (value + sign_extend16(immediate)) & 0xFFFFFFFF
+                    references.append(
+                        MemoryReference(
+                            address=address,
+                            instruction=word,
+                            register=rs,
+                            offset=sign_extend16(immediate),
+                            operation=operation,
+                            resolved_address=resolved,
+                        )
+                    )
+
+    return references
+
+
+def identify_calls(code: bytes, base_address: int) -> tuple[list[CallReference], list[MemoryReference]]:
+    calls = []
+    register_values = {}
+
+    for offset in range(0, len(code) - 3, 4):
+        address = base_address + offset
+        word = struct.unpack_from("<I", code, offset)[0]
+        opcode, rs, rt, rd, shamt, immediate = decode_fields(word)
+
+        if opcode == 0x0F:
+            register_values[rt] = immediate << 16
+        elif opcode == 0x09:
+            value = register_values.get(rs)
+            if value is not None:
+                register_values[rt] = (value + sign_extend16(immediate)) & 0xFFFFFFFF
+        elif opcode == 0x03:
+            target = ((address + 4) & 0xF0000000) | ((word & 0x03FFFFFF) << 2)
+            calls.append(CallReference(address, target, "jal"))
+        elif opcode == 0 and (word & 0x3F) == 0x09:
+            target = register_values.get(rs)
+            if target is not None:
+                code_start = base_address
+                code_end = base_address + len(code)
+                vector = (target & 0xF0000000) in (
+                    0xA0000000,
+                    0xB0000000,
+                    0xC0000000,
+                )
+                if code_start <= target < code_end or vector:
+                    calls.append(CallReference(address, target, "jalr"))
+
+    return calls, memory_references(code, base_address)
+
+
+def classify_hardware_references(references: list[MemoryReference]) -> dict[str, list[MemoryReference]]:
+    groups = {
+        "GPU": [],
+        "CD-ROM": [],
+        "SPU": [],
+        "TIMERS": [],
+        "DMA": [],
+        "OTHER_IO": [],
+    }
+    ranges = {
+        "GPU": ((0x1F801810, 0x1F801814),),
+        "CD-ROM": ((0x1F801800, 0x1F801803),),
+        "SPU": ((0x1F801C00, 0x1F802000),),
+        "TIMERS": ((0x1F801100, 0x1F801130),),
+        "DMA": ((0x1F801080, 0x1F8010FF),),
+    }
+    for ref in references:
+        address = ref.resolved_address
+        classified = False
+        for name, ranges_for_name in ranges.items():
+            if any(low <= address <= high for low, high in ranges_for_name):
+                groups[name].append(ref)
+                classified = True
+                break
+        if not classified and 0x1F800000 <= address < 0x1F810000:
+            groups["OTHER_IO"].append(ref)
+    return groups
+
+
+def classify_bios_calls(calls: list[CallReference]) -> dict[str, list[CallReference]]:
+    groups = {
+        "A0": [],
+        "B0": [],
+        "C0": [],
+        "INTERNAL": [],
+    }
+    for call in calls:
+        table = (call.target >> 24) & 0xFF
+        if call.target >> 16 == 0xA000:
+            groups["A0"].append(call)
+        elif call.target >> 16 == 0xB000:
+            groups["B0"].append(call)
+        elif call.target >> 16 == 0xC000:
+            groups["C0"].append(call)
+        else:
+            groups["INTERNAL"].append(call)
+    return groups
+
+
+def parse_psx_entry(path: Path) -> int:
+    data = path.read_bytes()
+    if len(data) >= 0x14 and data[:8] == b"PS-X EXE":
+        return struct.unpack_from("<I", data, 0x10)[0]
+    return 0x80010000
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Disassemble a PS-X EXE code section")
     parser.add_argument("executable", type=Path)
     parser.add_argument("--count", type=int, default=64)
     parser.add_argument("--start", type=parse_integer, default=0)
+    parser.add_argument("--map", action="store_true", help="print control-flow and system-call map")
     args = parser.parse_args()
 
     try:
         base_address, code = parse_psx_header(args.executable)
         print(f"Base: 0x{base_address:08X}")
         print(f"Code: {len(code)} bytes")
+        if args.map:
+            entry = parse_psx_entry(args.executable)
+            cfg = control_flow_map(code, base_address)
+            calls, refs = identify_calls(code, base_address)
+            bios = classify_bios_calls(calls)
+            hardware = classify_hardware_references(refs)
+            print(f"Entry: 0x{entry:08X}")
+            print(f"CFG blocks: {len(cfg['blocks'])}")
+            print(f"CFG edges: {sum(len(edges) for edges in cfg['edges'].values())}")
+            print("BIOS call groups:")
+            for name in ("A0", "B0", "C0", "INTERNAL"):
+                unique_targets = sorted({call.target for call in bios[name]})
+                print(f"  {name}: {len(bios[name])} calls, {len(unique_targets)} targets")
+                for target in unique_targets[:32]:
+                    print(f"    0x{target:08X}")
+            print("Hardware memory references:")
+            for name in ("GPU", "CD-ROM", "SPU", "TIMERS", "DMA", "OTHER_IO"):
+                unique_addresses = sorted({ref.resolved_address for ref in hardware[name]})
+                print(f"  {name}: {len(hardware[name])} instructions, {len(unique_addresses)} addresses")
+                for address in unique_addresses[:32]:
+                    print(f"    0x{address:08X}")
         for address, word, text in disassemble_range(code, base_address, args.start, args.count):
             print(f"0x{address:08X}: {word:08X}  {text}")
     except (OSError, ValueError) as error:

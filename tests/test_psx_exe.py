@@ -7,7 +7,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from inspect_psx_disc import extract_psx_code, parse_psx_exe_header
-from analyze_psx_exe import disassemble_mips, disassemble_range
+from analyze_psx_exe import (
+    classify_bios_calls,
+    classify_hardware_references,
+    control_flow_map,
+    disassemble_mips,
+    disassemble_range,
+    identify_calls,
+)
 
 
 class PsxExeHeaderTest(unittest.TestCase):
@@ -77,6 +84,28 @@ class MipsDisassemblerTest(unittest.TestCase):
         instructions = list(disassemble_range(code, 0x80010000, count=2))
         self.assertEqual(instructions[0][0], 0x80010000)
         self.assertEqual(instructions[1][0], 0x80010004)
+
+    def test_control_flow_adds_branch_edges(self):
+        code = struct.pack("<IIII", 0, (0x04 << 26) | 2, 0, 0)
+        cfg = control_flow_map(code, 0x80010000)
+        self.assertGreaterEqual(len(cfg["blocks"]), 2)
+
+    def test_identifies_a0_bios_vector_and_gpu_reference(self):
+        lui_t1 = (0x0F << 26) | (9 << 16) | 0xA000
+        addiu_t1 = (0x09 << 26) | (9 << 21) | (9 << 16) | 0x40
+        jalr_t1 = (9 << 21) | (31 << 11) | 0x09
+        lui_t0 = (0x0F << 26) | (8 << 16) | 0x1F80
+        lw_gpu = (0x23 << 26) | (8 << 21) | (2 << 16) | 0x1810
+        code = struct.pack("<IIIII", lui_t1, addiu_t1, jalr_t1, lui_t0, lw_gpu)
+
+        calls, refs = identify_calls(code, 0x80010000)
+        bios = classify_bios_calls(calls)
+        hardware = classify_hardware_references(refs)
+
+        self.assertEqual(len(bios["A0"]), 1)
+        self.assertEqual(bios["A0"][0].target, 0xA0000040)
+        self.assertEqual(len(hardware["GPU"]), 1)
+        self.assertEqual(hardware["GPU"][0].resolved_address, 0x1F801810)
 
 
 if __name__ == "__main__":
