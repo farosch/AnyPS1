@@ -128,10 +128,50 @@ def parse_psx_exe_header(data: bytes) -> dict[str, int | str]:
     }
 
 
+def find_boot_entry(image: Path) -> tuple[IsoEntry, bytes]:
+    _, entries = inspect_disc(image)
+    system_entry = next(
+        (entry for entry in entries if entry.path.upper().endswith("SYSTEM.CNF")),
+        None,
+    )
+    if system_entry is None:
+        raise ValueError("SYSTEM.CNF not found")
+
+    system_cnf = read_entry(image, system_entry).decode("ascii", errors="replace")
+    for line in system_cnf.splitlines():
+        if line.upper().strip().startswith("BOOT"):
+            boot_value = line.split("=", 1)[1].strip()
+            boot_name = boot_value.replace("\\", "/").split(":", 1)[-1].strip("/").upper()
+            if boot_name.endswith(";1"):
+                boot_name = boot_name[:-2]
+            boot_entry = next(
+                (entry for entry in entries if entry.path.upper() == boot_name),
+                None,
+            )
+            if boot_entry is None:
+                raise ValueError(f"boot executable not found: {boot_value}")
+            return boot_entry, read_entry(image, boot_entry)
+
+    raise ValueError("BOOT declaration not found")
+
+
+def extract_psx_code(exe: bytes) -> tuple[dict[str, int | str], bytes]:
+    header = parse_psx_exe_header(exe)
+    file_size = int(header["file_size"])
+    code_offset = 0x800
+    code_end = code_offset + file_size
+    if code_end > len(exe):
+        raise ValueError(
+            f"declared executable size 0x{file_size:X} exceeds file size 0x{len(exe):X}"
+        )
+    return header, exe[code_offset:code_end]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Inspect a PS1 MODE2/2352 disc image")
     parser.add_argument("image", type=Path)
     parser.add_argument("--boot", action="store_true", help="read SYSTEM.CNF and parse the boot executable")
+    parser.add_argument("--extract", type=Path, help="write the boot PS-X executable code section")
     args = parser.parse_args()
 
     try:
@@ -143,46 +183,26 @@ def main() -> int:
                 print(f"{entry.path}\t{entry.size}\tLBA {entry.lba}")
 
         if args.boot:
+            boot_entry, exe = find_boot_entry(args.image)
+            _, entries = inspect_disc(args.image)
             system_entry = next(
-                (entry for entry in entries if entry.path.upper().endswith("SYSTEM.CNF")),
-                None,
+                entry for entry in entries if entry.path.upper().endswith("SYSTEM.CNF")
             )
-            if system_entry is None:
-                print("SYSTEM.CNF: not found", file=sys.stderr)
-                return 1
             system_cnf = read_entry(args.image, system_entry).decode("ascii", errors="replace")
+            header, code = extract_psx_code(exe)
             print("SYSTEM.CNF:")
             print(system_cnf.strip())
-
-            for line in system_cnf.splitlines():
-                if line.upper().strip().startswith("BOOT"):
-                    boot_value = line.split("=", 1)[1].strip()
-                    boot_name = boot_value.replace("\\", "/").split(":", 1)[-1].strip("/").upper()
-                    if boot_name.endswith(";1"):
-                        boot_name = boot_name[:-2]
-                    boot_entry = next(
-                        (
-                            entry for entry in entries
-                            if entry.path.upper() == boot_name
-                        ),
-                        None,
-                    )
-                    if boot_entry is None:
-                        print(f"Boot executable not found: {boot_value}", file=sys.stderr)
-                        return 1
-                    exe = read_entry(args.image, boot_entry)
-                    header = parse_psx_exe_header(exe)
-                    print(f"Boot executable: {boot_entry.path}")
-                    print("PS-X EXE header:")
-                    for key, value in header.items():
-                        if isinstance(value, int):
-                            print(f"  {key}: 0x{value:08X}")
-                        else:
-                            print(f"  {key}: {value}")
-                    return 0
-
-            print("BOOT declaration: not found", file=sys.stderr)
-            return 1
+            print(f"Boot executable: {boot_entry.path}")
+            print("PS-X EXE header:")
+            for key, value in header.items():
+                if isinstance(value, int):
+                    print(f"  {key}: 0x{value:08X}")
+                else:
+                    print(f"  {key}: {value}")
+            if args.extract:
+                args.extract.write_bytes(code)
+                print(f"Extracted code: {args.extract} ({len(code)} bytes)")
+            return 0
     except (OSError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
