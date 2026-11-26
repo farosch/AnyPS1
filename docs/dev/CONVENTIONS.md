@@ -2,6 +2,8 @@
 
 - Keep implementation generic rather than title-specific.
 - Throw or return an explicit error for unsupported formats and states.
+- Never fail silently: propagate or return errors, and surface diagnostics where
+  the caller or command-line user can observe them.
 - Add tests for format parsing and relinking behavior.
 - Tests must use checked-in fixtures under `tests/fixtures/` for executable images,
   disc images, CUE files, headers, and other externally consumed file formats.

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstring>
 #include <fstream>
+#include <filesystem>
 #include <iterator>
 #include <stdexcept>
 #include <string>
@@ -14,6 +15,15 @@ namespace anyps1 {
 namespace {
 
 constexpr std::uint32_t PSX_HEADER_SIZE = 2048;
+
+void create_output_parent(const std::string& output)
+{
+    const std::filesystem::path output_path(output);
+    const std::filesystem::path parent = output_path.parent_path();
+    if (!parent.empty()) {
+        std::filesystem::create_directories(parent);
+    }
+}
 
 void write32(std::ofstream& output, std::uint32_t value)
 {
@@ -158,6 +168,8 @@ bool relink(const RelinkOptions& options)
     if (options.output.empty()) {
         throw std::invalid_argument("output path is empty");
     }
+
+    create_output_parent(options.output);
 
     std::ifstream input(options.input, std::ios::binary);
     if (!input) {

@@ -1,0 +1,327 @@
+    void raise_exception(std::uint32_t code)
+    {
+        exception_pending_ = true;
+        cop0_[14] = in_delay_slot_ ? pc_ - 4 : pc_;
+        cop0_[13] = (cop0_[13] & 0xFF00)
+            | (code << 2)
+            | (in_delay_slot_ ? 0x80000000u : 0);
+        cop0_[12] = (cop0_[12] & ~0x3Fu) | ((cop0_[12] << 2) & 0x3Fu);
+        pc_ = ((cop0_[12] & 0x00400000u) != 0) ? 0xBFC00180u : 0x80000080u;
+    }
+
+    bool execute_gte(std::uint32_t rs, std::uint32_t rt, std::uint32_t rd, std::uint32_t shamt, std::uint32_t instruction)
+    {
+        if (rs == 0) {
+            regs_[rt] = static_cast<std::uint32_t>(gte_data_[rd]);
+            return true;
+        }
+        if (rs == 2) {
+            regs_[rt] = gte_control[rd];
+            return true;
+        }
+        if (rs == 4) {
+            gte_data_[rd] = static_cast<std::int32_t>(regs_[rt]);
+            return true;
+        }
+        if (rs == 6) {
+            gte_control[rd] = regs_[rt];
+            return true;
+        }
+        if (rs == 16) {
+            const std::uint32_t command = instruction & 0x3F;
+            if (command == 0x06) {
+                const std::int64_t x1 = gte_data_[12];
+                const std::int64_t y1 = gte_data_[13];
+                const std::int64_t z1 = gte_data_[14];
+                gte_control[24] = static_cast<std::uint32_t>(
+                    x1 * y1 - y1 * z1 + z1 * x1
+                );
+            } else if (command == 0x01 || command == 0x00) {
+                gte_control[24] = static_cast<std::uint32_t>(gte_data_[9] / 16);
+                gte_control[25] = gte_data_[10];
+                gte_control[26] = gte_data_[11];
+            } else if (command == 0x30) {
+                gte_control[24] = static_cast<std::uint32_t>(gte_data_[9] / 16);
+                gte_control[25] = gte_data_[10];
+                gte_control[26] = gte_data_[11];
+            } else if (command == 0x12) {
+                gte_control[24] = gte_data_[9] + gte_data_[12];
+                gte_control[25] = gte_data_[10] + gte_data_[13];
+                gte_control[26] = gte_data_[11] + gte_data_[14];
+            } else if (command == 0x14) {
+                gte_control[24] = gte_data_[9] * gte_data_[9];
+                gte_control[25] = gte_data_[10] * gte_data_[10];
+                gte_control[26] = gte_data_[11] * gte_data_[11];
+            } else if (command == 0x10 || command == 0x11 || command == 0x13
+                || command == 0x1B || command == 0x1C || command == 0x1D
+                || command == 0x1E || command == 0x28 || command == 0x29
+                || command == 0x2A || command == 0x2D || command == 0x2E
+                || command == 0x3F) {
+                gte_control[24] = static_cast<std::uint32_t>(
+                    std::clamp(gte_data_[9], -32768, 32767));
+                gte_control[25] = static_cast<std::uint32_t>(
+                    std::clamp(gte_data_[10], -32768, 32767));
+                gte_control[26] = static_cast<std::uint32_t>(
+                    std::clamp(gte_data_[11], -32768, 32767));
+            }
+            return true;
+        }
+        unsupported_ = "unsupported COP2 instruction";
+        return false;
+    }
+
+    std::uint16_t gpu_color(std::uint32_t word) const
+    {
+        const std::uint32_t r = word & 0xFF;
+        const std::uint32_t g = (word >> 8) & 0xFF;
+        const std::uint32_t b = (word >> 16) & 0xFF;
+        return static_cast<std::uint16_t>(
+            ((r >> 3) & 0x1F)
+            | (((g >> 3) & 0x1F) << 5)
+            | (((b >> 3) & 0x1F) << 10)
+        );
+    }
+
+    void put_pixel(std::uint32_t x, std::uint32_t y, std::uint16_t color)
+    {
+        if (x < 1024 && y < 512) {
+            vram_[y * 1024 + x] = color;
+            ++gpu_vram_write_count;
+        }
+    }
+
+    void fill_rectangle(std::uint32_t x, std::uint32_t y, std::uint32_t width, std::uint32_t height, std::uint16_t color)
+    {
+        for (std::uint32_t row = y; row < y + height && row < 512; ++row) {
+            for (std::uint32_t column = x; column < x + width && column < 1024; ++column) {
+                vram_[row * 1024 + column] = color;
+                ++gpu_vram_write_count;
+            }
+        }
+    }
+
+    void draw_flat_triangle(
+        std::uint32_t x1, std::uint32_t y1,
+        std::uint32_t x2, std::uint32_t y2,
+        std::uint32_t x3, std::uint32_t y3,
+        std::uint16_t color
+    )
+    {
+        const std::int64_t area =
+            (static_cast<std::int64_t>(x2) - x1) * (static_cast<std::int64_t>(y3) - y1)
+            - (static_cast<std::int64_t>(y2) - y1) * (static_cast<std::int64_t>(x3) - x1);
+        if (area == 0) {
+            return;
+        }
+
+        std::uint32_t min_x = std::min({x1, x2, x3});
+        std::uint32_t min_y = std::min({y1, y2, y3});
+        std::uint32_t max_x = std::max({x1, x2, x3});
+        std::uint32_t max_y = std::max({y1, y2, y3});
+        for (std::uint32_t y = min_y; y <= max_y && y < 512; ++y) {
+            for (std::uint32_t x = min_x; x <= max_x && x < 1024; ++x) {
+                const std::int64_t edge1 =
+                    (static_cast<std::int64_t>(x2) - x1) * (static_cast<std::int64_t>(y) - y1)
+                    - (static_cast<std::int64_t>(y2) - y1) * (static_cast<std::int64_t>(x) - x1);
+                const std::int64_t edge2 =
+                    (static_cast<std::int64_t>(x3) - x2) * (static_cast<std::int64_t>(y) - y2)
+                    - (static_cast<std::int64_t>(y3) - y2) * (static_cast<std::int64_t>(x) - x2);
+                const std::int64_t edge3 =
+                    (static_cast<std::int64_t>(x1) - x3) * (static_cast<std::int64_t>(y) - y3)
+                    - (static_cast<std::int64_t>(y1) - y3) * (static_cast<std::int64_t>(x) - x3);
+                if ((area > 0 && edge1 >= 0 && edge2 >= 0 && edge3 >= 0)
+                    || (area < 0 && edge1 <= 0 && edge2 <= 0 && edge3 <= 0)) {
+                    put_pixel(x, y, color);
+                }
+            }
+        }
+    }
+
+    void gp0_store(std::uint32_t word)
+    {
+        ++gpu_write_count;
+        if (std::getenv("ANYPS1_GPU_TRACE") != nullptr) {
+            std::fprintf(stderr, "GP0=0x%08X writes=%llu vrampix=%llu pc=0x%08X\n",
+                static_cast<unsigned>(word),
+                static_cast<unsigned long long>(gpu_write_count),
+                static_cast<unsigned long long>(gpu_vram_write_count),
+                static_cast<unsigned>(pc_));
+        }
+        if (gp0_transfer_remaining != 0) {
+            for (std::uint32_t pixel = 0; pixel < 2 && gp0_transfer_remaining != 0; ++pixel) {
+                const std::uint16_t value = static_cast<std::uint16_t>(
+                    pixel == 0 ? word & 0xFFFF : word >> 16
+                );
+                gp0_transfer_x = gp0_transfer_start_x + gp0_transfer_cursor % gp0_transfer_width;
+                gp0_transfer_y = gp0_transfer_start_y + gp0_transfer_cursor / gp0_transfer_width;
+                if (gp0_transfer_y < 512 && gp0_transfer_x < 1024) {
+                    vram_[gp0_transfer_y * 1024 + gp0_transfer_x] = value;
+                    ++gpu_vram_write_count;
+                }
+                ++gp0_transfer_cursor;
+                --gp0_transfer_remaining;
+            }
+            if (gp0_transfer_remaining == 0) {
+                gpu_status |= 0x04000000;
+            }
+            return;
+        }
+
+        if (gp0_expected == 0) {
+            gp0_command = word;
+            gp0_param_count = 0;
+            const std::uint32_t opcode = word >> 24;
+            if (opcode == 0x02) {
+                gp0_expected = 3;
+            } else if (opcode >= 0x20 && opcode <= 0x3F) {
+                const bool textured = (opcode & 0x04) != 0;
+                const bool gouraud = (opcode & 0x10) != 0;
+                const bool quad = (opcode & 0x08) != 0;
+                gp0_expected = 0;
+                if (!textured && !gouraud) {
+                    gp0_expected = quad ? 4 : 3;
+                } else if (textured && !gouraud) {
+                    gp0_expected = quad ? 8 : 6;
+                } else if (!textured && gouraud) {
+                    gp0_expected = quad ? 8 : 6;
+                } else {
+                    gp0_expected = quad ? 12 : 9;
+                }
+            } else if ((opcode >= 0x60 && opcode <= 0x67) || (opcode >= 0x68 && opcode <= 0x7F)) {
+                gp0_expected = (opcode & 0x04) != 0 ? 3 : 2;
+            } else if (opcode == 0xA0) {
+                gp0_expected = 2;
+            } else if (opcode == 0xE1) {
+                gp0_expected = 1;
+            } else if (opcode == 0xE3 || opcode == 0xE4) {
+                gp0_expected = 1;
+            } else if (opcode == 0xE5 || opcode == 0xE6) {
+                gp0_expected = 1;
+            } else {
+                gp0_expected = 0;
+            }
+            if (gp0_expected == 0) {
+                gp0_command = 0;
+            }
+            return;
+        }
+
+        gp0_params_[gp0_param_count++] = word;
+        if (gp0_param_count != gp0_expected) {
+            return;
+        }
+
+        const std::uint32_t opcode = gp0_command >> 24;
+        if (opcode == 0x02) {
+            const std::uint32_t x = gp0_params_[1] & 0xFFFF;
+            const std::uint32_t y = gp0_params_[1] >> 16;
+            const std::uint32_t width = gp0_params_[2] & 0xFFFF;
+            const std::uint32_t height = gp0_params_[2] >> 16;
+            fill_rectangle(x, y, width, height, gpu_color(gp0_params_[0]));
+        } else if (opcode >= 0x20 && opcode <= 0x3F) {
+            const bool quad = (opcode & 0x08) != 0;
+            const bool gouraud = (opcode & 0x10) != 0;
+            const bool textured = (opcode & 0x04) != 0;
+            if (!gouraud) {
+                const std::uint32_t x1 = gp0_params_[0] & 0xFFFF;
+                const std::uint32_t y1 = gp0_params_[0] >> 16;
+                std::uint32_t param_index = textured ? 2 : 1;
+                const std::uint32_t x2 = gp0_params_[param_index] & 0xFFFF;
+                const std::uint32_t y2 = gp0_params_[param_index] >> 16;
+                param_index += textured ? 2 : 1;
+                const std::uint32_t x3 = gp0_params_[param_index] & 0xFFFF;
+                const std::uint32_t y3 = gp0_params_[param_index] >> 16;
+                const std::uint16_t color = gpu_color(gp0_command);
+                draw_flat_triangle(x1, y1, x2, y2, x3, y3, color);
+                if (quad) {
+                    const std::uint32_t x4 = gp0_params_[textured ? 6 : 3] & 0xFFFF;
+                    const std::uint32_t y4 = gp0_params_[textured ? 6 : 3] >> 16;
+                    draw_flat_triangle(x1, y1, x3, y3, x4, y4, color);
+                }
+            } else if (textured) {
+                const std::uint32_t x1 = gp0_params_[1] & 0xFFFF;
+                const std::uint32_t y1 = gp0_params_[1] >> 16;
+                const std::uint32_t x2 = gp0_params_[4] & 0xFFFF;
+                const std::uint32_t y2 = gp0_params_[4] >> 16;
+                const std::uint32_t x3 = gp0_params_[7] & 0xFFFF;
+                const std::uint32_t y3 = gp0_params_[7] >> 16;
+                const std::uint16_t color = gpu_color(gp0_params_[0]);
+                draw_flat_triangle(x1, y1, x2, y2, x3, y3, color);
+                if (quad) {
+                    const std::uint32_t x4 = gp0_params_[10] & 0xFFFF;
+                    const std::uint32_t y4 = gp0_params_[10] >> 16;
+                    draw_flat_triangle(x1, y1, x3, y3, x4, y4, color);
+                }
+            } else {
+                const std::uint32_t x1 = gp0_params_[1] & 0xFFFF;
+                const std::uint32_t y1 = gp0_params_[1] >> 16;
+                const std::uint32_t x2 = gp0_params_[3] & 0xFFFF;
+                const std::uint32_t y2 = gp0_params_[3] >> 16;
+                const std::uint32_t x3 = gp0_params_[5] & 0xFFFF;
+                const std::uint32_t y3 = gp0_params_[5] >> 16;
+                const std::uint16_t color = gpu_color(gp0_params_[0]);
+                draw_flat_triangle(x1, y1, x2, y2, x3, y3, color);
+                if (quad) {
+                    const std::uint32_t x4 = gp0_params_[7] & 0xFFFF;
+                    const std::uint32_t y4 = gp0_params_[7] >> 16;
+                    draw_flat_triangle(x1, y1, x3, y3, x4, y4, color);
+                }
+            }
+        } else if (opcode >= 0x60 && opcode <= 0x7F) {
+            const std::uint32_t x = gp0_params_[0] & 0xFFFF;
+            const std::uint32_t y = gp0_params_[0] >> 16;
+            const std::uint32_t width = gp0_params_[1] & 0xFFFF;
+            const std::uint32_t height = gp0_params_[1] >> 16;
+            fill_rectangle(x, y, width, height, gpu_color(gp0_command));
+        } else if (opcode == 0xA0) {
+            gp0_transfer_x = gp0_params_[0] & 0xFFFF;
+            gp0_transfer_y = gp0_params_[0] >> 16;
+            gp0_transfer_width = gp0_params_[1] & 0xFFFF;
+            gp0_transfer_height = gp0_params_[1] >> 16;
+            gp0_transfer_start_x = gp0_transfer_x;
+            gp0_transfer_start_y = gp0_transfer_y;
+            gp0_transfer_cursor = 0;
+            gp0_transfer_remaining = gp0_transfer_width * gp0_transfer_height;
+            gpu_status &= ~0x04000000u;
+        }
+
+        gp0_param_count = 0;
+        gp0_expected = 0;
+        gp0_command = 0;
+    }
+
+    void gp1_store(std::uint32_t word)
+    {
+        if (std::getenv("ANYPS1_GPU_TRACE") != nullptr) {
+            std::fprintf(stderr, "GP1=0x%08X display=%ux%u+%u,%u pc=0x%08X\n",
+                static_cast<unsigned>(word),
+                static_cast<unsigned>(display_width),
+                static_cast<unsigned>(display_height),
+                static_cast<unsigned>(display_x),
+                static_cast<unsigned>(display_y),
+                static_cast<unsigned>(pc_));
+        }
+        const std::uint32_t command = word >> 24;
+        const std::uint32_t parameter = word & 0xFFFFFF;
+        if (command == 0x03) {
+            gpu_status = (gpu_status & ~0x00800000u) | ((parameter & 1) ? 0 : 0x00800000u);
+        } else if (command == 0x05) {
+            display_x = parameter & 0x3FF;
+            display_y = (parameter >> 10) & 0x1FF;
+        } else if (command == 0x06) {
+            display_width = ((parameter >> 12) & 0xFFF) - (parameter & 0xFFF) + 1;
+        } else if (command == 0x07) {
+            display_height = ((parameter >> 10) & 0x3FF) - (parameter & 0x3FF) + 1;
+        } else if (command == 0x08) {
+            gpu_status = (gpu_status & ~0x0007FFFFu) | (parameter & 0x0007FFFFu);
+            const std::uint32_t width_code = parameter & 3;
+            const std::uint32_t height = (parameter >> 2) & 1;
+            display_width = (width_code == 1) ? 368 : ((width_code == 2) ? 512 : ((width_code == 3) ? 640 : 256));
+            if (height == 0) {
+                display_height = display_height <= 256 ? 240 : display_height;
+            } else {
+                display_height = 480;
+            }
+        }
+    }
+

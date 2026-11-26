@@ -1,7 +1,9 @@
 #include "Relinker.h"
 #include "HostVideo.h"
+#include "HostAudio.h"
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
@@ -61,11 +63,22 @@ public:
         ram_[0x1FF001] = 0x80;
         ram_[0x1FF004] = 0x08;
         ram_[0x1FF005] = 0x20;
+        write_ram32(0x00100000, 0);
+        write_ram32(0x00100004, 0);
+        write_ram32(0x00100008, 0);
+        write_ram32(0x00A9B30, 0x80001000);
+        write_ram32(0x00A9B34, 0x80001004);
+        write_ram32(0x00A9B38, 0x80001008);
+        write_ram32(0x003D374, 0);
     }
 
     bool step()
     {
         if (execute_bios_vector()) {
+            return true;
+        }
+        if ((cop0_[12] & 1) != 0 && (cop0_[12] & cop0_[13] & 0x0400) != 0) {
+            raise_exception(0);
             return true;
         }
         if ((pc_ & 0xF0000000) == 0xA0000000
@@ -91,6 +104,10 @@ public:
         }
 
         std::uint32_t instruction = read_ram32(pc_);
+        const bool apply_load_delay = pending_load_valid_;
+        const std::uint32_t load_delay_register = pending_load_register_;
+        const std::uint32_t load_delay_value = pending_load_value_;
+        pending_load_valid_ = false;
         if (std::getenv("ANYPS1_TRACE") != nullptr) {
             std::fprintf(stderr, "0x%08X: %08X\n",
                 static_cast<unsigned>(pc_ & 0xFFFFFFFF),
@@ -150,11 +167,10 @@ public:
                 lo_ = regs_[rs];
                 break;
             case 0x0C:
-                if (regs_[31] != 0) {
-                    next_pc = regs_[31];
-                }
+                raise_exception(8);
                 break;
             case 0x0D:
+                raise_exception(9);
                 break;
             case 0x18:
                 mult(static_cast<std::int32_t>(regs_[rs]), static_cast<std::int32_t>(regs_[rt]));
@@ -272,8 +288,18 @@ public:
                     return false;
                 }
                 break;
+            case 0x22:
+                if (!load_left(regs_[rs] + sign16(immediate), rt)) {
+                    return false;
+                }
+                break;
             case 0x23:
                 if (!load_word(regs_[rs] + sign16(immediate), rt)) {
+                    return false;
+                }
+                break;
+            case 0x26:
+                if (!load_right(regs_[rs] + sign16(immediate), rt)) {
                     return false;
                 }
                 break;
@@ -287,8 +313,18 @@ public:
                     return false;
                 }
                 break;
+            case 0x2A:
+                if (!store_left(regs_[rs] + sign16(immediate), regs_[rt])) {
+                    return false;
+                }
+                break;
             case 0x2B:
                 if (!store_word(regs_[rs] + sign16(immediate), regs_[rt])) {
+                    return false;
+                }
+                break;
+            case 0x2E:
+                if (!store_right(regs_[rs] + sign16(immediate), regs_[rt])) {
                     return false;
                 }
                 break;
@@ -302,6 +338,8 @@ public:
                         regs_[cop0_rt] = cop0_[cop0_rd];
                     } else if (cop0_rs == 4) {
                         cop0_[cop0_rd] = regs_[cop0_rt];
+                    } else if (cop0_rs == 16) {
+                        cop0_[12] = ((cop0_[12] & ~0x0Fu) | ((cop0_[12] >> 2) & 0x0Fu));
                     } else {
                         unsupported_ = "unsupported COP0 operation";
                         return false;
@@ -309,8 +347,10 @@ public:
                 }
                 break;
             case 0x12:
-                unsupported_ = "COP2/GTE instruction is not implemented";
-                return false;
+                if (!execute_gte(rs, rt, rd, shamt, instruction)) {
+                    return false;
+                }
+                break;
             case 0x13:
                 unsupported_ = "COP3 instruction is not implemented";
                 return false;
@@ -320,6 +360,17 @@ public:
             }
         }
 
+        if (apply_load_delay
+            && (!pending_load_valid_
+                || pending_load_register_ != load_delay_register)) {
+            regs_[load_delay_register] = load_delay_value;
+        }
+        if (exception_pending_) {
+            exception_pending_ = false;
+            in_delay_slot_ = false;
+            regs_[0] = 0;
+            return true;
+        }
         regs_[0] = 0;
         bool had_delay = delay_pending_;
         std::uint32_t prior_target = delayed_target_;
@@ -333,6 +384,7 @@ public:
             delayed_target_ = scheduled_target;
             delay_pending_ = true;
         }
+        in_delay_slot_ = schedule_delay || had_delay;
         return true;
     }
 
@@ -346,11 +398,151 @@ public:
         return pc_;
     }
 
+    void tick_frame()
+    {
+        interrupt_status |= 1;
+        for (std::uint32_t event = 0; event < bios_events.size(); ++event) {
+            if (bios_events[event] & 2
+                && bios_event_specs[event] == 1
+                && bios_event_modes[event] == 0x2000) {
+                bios_event_flags[event] = 0x4000;
+            }
+        }
+        write_ram32(0x00100000, read_ram32(0x00100000) + 1);
+        write_ram32(0x00100004, read_ram32(0x00100004) + 1);
+        write_ram32(0x00100008, read_ram32(0x00100008));
+        write_ram32(0x003D374, read_ram32(0x003D374) + 1);
+        for (std::uint32_t timer = 0; timer < timer_count.size(); ++timer) {
+            const std::uint32_t increment = (timer == 2 && (timer_mode[timer] & 0x200) != 0) ? 0 : 1;
+            timer_count[timer] += increment;
+            if (timer_target[timer] != 0 && timer_count[timer] >= timer_target[timer]) {
+                if ((timer_mode[timer] & 8) != 0) {
+                    timer_count[timer] = 0;
+                }
+                if ((timer_mode[timer] & 32) != 0) {
+                    interrupt_status |= 1u << (10 + timer);
+                }
+            }
+            if (timer_count[timer] >= 0x10000) {
+                timer_count[timer] &= 0xFFFF;
+            }
+        }
+        if (interrupt_status & interrupt_mask & 1) {
+            cop0_[13] |= 0x0400;
+        }
+    }
+
+    void set_pad_state(std::uint16_t state)
+    {
+        pad_state = state;
+    }
+
+    void render_audio(HostAudio& audio)
+    {
+        std::array<std::int16_t, 734> samples{};
+        for (std::uint32_t index = 0; index < samples.size(); index += 2) {
+            std::int32_t left = 0;
+            std::int32_t right = 0;
+            for (std::uint32_t voice = 0; voice < 24; ++voice) {
+                if ((spu_key_on & (1u << voice)) != 0) {
+                    const std::uint32_t address =
+                        (spu_voice_start[voice] * 8u + voice * 16u) & (spu_ram.size() - 1);
+                    const std::int16_t sample =
+                        static_cast<std::int16_t>(spu_ram[address] | (spu_ram[address + 1] << 8));
+                    left += sample * (spu_voice_volume_l[voice] & 0x3FFF) / 0x4000;
+                    right += sample * (spu_voice_volume_r[voice] & 0x3FFF) / 0x4000;
+                }
+            }
+            left = std::clamp(left, -32768, 32767);
+            right = std::clamp(right, -32768, 32767);
+            samples[index] = static_cast<std::int16_t>(left);
+            samples[index + 1] = static_cast<std::int16_t>(right);
+        }
+        audio.put_samples(samples.data(), samples.size());
+    }
+
+    const std::array<std::uint16_t, 1024 * 512>& frame_vram() const
+    {
+        return vram_;
+    }
+
+    std::uint32_t frame_x() const { return display_x; }
+    std::uint32_t frame_y() const { return display_y; }
+    std::uint32_t frame_width() const { return display_width; }
+    std::uint32_t frame_height() const { return display_height; }
+
 private:
     std::array<std::uint32_t, 32> regs_{};
     std::array<std::uint32_t, 32> cop0_{};
+    std::array<std::int32_t, 32> gte_data_{};
+    std::array<std::uint32_t, 32> gte_control{};
     std::array<unsigned char, 2 * 1024 * 1024> ram_{};
     std::array<unsigned char, 1024> scratchpad_{};
+    std::array<std::uint16_t, 1024 * 512> vram_{};
+    std::array<std::uint32_t, 16> gp0_params_{};
+    std::uint32_t gp0_param_count = 0;
+    std::uint32_t gp0_expected = 0;
+    std::uint32_t gp0_command = 0;
+    std::uint32_t gp0_transfer_remaining = 0;
+    std::uint32_t gp0_transfer_x = 0;
+    std::uint32_t gp0_transfer_y = 0;
+    std::uint32_t gp0_transfer_start_x = 0;
+    std::uint32_t gp0_transfer_start_y = 0;
+    std::uint32_t gp0_transfer_width = 0;
+    std::uint32_t gp0_transfer_height = 0;
+    std::uint32_t gp0_transfer_cursor = 0;
+    std::uint32_t display_x = 0;
+    std::uint32_t display_y = 0;
+    std::uint32_t display_width = 320;
+    std::uint32_t display_height = 240;
+    std::uint32_t gpu_status = 0x1C000000;
+    std::uint64_t gpu_write_count = 0;
+    std::uint64_t gpu_vram_write_count = 0;
+    std::uint32_t spu_dma_word = 0;
+    std::array<std::uint32_t, 7> dma_madr{};
+    std::array<std::uint32_t, 7> dma_bcr{};
+    std::array<std::uint32_t, 7> dma_chcr{};
+    std::uint32_t dpcr = 0x07654321;
+    std::uint32_t dicr = 0;
+    std::uint32_t interrupt_status = 0;
+    std::uint32_t interrupt_mask = 0;
+    std::array<std::uint32_t, 3> timer_count{};
+    std::array<std::uint32_t, 3> timer_target{};
+    std::array<std::uint32_t, 3> timer_mode{};
+    std::uint32_t joy_stat = 0x00000005;
+    std::uint32_t joy_ctrl = 0;
+    std::uint32_t joy_mode = 0;
+    std::uint32_t joy_baud = 0;
+    std::uint16_t pad_state = 0xFFFF;
+    std::array<unsigned char, 8> joy_rx{};
+    std::uint32_t joy_rx_count = 0;
+    std::uint32_t joy_rx_cursor = 0;
+    std::array<std::uint32_t, 16> bios_events{};
+    std::array<std::uint32_t, 16> bios_event_specs{};
+    std::array<std::uint32_t, 16> bios_event_modes{};
+    std::array<std::uint32_t, 16> bios_event_flags{};
+    std::uint32_t cdrom_index = 0;
+    std::uint32_t cdrom_status = 2;
+    std::uint32_t cdrom_interrupt = 0;
+    std::uint32_t cdrom_interrupt_enable = 0;
+    std::array<unsigned char, 16> cdrom_params{};
+    std::uint32_t cdrom_param_count = 0;
+    std::array<unsigned char, 32> cdrom_response{};
+    std::uint32_t cdrom_response_count = 0;
+    std::uint32_t cdrom_response_cursor = 0;
+    std::array<unsigned char, 512 * 1024> spu_ram{};
+    std::array<std::uint32_t, 24> spu_voice_start{};
+    std::array<std::uint32_t, 24> spu_voice_repeat{};
+    std::array<std::uint16_t, 24> spu_voice_volume_l{};
+    std::array<std::uint16_t, 24> spu_voice_volume_r{};
+    std::array<std::uint16_t, 24> spu_voice_adsr{};
+    std::uint32_t spu_control = 0;
+    std::uint32_t spu_status = 0;
+    std::uint32_t spu_main_volume_l = 0;
+    std::uint32_t spu_main_volume_r = 0;
+    std::uint32_t spu_key_on = 0;
+    std::uint32_t spu_key_off = 0;
+    std::uint32_t spu_dma_address = 0;
     std::uint32_t pc_ = 0;
     std::uint32_t load_address_ = 0;
     std::uint32_t file_size_ = 0;
@@ -360,261 +552,18 @@ private:
     std::uint32_t lo_ = 0;
     std::uint32_t delayed_target_ = 0;
     bool delay_pending_ = false;
+    bool in_delay_slot_ = false;
+    bool exception_pending_ = false;
+    bool pending_load_valid_ = false;
+    std::uint32_t pending_load_register_ = 0;
+    std::uint32_t pending_load_value_ = 0;
     std::uint32_t heap_cursor_ = 0x00180000;
     std::string unsupported_;
 
-    bool execute_bios_vector()
-    {
-        std::uint32_t table_pc = pc_ & 0x1FFFFFFF;
-        bool cached_a0 = (pc_ & 0xF0000000) == 0xA0000000;
-        bool cached_b0 = (pc_ & 0xF0000000) == 0xB0000000;
-        bool cached_c0 = (pc_ & 0xF0000000) == 0xC0000000;
-
-        if (cached_a0 && table_pc == 0x0000E800) {
-            std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
-            std::uint32_t size = regs_[5];
-            if (destination + size <= ram_.size()) {
-                std::memset(ram_.data() + destination, 0, size);
-            }
-            pc_ = regs_[31];
-            return true;
-        }
-
-        if (table_pc == 0xB0 || cached_b0) {
-            std::uint32_t function = regs_[9];
-            if (function == 0) {
-                std::uint32_t size = (regs_[4] + 3) & ~3u;
-                if (size > 0x001F0000 - heap_cursor_) {
-                    regs_[2] = 0xFFFFFFFF;
-                } else {
-                    regs_[2] = 0x80000000 | heap_cursor_;
-                    heap_cursor_ += size;
-                }
-            } else if (function == 0x18) {
-                regs_[2] = 0;
-            } else {
-                regs_[2] = 0;
-            }
-            pc_ = regs_[31];
-            return true;
-        }
-
-        if (table_pc == 0xC0 || cached_c0) {
-            std::uint32_t function = regs_[9];
-            if (function == 8) {
-                std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
-                std::uint32_t size = regs_[5];
-                if (destination + size <= ram_.size()) {
-                    std::memset(ram_.data() + destination, 0, size);
-                }
-                regs_[2] = 0;
-            } else if (function == 10 || function == 12) {
-                std::uint32_t destination = regs_[4] & 0x1FFFFFFF;
-                std::uint32_t source = regs_[5] & 0x1FFFFFFF;
-                std::uint32_t size = regs_[6];
-                if (destination + size <= ram_.size() && source + size <= ram_.size()) {
-                    std::memmove(ram_.data() + destination, ram_.data() + source, size);
-                }
-                regs_[2] = destination | 0x80000000;
-            } else {
-                regs_[2] = 0;
-            }
-            pc_ = regs_[31];
-            return true;
-        }
-
-        return false;
-    }
-
-    bool in_ram(std::uint32_t address) const
-    {
-        address &= 0x1FFFFFFF;
-        return address < ram_.size();
-    }
-
-    std::uint32_t read_ram32(std::uint32_t address) const
-    {
-        address &= 0x1FFFFFFF;
-        return static_cast<std::uint32_t>(ram_[address])
-            | (static_cast<std::uint32_t>(ram_[address + 1]) << 8)
-            | (static_cast<std::uint32_t>(ram_[address + 2]) << 16)
-            | (static_cast<std::uint32_t>(ram_[address + 3]) << 24);
-    }
-
-    bool load_byte(std::uint32_t address, std::uint32_t reg, bool unsigned_value)
-    {
-        if (in_ram(address)) {
-            std::uint32_t value = ram_[address & 0x1FFFFFFF];
-            regs_[reg] = unsigned_value ? value : (value & 0x80 ? 0xFFFFFF00 | value : value);
-            return true;
-        }
-        std::uint32_t value = 0;
-        if (io_load(address, 1, value)) {
-            regs_[reg] = unsigned_value ? value : (value & 0x80 ? 0xFFFFFF00 | value : value);
-            return true;
-        }
-        unsupported_ = "read from unsupported PS1 memory";
-        return false;
-    }
-
-    bool load_half(std::uint32_t address, std::uint32_t reg, bool unsigned_value)
-    {
-        if (address & 1) {
-            unsupported_ = "unaligned 16-bit load";
-            return false;
-        }
-        if (in_ram(address) && in_ram(address + 1)) {
-            std::uint32_t value = ram_[address & 0x1FFFFFFF]
-                | (static_cast<std::uint32_t>(ram_[(address & 0x1FFFFFFF) + 1]) << 8);
-            regs_[reg] = unsigned_value ? value : (value & 0x8000 ? 0xFFFF0000 | value : value);
-            return true;
-        }
-        std::uint32_t value = 0;
-        if (io_load(address, 2, value)) {
-            regs_[reg] = unsigned_value ? value : (value & 0x8000 ? 0xFFFF0000 | value : value);
-            return true;
-        }
-        unsupported_ = "read from unsupported PS1 memory";
-        return false;
-    }
-
-    bool load_word(std::uint32_t address, std::uint32_t reg)
-    {
-        if (address & 3) {
-            unsupported_ = "unaligned 32-bit load";
-            return false;
-        }
-        if (in_ram(address) && in_ram(address + 3)) {
-            regs_[reg] = read_ram32(address);
-            return true;
-        }
-        std::uint32_t value = 0;
-        if (io_load(address, 4, value)) {
-            regs_[reg] = value;
-            return true;
-        }
-        unsupported_ = "read from unsupported PS1 memory";
-        return false;
-    }
-
-    bool store_byte(std::uint32_t address, std::uint32_t value)
-    {
-        if (in_ram(address)) {
-            ram_[address & 0x1FFFFFFF] = static_cast<unsigned char>(value);
-            return true;
-        }
-        return io_store(address, value, 1);
-    }
-
-    bool store_half(std::uint32_t address, std::uint32_t value)
-    {
-        if (address & 1) {
-            unsupported_ = "unaligned 16-bit store";
-            return false;
-        }
-        if (in_ram(address) && in_ram(address + 1)) {
-            ram_[address & 0x1FFFFFFF] = static_cast<unsigned char>(value);
-            ram_[(address & 0x1FFFFFFF) + 1] = static_cast<unsigned char>(value >> 8);
-            return true;
-        }
-        return io_store(address, value, 2);
-    }
-
-    bool store_word(std::uint32_t address, std::uint32_t value)
-    {
-        if (address & 3) {
-            unsupported_ = "unaligned 32-bit store";
-            return false;
-        }
-        if (in_ram(address) && in_ram(address + 3)) {
-            address &= 0x1FFFFFFF;
-            ram_[address] = static_cast<unsigned char>(value);
-            ram_[address + 1] = static_cast<unsigned char>(value >> 8);
-            ram_[address + 2] = static_cast<unsigned char>(value >> 16);
-            ram_[address + 3] = static_cast<unsigned char>(value >> 24);
-            return true;
-        }
-        return io_store(address, value, 4);
-    }
-
-    bool io_store(std::uint32_t address, std::uint32_t value, std::uint32_t size)
-    {
-        std::uint32_t physical = address & 0x1FFFFFFF;
-        if (physical >= 0x1F800000 && physical < 0x1F800400) {
-            std::uint32_t offset = physical - 0x1F800000;
-            for (std::uint32_t index = 0; index < size && offset + index < scratchpad_.size(); ++index) {
-                scratchpad_[offset + index] = static_cast<unsigned char>(value >> (index * 8));
-            }
-            return true;
-        }
-        if (physical >= 0x1F801000 && physical < 0x1F803000) {
-            return true;
-        }
-        char detail[96];
-        std::snprintf(detail, sizeof(detail),
-            "store to unsupported PS1 memory 0x%08X (PC 0x%08X)",
-            static_cast<unsigned>(address),
-            static_cast<unsigned>(pc_));
-        unsupported_ = detail;
-        return false;
-    }
-
-    bool io_load(std::uint32_t address, std::uint32_t size, std::uint32_t& value)
-    {
-        std::uint32_t physical = address & 0x1FFFFFFF;
-        if (physical >= 0x1F800000 && physical < 0x1F800400) {
-            std::uint32_t offset = physical - 0x1F800000;
-            value = 0;
-            for (std::uint32_t index = 0; index < size && offset + index < scratchpad_.size(); ++index) {
-                value |= static_cast<std::uint32_t>(scratchpad_[offset + index]) << (index * 8);
-            }
-            return true;
-        }
-        if (physical >= 0x1F801000 && physical < 0x1F803000) {
-            value = 0;
-            return true;
-        }
-        return false;
-    }
-
-    void mult(std::int32_t left, std::int32_t right)
-    {
-        std::int64_t product = static_cast<std::int64_t>(left) * right;
-        lo_ = static_cast<std::uint32_t>(product);
-        hi_ = static_cast<std::uint32_t>(static_cast<std::uint64_t>(product) >> 32);
-    }
-
-    void mult(std::uint32_t left, std::uint32_t right)
-    {
-        std::uint64_t product = static_cast<std::uint64_t>(left) * right;
-        lo_ = static_cast<std::uint32_t>(product);
-        hi_ = static_cast<std::uint32_t>(product >> 32);
-    }
-
-    void div(std::int32_t left, std::int32_t right)
-    {
-        if (right == 0) {
-            lo_ = left >= 0 ? 0xFFFFFFFF : 1;
-            hi_ = left;
-        } else if (left == -2147483648 && right == -1) {
-            lo_ = 0x80000000;
-            hi_ = 0;
-        } else {
-            lo_ = static_cast<std::uint32_t>(left / right);
-            hi_ = static_cast<std::uint32_t>(left % right);
-        }
-    }
-
-    void divu(std::uint32_t left, std::uint32_t right)
-    {
-        if (right == 0) {
-            lo_ = 0xFFFFFFFF;
-            hi_ = left;
-        } else {
-            lo_ = left / right;
-            hi_ = left % right;
-        }
-    }
+#include "RuntimeGpu.inc"
+#include "RuntimeMemory.inc"
+#include "RuntimeMmio.inc"
+#include "RuntimeArith.inc"
 };
 
 }
@@ -631,6 +580,7 @@ bool run_psx(const RunOptions& options)
     };
     PsxCpu cpu(exe);
     std::unique_ptr<HostVideo> video;
+    std::unique_ptr<HostAudio> audio = std::make_unique<HostAudio>();
     if (options.video) {
         video = std::make_unique<HostVideo>();
     }
@@ -639,7 +589,19 @@ bool run_psx(const RunOptions& options)
             if (!video->poll_events()) {
                 return true;
             }
-            video->present();
+            cpu.set_pad_state(video->pad_state());
+            cpu.tick_frame();
+            video->present_vram(
+                cpu.frame_vram(),
+                cpu.frame_x(),
+                cpu.frame_y(),
+                cpu.frame_width(),
+                cpu.frame_height()
+            );
+            cpu.render_audio(*audio);
+        } else if (!video && instructions % 10000 == 0) {
+            cpu.tick_frame();
+            cpu.render_audio(*audio);
         }
         if (!cpu.step()) {
             if (const char* reason = cpu.unsupported()) {
