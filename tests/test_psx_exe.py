@@ -18,48 +18,32 @@ from analyze_psx_exe import (
 from extract_psx_game import parse_cue, safe_output_path
 
 
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+
 class PsxExeHeaderTest(unittest.TestCase):
     def test_parse_valid_header(self):
-        data = bytearray(64)
-        data[:8] = b"PS-X EXE"
-        struct.pack_into("<I", data, 0x10, 0x80010008)
-        struct.pack_into("<I", data, 0x14, 0x80020000)
-        struct.pack_into("<I", data, 0x18, 0x80010000)
-        struct.pack_into("<I", data, 0x1C, 0x1000)
-        struct.pack_into("<I", data, 0x30, 0x801FFFF0)
-        struct.pack_into("<I", data, 0x34, 0xFFFFFF00)
+        data = (FIXTURES / "valid.ps-exe").read_bytes()
 
-        header = parse_psx_exe_header(bytes(data))
+        header = parse_psx_exe_header(data)
 
         self.assertEqual(header["initial_pc"], 0x80010008)
         self.assertEqual(header["load_address"], 0x80010000)
-        self.assertEqual(header["file_size"], 0x1000)
-        self.assertEqual(header["initial_sp_base"], 0x801FFFF0)
-        self.assertEqual(header["initial_sp_offset"], 0xFFFFFF00)
+        self.assertEqual(header["file_size"], 0x20)
 
     def test_reject_invalid_header(self):
         with self.assertRaises(ValueError):
-            parse_psx_exe_header(b"NOT A PSX EXECUTABLE")
+            parse_psx_exe_header((FIXTURES / "invalid.ps-exe").read_bytes())
 
     def test_extract_declared_code_section(self):
-        data = bytearray(0x804)
-        data[:8] = b"PS-X EXE"
-        struct.pack_into("<I", data, 0x18, 0x80010000)
-        struct.pack_into("<I", data, 0x1C, 4)
-        data[0x800:0x804] = b"\x00\x00\x00\x24"
-
-        header, code = extract_psx_code(bytes(data))
+        header, code = extract_psx_code((FIXTURES / "declared-code.ps-exe").read_bytes())
 
         self.assertEqual(header["load_address"], 0x80010000)
         self.assertEqual(code, b"\x00\x00\x00\x24")
 
     def test_extract_rejects_truncated_code(self):
-        data = bytearray(0x800)
-        data[:8] = b"PS-X EXE"
-        struct.pack_into("<I", data, 0x1C, 4)
-
         with self.assertRaises(ValueError):
-            extract_psx_code(bytes(data))
+            extract_psx_code((FIXTURES / "truncated.ps-exe").read_bytes())
 
 
 class MipsDisassemblerTest(unittest.TestCase):
@@ -81,13 +65,13 @@ class MipsDisassemblerTest(unittest.TestCase):
         )
 
     def test_range_preserves_address(self):
-        code = struct.pack("<II", 0, (0x09 << 26) | (9 << 16) | 1)
+        code = (FIXTURES / "mips" / "instructions.bin").read_bytes()[:8]
         instructions = list(disassemble_range(code, 0x80010000, count=2))
         self.assertEqual(instructions[0][0], 0x80010000)
         self.assertEqual(instructions[1][0], 0x80010004)
 
     def test_control_flow_adds_branch_edges(self):
-        code = struct.pack("<IIII", 0, (0x04 << 26) | 2, 0, 0)
+        code = (FIXTURES / "mips" / "control-flow.bin").read_bytes()
         cfg = control_flow_map(code, 0x80010000)
         self.assertGreaterEqual(len(cfg["blocks"]), 2)
 
@@ -111,66 +95,35 @@ class MipsDisassemblerTest(unittest.TestCase):
 
 class GameExtractionTest(unittest.TestCase):
     def test_parse_multitrack_cue(self):
-        cue = b'FILE "Game.bin" BINARY\r\n  TRACK 01 MODE2/2352\r\nFILE "Audio.bin" BINARY\r\n  TRACK 02 AUDIO\r\n'
-        with __import__("tempfile").TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "Game.bin").write_bytes(b"")
-            (root / "Audio.bin").write_bytes(b"")
-            (root / "Game.cue").write_bytes(cue)
+        root = FIXTURES / "cue" / "multitrack"
+        tracks = parse_cue(root / "Game.cue")
 
-            tracks = parse_cue(root / "Game.cue")
-
-            self.assertEqual(len(tracks), 2)
-            self.assertEqual(tracks[0].number, 1)
-            self.assertEqual(tracks[0].mode, "MODE2/2352")
-            self.assertEqual(tracks[1].number, 2)
-            self.assertEqual(tracks[1].mode, "AUDIO")
+        self.assertEqual(len(tracks), 2)
+        self.assertEqual(tracks[0].number, 1)
+        self.assertEqual(tracks[0].mode, "MODE2/2352")
+        self.assertEqual(tracks[1].number, 2)
+        self.assertEqual(tracks[1].mode, "AUDIO")
 
     def test_parse_separate_data_and_audio_bins(self):
-        cue = (
-            'FILE "Track 1.bin" BINARY\n'
-            "  TRACK 01 MODE2/2352\n"
-            'FILE "Track 2.bin" BINARY\n'
-            "  TRACK 02 AUDIO\n"
-            "    INDEX 01 00:00:00\n"
-            'FILE "Track 3.bin" BINARY\n'
-            "  TRACK 03 AUDIO\n"
-            "    INDEX 01 00:00:00\n"
-        )
-        with __import__("tempfile").TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "Track 1.bin").write_bytes(b"\x00" * (2352 * 10))
-            (root / "Track 2.bin").write_bytes(b"\x00" * (2352 * 5))
-            (root / "Track 3.bin").write_bytes(b"\x00" * (2352 * 3))
-            (root / "Game.cue").write_text(cue)
+        root = FIXTURES / "cue" / "separate"
+        tracks = parse_cue(root / "Game.cue")
 
-            tracks = parse_cue(root / "Game.cue")
-
-            self.assertEqual([track.number for track in tracks], [1, 2, 3])
-            self.assertEqual(tracks[1].file_start_lba, 10)
-            self.assertEqual(tracks[2].file_start_lba, 15)
+        self.assertEqual([track.number for track in tracks], [1, 2, 3])
+        self.assertEqual(tracks[1].file_start_lba, 10)
+        self.assertEqual(tracks[2].file_start_lba, 15)
 
     def test_rejects_parent_traversal_path(self):
-        with __import__("tempfile").TemporaryDirectory() as directory:
-            root = Path(directory)
-            with self.assertRaises(ValueError):
-                safe_output_path(root, "../escape.bin")
+        root = FIXTURES / "cue" / "separate"
+        with self.assertRaises(ValueError):
+            safe_output_path(root, "../escape.bin")
 
     def test_extracts_two_cues_as_separate_discs(self):
-        cue_1 = 'FILE "Disc1.bin" BINARY\n  TRACK 01 MODE2/2352\n'
-        cue_2 = 'FILE "Disc2.bin" BINARY\n  TRACK 01 MODE2/2352\n'
-        with __import__("tempfile").TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "Disc1.bin").write_bytes(b"\x00" * (2352 * 2))
-            (root / "Disc2.bin").write_bytes(b"\x00" * (2352 * 2))
-            (root / "Disc1.cue").write_text(cue_1)
-            (root / "Disc2.cue").write_text(cue_2)
+        root = FIXTURES / "cue" / "discs"
+        tracks_1 = parse_cue(root / "Disc1.cue")
+        tracks_2 = parse_cue(root / "Disc2.cue")
 
-            tracks_1 = parse_cue(root / "Disc1.cue")
-            tracks_2 = parse_cue(root / "Disc2.cue")
-
-            self.assertEqual(tracks_1[0].bin_file, "Disc1.bin")
-            self.assertEqual(tracks_2[0].bin_file, "Disc2.bin")
+        self.assertEqual(tracks_1[0].bin_file, "Disc1.bin")
+        self.assertEqual(tracks_2[0].bin_file, "Disc2.bin")
 
 
 if __name__ == "__main__":

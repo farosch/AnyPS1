@@ -4,5 +4,5 @@ add_test(NAME psx_exe_header COMMAND python3 -m unittest discover -s ${CMAKE_SOU
 add_executable(anyps1_relinker_test RelinkerTest.cpp)
 target_include_directories(anyps1_relinker_test PRIVATE ${CMAKE_SOURCE_DIR}/core)
 target_link_libraries(anyps1_relinker_test PRIVATE anyps1_relinker)
-add_test(NAME relinker_artifact COMMAND anyps1_relinker_test)
+add_test(NAME relinker_artifact COMMAND anyps1_relinker_test ${CMAKE_SOURCE_DIR}/tests/fixtures/valid.ps-exe)
 

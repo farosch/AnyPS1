@@ -2,52 +2,26 @@
 
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-#include <vector>
 
-namespace {
-
-void write32(std::ofstream& output, std::size_t offset, std::uint32_t value)
+int main(int argc, char** argv)
 {
-    output.seekp(static_cast<std::streamoff>(offset));
-    const std::array<unsigned char, 4> bytes{
-        static_cast<unsigned char>(value),
-        static_cast<unsigned char>(value >> 8),
-        static_cast<unsigned char>(value >> 16),
-        static_cast<unsigned char>(value >> 24),
-    };
-    output.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-}
-
-}
-
-int main()
-{
-    const char* input_path = "/tmp/anyps1-relinker-test.ps-exe";
+    if (argc != 2) {
+        std::cerr << "Usage: anyps1_relinker_test <fixture.ps-exe>\n";
+        return 1;
+    }
+    const char* input_path = argv[1];
     const char* output_path = "/tmp/anyps1-relinker-test.elf";
     const char* windows_output_path = "/tmp/anyps1-relinker-test.exe";
+    const char* nested_output_path = "/tmp/anyps1-relinker-test/nested/output.elf";
     try {
-        std::ofstream input(input_path, std::ios::binary | std::ios::trunc);
-        std::vector<unsigned char> exe(2080, 0);
-        std::memcpy(exe.data(), "PS-X EXE", 8);
-        exe[0x10] = 0x08;
-        exe[0x11] = 0x00;
-        exe[0x12] = 0x01;
-        exe[0x13] = 0x80;
-        exe[0x18] = 0x00;
-        exe[0x19] = 0x00;
-        exe[0x1A] = 0x01;
-        exe[0x1B] = 0x80;
-        exe[0x1C] = 0x20;
-        exe[0x1D] = 0x00;
-        exe[0x1E] = 0x00;
-        exe[0x1F] = 0x00;
-        input.write(reinterpret_cast<const char*>(exe.data()), static_cast<std::streamsize>(exe.size()));
-        input.close();
+        if (!std::filesystem::is_regular_file(input_path)) {
+            throw std::runtime_error("missing relinker fixture");
+        }
 
         anyps1::RelinkOptions options;
         options.input = input_path;
@@ -68,6 +42,15 @@ int main()
         windows_options.target = anyps1::TargetPlatform::Windows;
         if (!anyps1::relink(windows_options)) {
             throw std::runtime_error("Windows relink failed");
+        }
+        anyps1::RelinkOptions nested_options;
+        nested_options.input = input_path;
+        nested_options.output = nested_output_path;
+        if (!anyps1::relink(nested_options)) {
+            throw std::runtime_error("nested output relink failed");
+        }
+        if (!std::filesystem::is_regular_file(nested_output_path)) {
+            throw std::runtime_error("nested output directory was not created");
         }
         std::ifstream windows_artifact(windows_output_path, std::ios::binary);
         std::array<unsigned char, 132> windows_header{};
@@ -99,14 +82,14 @@ int main()
             throw std::runtime_error("ELF section-name table is empty");
         }
 
-        std::remove(input_path);
         std::remove(output_path);
         std::remove(windows_output_path);
+        std::filesystem::remove_all("/tmp/anyps1-relinker-test");
         return 0;
     } catch (const std::exception& error) {
-        std::remove(input_path);
         std::remove(output_path);
         std::remove(windows_output_path);
+        std::filesystem::remove_all("/tmp/anyps1-relinker-test");
         std::cerr << "Relinker test failed: " << error.what() << "\n";
         return 1;
     }

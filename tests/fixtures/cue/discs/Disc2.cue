@@ -1,0 +1,2 @@
+FILE "Disc2.bin" BINARY
+  TRACK 01 MODE2/2352
