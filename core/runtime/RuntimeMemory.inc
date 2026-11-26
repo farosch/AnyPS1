@@ -26,9 +26,9 @@
                     heap_cursor_ += size;
                 }
             } else if (function == 0x07) {
+                regs_[2] = 1;
                 const std::uint32_t event_class = regs_[4];
                 const std::uint32_t event_spec = regs_[5];
-                regs_[2] = 1;
                 for (std::uint32_t handle = 0; handle < bios_events.size(); ++handle) {
                     if (bios_events[handle] != 0
                         && bios_event_flags[handle] == 0x2000
@@ -116,6 +116,16 @@
                 regs_[2] = kernel_frame_counter;
             } else if (function == 0x18) {
                 regs_[2] = 0;
+            } else if (function == 0x1F) {
+                regs_[2] = regs_[4];
+            } else if (function == 0x20) {
+                regs_[2] = regs_[4];
+            } else if (function == 0x21) {
+                regs_[2] = 0;
+            } else if (function == 0x22) {
+                regs_[2] = 0;
+            } else if (function == 0x23) {
+                regs_[2] = regs_[4];
             } else if (function == 0x19) {
                 const std::uint32_t address = regs_[4] & 0x1FFFFFFF;
                 const std::uint32_t increment = regs_[5];
@@ -182,6 +192,12 @@
     {
         if ((address & 0xFF000000u) == 0x1F000000u) {
             return false;
+        }
+        if ((address & 0xF0000000u) == 0x80000000u
+            || (address & 0xF0000000u) == 0xA0000000u
+            || (address & 0xF0000000u) == 0x90000000u) {
+            const std::uint32_t physical = address & 0x1FFFFFFF;
+            return physical < ram_.size();
         }
         if (address >= 0x80200000u && address < 0x80210000u) {
             address = 0x801FF000u | (address & 0xFFFu);

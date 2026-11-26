@@ -44,6 +44,19 @@
                 gte_control[24] = static_cast<std::uint32_t>(
                     x * gte_data_[13] - y * gte_data_[14] + z * gte_data_[12]);
                 break;
+            case 0x02:
+                gte_control[24] = static_cast<std::uint32_t>(
+                    (gte_data_[9] * gte_data_[10]) - (gte_data_[10] * gte_data_[11])
+                    + (gte_data_[11] * gte_data_[12]));
+                break;
+            case 0x04:
+                gte_control[24] = static_cast<std::uint32_t>(
+                    std::clamp<std::int64_t>(z * gte_data_[9] - x * gte_data_[11], -32768, 32767));
+                gte_control[25] = static_cast<std::uint32_t>(
+                    std::clamp<std::int64_t>(z * gte_data_[10] - y * gte_data_[12], -32768, 32767));
+                gte_control[26] = static_cast<std::uint32_t>(
+                    std::clamp<std::int64_t>(x * gte_data_[11] - y * gte_data_[13], -32768, 32767));
+                break;
             case 0x12:
                 gte_control[24] = static_cast<std::uint32_t>(gte_data_[9]);
                 gte_control[25] = static_cast<std::uint32_t>(gte_data_[10] & 0xFFFF);
