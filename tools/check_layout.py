@@ -7,7 +7,6 @@ def required_layout(root: Path) -> tuple[Path, ...]:
         root / "core" / "libs",
         root / "tools",
         root / "cmake",
-        root / "docs",
         root / "demo",
         root / "tests",
         root / "3rdparty",
