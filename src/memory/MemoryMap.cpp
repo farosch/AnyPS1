@@ -18,8 +18,9 @@ Ps1AddressInfo classify_ps1_address(
         return {Ps1AddressKind::Invalid, address, 0, 0};
     }
     normalize_ps1_address(address);
-    if (address < 0x00200000u) {
-        return {Ps1AddressKind::Ram, address, address, 0x00200000u};
+    if (address < 0x00800000u) {
+        const std::uint32_t offset = address & 0x001FFFFFu;
+        return {Ps1AddressKind::Ram, offset, offset, 0x00200000u};
     }
     if (address >= 0x1F800000u && address < 0x1F800400u) {
         return {Ps1AddressKind::Scratchpad,

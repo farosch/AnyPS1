@@ -28,7 +28,7 @@ int main()
 {
     try {
         constexpr std::uint32_t load_address = 0x80010000u;
-        constexpr std::uint32_t file_size = 64u;
+        constexpr std::uint32_t file_size = 96u;
         std::vector<unsigned char> data(
             anyps1::PSX_HEADER_SIZE + file_size);
         write_word(data, 0, 0x3C088001u);
@@ -43,6 +43,20 @@ int main()
         if (resolved != load_address + 0x20u) {
             throw std::runtime_error("constant target was not resolved");
         }
+
+        write_word(data, 0, 0x240800A0u);
+        const std::uint32_t zero_based =
+            anyps1::resolve_static_indirect_target(
+                data,
+                load_address,
+                file_size,
+                load_address + 4u,
+                8u);
+        if (zero_based != 0xA0u) {
+            throw std::runtime_error(
+                "zero-based immediate target was not resolved");
+        }
+        write_word(data, 0, 0x3C088001u);
 
         write_word(data, 2, 0x8D084000u);
         write_word(data, 3, 0x01000008u);
@@ -70,6 +84,28 @@ int main()
                 8u);
         if (loaded != load_address + 28u) {
             throw std::runtime_error("payload-loaded target was not resolved");
+        }
+
+        write_word(data, 8, 0x3C028001u);
+        write_word(data, 9, 0x8C420020u);
+        write_word(data, 10, 0x24420004u);
+        write_word(data, 11, 0u);
+        write_word(data, 12, 0x3C048001u);
+        write_word(data, 13, 0x24840040u);
+        write_word(data, 14, 0x24840004u);
+        write_word(data, 15, 0u);
+        write_word(data, 18, load_address + 32u);
+        write_word(data, 19, load_address + 48u);
+        const std::vector<std::uint32_t> pointer_targets =
+            anyps1::discover_payload_pointer_targets(
+                data,
+                load_address,
+                file_size);
+        if (pointer_targets.size() != 2u ||
+            pointer_targets[0] != load_address + 32u ||
+            pointer_targets[1] != load_address + 48u) {
+            throw std::runtime_error(
+                "contiguous payload pointer table was not discovered");
         }
         return 0;
     } catch (const std::exception& error) {

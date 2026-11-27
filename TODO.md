@@ -48,6 +48,12 @@
   endianness, unaligned access, and HI/LO semantics with focused fixtures.
 - [x] Add support for sparse control-flow regions and discontinuous executable
   sections in CFG discovery.
+- [x] Preserve post-`JALR` continuation leaders and dispatch runtime
+  indirect calls through lowered native leaders.
+- [x] Recover conservative callback targets from contiguous executable
+  pointer tables without seeding isolated data words.
+- [x] Resolve zero-based immediate and payload-loaded indirect targets while
+  invalidating stale constants on intervening register writes.
 - [ ] Complete PS1 COP2/GTE matrix, vector, color, perspective, interpolation,
   saturation, and flag semantics beyond the shared runtime operation subset
   currently reached by reference executables.
@@ -103,6 +109,10 @@
 - [x] Emit checked bounds for RAM and scratchpad accesses.
 - [x] Route out-of-range and MMIO accesses to explicit fault/unsupported exits.
 - [x] Preserve executable payload bytes for native payload copying.
+- [x] Copy executable payloads at their physical PS1 RAM load offset and reject
+  payloads that exceed the mirrored 8 MiB RAM address window.
+- [x] Map PS1 RAM mirror accesses throughout the 8 MiB mirror window to the
+  backing 2 MiB host RAM.
 - [x] Remove title-specific, BIOS-dependent, and virtualized-memory behavior.
 - [x] Implement page/range validation for executable sections and RAM boundaries.
 - [x] Add executable-section protection and separate code/data/rodata mappings.
@@ -119,6 +129,8 @@
 
 - [x] Replace BIOS-vector assumptions with native host services or explicit
   unsupported results.
+- [x] Implement the A0 `0x39` byte-copy BIOS service with native RAM bounds and
+  return-address handling on Linux and Windows.
 - [x] Add native Linux console write and process exit handling.
 - [x] Implement generic file, input, audio, video, and Vulkan host mappings.
 - [x] Add SDL3 gamepad, keyboard, and mouse runtime support.
@@ -151,6 +163,8 @@
   VBlank scheduling, event/input polling, audio, and framebuffer presentation.
 - [ ] Integrate memory-card and disc runtime APIs through the actual PS1
   controller and CD-ROM/MMIO protocols.
+- [ ] Implement the remaining B0/C0 BIOS services reached by real executable
+  startup paths beyond A0 byte copy.
 - [ ] Advance real-executable conversion past the first unsupported COP2/MMIO
   family and record the next concrete runtime blocker.
 

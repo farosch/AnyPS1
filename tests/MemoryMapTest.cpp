@@ -22,6 +22,15 @@ int main()
             ram.normalized_address != 0x00001000u) {
             throw std::runtime_error("RAM address classification failed");
         }
+        const anyps1::Ps1AddressInfo mirrored_ram =
+            anyps1::classify_ps1_address(
+                0xA0600010u,
+                0x80010000u,
+                0x100u);
+        if (mirrored_ram.kind != anyps1::Ps1AddressKind::Ram ||
+            mirrored_ram.offset != 0x10u) {
+            throw std::runtime_error("mirrored RAM classification failed");
+        }
 
         const anyps1::Ps1AddressInfo scratch =
             anyps1::classify_ps1_address(

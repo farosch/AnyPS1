@@ -61,6 +61,21 @@ struct Ps1FileCallPlan {
 
 Ps1FileCallPlan map_ps1_file_call(std::uint32_t vector);
 
+enum class Ps1BiosCallKind {
+    Unsupported,
+    Memcpy
+};
+
+struct Ps1BiosCallPlan {
+    Ps1BiosCallKind kind = Ps1BiosCallKind::Unsupported;
+    std::uint32_t vector = 0;
+    std::uint32_t function = 0;
+};
+
+Ps1BiosCallPlan map_ps1_bios_call(
+    std::uint32_t vector,
+    std::uint32_t function);
+
 class NativeFileRuntime {
 public:
     NativeFileRuntime();

@@ -72,6 +72,16 @@ Ps1FileCallPlan map_ps1_file_call(std::uint32_t vector)
     }
 }
 
+Ps1BiosCallPlan map_ps1_bios_call(
+    std::uint32_t vector,
+    std::uint32_t function)
+{
+    if (vector == 0xA0u && function == 0x39u) {
+        return {Ps1BiosCallKind::Memcpy, vector, function};
+    }
+    return {Ps1BiosCallKind::Unsupported, vector, function};
+}
+
 HostServiceMapping map_host_service(HostServiceKind kind)
 {
     switch (kind) {

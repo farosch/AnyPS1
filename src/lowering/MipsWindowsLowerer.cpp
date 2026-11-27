@@ -230,6 +230,14 @@ void MipsWindowsLowerer::lower(
         throw std::runtime_error(
             "unsupported native Windows lowering: entry point outside executable payload");
     }
+    const std::uint32_t payload_ram_offset =
+        load_address & 0x1FFFFFu;
+    if (payload_ram_offset > 0x200000u ||
+        file_size > 0x200000u - payload_ram_offset) {
+        throw std::runtime_error(
+            "unsupported native Windows lowering: "
+            "executable payload exceeds PS1 RAM");
+    }
 
     std::set<std::uint32_t> leaders;
     std::set<std::uint32_t> delay_slots;
@@ -249,6 +257,13 @@ void MipsWindowsLowerer::lower(
     std::string first_unsupported_name;
     std::set<std::string> unsupported_family_names;
     std::set<std::uint32_t> emittable_leaders;
+    for (std::uint32_t target : discover_payload_pointer_targets(
+             data,
+             load_address,
+             file_size)) {
+        leaders.insert(target);
+        work.push(target);
+    }
 
     while (!work.empty()) {
         const std::uint32_t address = work.front();
@@ -310,6 +325,11 @@ void MipsWindowsLowerer::lower(
             work.push(address + 4);
         }
         if (jr || jalr) {
+            if (jalr) {
+                ++call_edges;
+                leaders.insert(address + 8);
+                work.push(address + 8);
+            }
             const std::uint32_t resolved_target =
                 resolve_static_indirect_target(
                     data,
@@ -323,19 +343,43 @@ void MipsWindowsLowerer::lower(
                 leaders.insert(resolved_target);
                 work.push(resolved_target);
             } else {
-                const std::vector<std::uint32_t> table_targets =
-                    discover_indirect_table_targets(
+                const Ps1BiosCallPlan bios_call = map_ps1_bios_call(
+                    resolved_target,
+                    resolve_static_indirect_target(
                         data,
                         load_address,
                         file_size,
-                        address,
-                        rs);
-                if (table_targets.empty()) {
-                    ++unresolved_indirect_transfers;
+                        address + 4,
+                        9u));
+                const std::uint32_t return_target =
+                    bios_call.kind == Ps1BiosCallKind::Unsupported
+                        ? 0u
+                        : resolve_static_indirect_target(
+                            data,
+                            load_address,
+                            file_size,
+                            address,
+                            31u);
+                if (return_target >= load_address &&
+                    return_target < static_cast<std::uint64_t>(load_address) + file_size &&
+                    (return_target & 3u) == 0) {
+                    leaders.insert(return_target);
+                    work.push(return_target);
                 } else {
-                    for (std::uint32_t target : table_targets) {
-                        leaders.insert(target);
-                        work.push(target);
+                    const std::vector<std::uint32_t> table_targets =
+                        discover_indirect_table_targets(
+                            data,
+                            load_address,
+                            file_size,
+                            address,
+                            rs);
+                    if (table_targets.empty()) {
+                        ++unresolved_indirect_transfers;
+                    } else {
+                        for (std::uint32_t target : table_targets) {
+                            leaders.insert(target);
+                            work.push(target);
+                        }
                     }
                 }
             }
@@ -511,6 +555,54 @@ void MipsWindowsLowerer::lower(
     source << "call ExitProcess\n";
     source << "unsupported_exit ENDP\n";
     source << "indirect_jump PROC\n";
+    const Ps1BiosCallPlan memcpy_call =
+        map_ps1_bios_call(0xA0u, 0x39u);
+    source << "cmp eax," << memcpy_call.vector << "\n";
+    source << "jne indirect_leader_dispatch\n";
+    source << "cmp dword ptr regs+36," << memcpy_call.function << "\n";
+    source << "jne unresolved_indirect_exit\n";
+    source << "mov eax,dword ptr regs+16\n";
+    source << "mov dword ptr regs+8,eax\n";
+    source << "test eax,eax\n";
+    source << "jz bios_memcpy_return\n";
+    source << "mov ecx,dword ptr regs+24\n";
+    source << "test ecx,ecx\n";
+    source << "jle bios_memcpy_return\n";
+    source << "and eax,1FFFFFFFh\n";
+    source << "cmp eax,800000h\n";
+    source << "jae bios_memory_fault_exit\n";
+    source << "and eax,1FFFFFh\n";
+    source << "mov r10d,eax\n";
+    source << "add r10d,ecx\n";
+    source << "jb bios_memory_fault_exit\n";
+    source << "cmp r10d,200000h\n";
+    source << "ja bios_memory_fault_exit\n";
+    source << "mov r11d,dword ptr regs+20\n";
+    source << "and r11d,1FFFFFFFh\n";
+    source << "cmp r11d,800000h\n";
+    source << "jae bios_memory_fault_exit\n";
+    source << "and r11d,1FFFFFh\n";
+    source << "mov r8d,r11d\n";
+    source << "add r8d,ecx\n";
+    source << "jb bios_memory_fault_exit\n";
+    source << "cmp r8d,200000h\n";
+    source << "ja bios_memory_fault_exit\n";
+    source << "lea r8,ram\n";
+    source << "mov r10d,eax\n";
+    source << "add r8,r10\n";
+    source << "lea r9,ram\n";
+    source << "add r9,r11\n";
+    source << "bios_memcpy_byte:\n";
+    source << "mov dl,byte ptr [r8]\n";
+    source << "mov byte ptr [r9],dl\n";
+    source << "inc r8\n";
+    source << "inc r9\n";
+    source << "dec ecx\n";
+    source << "jnz bios_memcpy_byte\n";
+    source << "bios_memcpy_return:\n";
+    source << "mov eax,dword ptr regs+124\n";
+    source << "jmp indirect_jump\n";
+    source << "indirect_leader_dispatch:\n";
     for (std::uint32_t target : emittable_leaders) {
         if (target >= load_address &&
             target < static_cast<std::uint64_t>(load_address) + file_size) {
@@ -518,8 +610,16 @@ void MipsWindowsLowerer::lower(
             source << "je p" << std::hex << target << std::dec << "\n";
         }
     }
-    source << "jmp unsupported_exit\n";
+    source << "jmp unresolved_indirect_exit\n";
     source << "indirect_jump ENDP\n";
+    source << "unresolved_indirect_exit PROC\n";
+    source << "mov ecx,17\n";
+    source << "call ExitProcess\n";
+    source << "unresolved_indirect_exit ENDP\n";
+    source << "bios_memory_fault_exit PROC\n";
+    source << "mov ecx,13\n";
+    source << "call ExitProcess\n";
+    source << "bios_memory_fault_exit ENDP\n";
     source << "main PROC\n";
     source << "sub rsp,40\n";
     source << "mov ecx,-11\n";
@@ -544,6 +644,7 @@ void MipsWindowsLowerer::lower(
 
     source << "lea rsi,payload\n";
     source << "lea rdi,ram\n";
+    source << "add rdi," << payload_ram_offset << "\n";
     source << "mov ecx," << file_size << "\n";
     source << "rep movsb\n";
     source << "mov dword ptr regs+116," << initial_sp << "\n";
@@ -1184,6 +1285,9 @@ void MipsWindowsLowerer::lower(
             source << "lea rbx,scratchpad\n";
             source << "jmp load_region_" << std::hex << address << std::dec << "\n";
             source << "ram_load_" << std::hex << address << std::dec << ":\n";
+            source << "cmp eax,800000h\n";
+            source << "jae memory_fault_exit\n";
+            source << "and eax,1FFFFFh\n";
             source << "cmp eax," << (0x200000u - access_size) << "\n";
             source << "ja memory_fault_exit\n";
             source << "lea rbx,ram\n";
@@ -1259,6 +1363,9 @@ void MipsWindowsLowerer::lower(
             source << "lea rbx,scratchpad\n";
             source << "jmp store_region_" << std::hex << address << std::dec << "\n";
             source << "ram_store_" << std::hex << address << std::dec << ":\n";
+            source << "cmp eax,800000h\n";
+            source << "jae memory_fault_exit\n";
+            source << "and eax,1FFFFFh\n";
             source << "cmp eax," << (0x200000u - access_size) << "\n";
             source << "ja memory_fault_exit\n";
             source << "lea rbx,ram\n";

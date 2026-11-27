@@ -56,6 +56,13 @@ void MipsLinuxLowerer::lower(
     if (initial_pc < load_address || initial_pc >= load_address + file_size) {
         throw std::runtime_error("unsupported native lowering: entry point outside executable payload");
     }
+    const std::uint32_t payload_ram_offset =
+        load_address & 0x1FFFFFu;
+    if (payload_ram_offset > 0x200000u ||
+        file_size > 0x200000u - payload_ram_offset) {
+        throw std::runtime_error(
+            "unsupported native lowering: executable payload exceeds PS1 RAM");
+    }
 
     std::set<std::uint32_t> leaders;
     std::set<std::uint32_t> delay_slots;
@@ -76,6 +83,13 @@ void MipsLinuxLowerer::lower(
     bool native_host_loop_required = false;
     leaders.insert(initial_pc);
     work.push(initial_pc);
+    for (std::uint32_t target : discover_payload_pointer_targets(
+             data,
+             load_address,
+             file_size)) {
+        leaders.insert(target);
+        work.push(target);
+    }
     while (!work.empty()) {
         const std::uint32_t address = work.front();
         work.pop();
@@ -144,6 +158,11 @@ void MipsLinuxLowerer::lower(
             work.push(address + 4);
         }
         if (jr || jalr) {
+            if (jalr) {
+                ++call_edges;
+                leaders.insert(address + 8);
+                work.push(address + 8);
+            }
             const std::uint32_t resolved_target =
                 resolve_static_indirect_target(
                     data,
@@ -157,19 +176,43 @@ void MipsLinuxLowerer::lower(
                 leaders.insert(resolved_target);
                 work.push(resolved_target);
             } else {
-                const std::vector<std::uint32_t> table_targets =
-                    discover_indirect_table_targets(
+                const Ps1BiosCallPlan bios_call = map_ps1_bios_call(
+                    resolved_target,
+                    resolve_static_indirect_target(
                         data,
                         load_address,
                         file_size,
-                        address,
-                        rs);
-                if (table_targets.empty()) {
-                    ++unresolved_indirect_transfers;
+                        address + 4,
+                        9u));
+                const std::uint32_t return_target =
+                    bios_call.kind == Ps1BiosCallKind::Unsupported
+                        ? 0u
+                        : resolve_static_indirect_target(
+                            data,
+                            load_address,
+                            file_size,
+                            address,
+                            31u);
+                if (return_target >= load_address &&
+                    return_target < load_address + file_size &&
+                    (return_target & 3u) == 0) {
+                    leaders.insert(return_target);
+                    work.push(return_target);
                 } else {
-                    for (std::uint32_t target : table_targets) {
-                        leaders.insert(target);
-                        work.push(target);
+                    const std::vector<std::uint32_t> table_targets =
+                        discover_indirect_table_targets(
+                            data,
+                            load_address,
+                            file_size,
+                            address,
+                            rs);
+                    if (table_targets.empty()) {
+                        ++unresolved_indirect_transfers;
+                    } else {
+                        for (std::uint32_t target : table_targets) {
+                            leaders.insert(target);
+                            work.push(target);
+                        }
                     }
                 }
             }
@@ -342,7 +385,7 @@ void MipsLinuxLowerer::lower(
     source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_host_loop(%rip), %rsi\nmov $" << host_loop_diag.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";
-    source << "add $" << (load_address & 0x1FFFFFu) << ", %rdi\n";
+    source << "add $" << payload_ram_offset << ", %rdi\n";
     source << "leaq payload(%rip), %rsi\n";
     source << "mov $" << file_size << ", %ecx\n";
     source << "rep movsb\n";
@@ -369,6 +412,7 @@ void MipsLinuxLowerer::lower(
     source << "memory_fault_exit:\nmov $13, %edi\nmov $60, %eax\nsyscall\n";
     source << "mmio_exit:\nmov $14, %edi\nmov $60, %eax\nsyscall\n";
     source << "unsupported_jump_exit:\nmov $15, %edi\nmov $60, %eax\nsyscall\n";
+    source << "unsupported_bios_exit:\nmov $17, %edi\nmov $60, %eax\nsyscall\n";
     source << "unsupported_instruction_exit:\n";
     source << "leaq diag_first_gap(%rip), %rsi\n";
     source << "mov $" << first_gap.size() << ", %rdx\n";
@@ -395,6 +439,53 @@ void MipsLinuxLowerer::lower(
     source << "ret\n";
     source << ".extern anyps1_gte_execute\n";
     source << "indirect_jump:\n";
+    const Ps1BiosCallPlan memcpy_call =
+        map_ps1_bios_call(0xA0u, 0x39u);
+    source << "cmpl $" << memcpy_call.vector << ", %eax\n";
+    source << "jne indirect_leader_dispatch\n";
+    source << "cmpl $" << memcpy_call.function << ", 36(%r12)\n";
+    source << "jne unsupported_bios_exit\n";
+    source << "movl 16(%r12), %eax\n";
+    source << "movl %eax, 8(%r12)\n";
+    source << "testl %eax, %eax\n";
+    source << "jz bios_memcpy_return\n";
+    source << "movl 24(%r12), %ecx\n";
+    source << "testl %ecx, %ecx\n";
+    source << "jle bios_memcpy_return\n";
+    source << "andl $0x1FFFFFFF, %eax\n";
+    source << "cmpl $0x800000, %eax\n";
+    source << "jae memory_fault_exit\n";
+    source << "andl $0x1FFFFF, %eax\n";
+    source << "movl %eax, %r10d\n";
+    source << "addl %ecx, %r10d\n";
+    source << "jb memory_fault_exit\n";
+    source << "cmpl $0x200000, %r10d\n";
+    source << "ja memory_fault_exit\n";
+    source << "movl 20(%r12), %r11d\n";
+    source << "andl $0x1FFFFFFF, %r11d\n";
+    source << "cmpl $0x800000, %r11d\n";
+    source << "jae memory_fault_exit\n";
+    source << "andl $0x1FFFFF, %r11d\n";
+    source << "movl %r11d, %r10d\n";
+    source << "addl %ecx, %r10d\n";
+    source << "jb memory_fault_exit\n";
+    source << "cmpl $0x200000, %r10d\n";
+    source << "ja memory_fault_exit\n";
+    source << "leaq ram(%rip), %r8\n";
+    source << "addq %rax, %r8\n";
+    source << "leaq ram(%rip), %r9\n";
+    source << "addq %r11, %r9\n";
+    source << "bios_memcpy_byte:\n";
+    source << "movb (%r8), %dl\n";
+    source << "movb %dl, (%r9)\n";
+    source << "incq %r8\n";
+    source << "incq %r9\n";
+    source << "decl %ecx\n";
+    source << "jnz bios_memcpy_byte\n";
+    source << "bios_memcpy_return:\n";
+    source << "movl 124(%r12), %eax\n";
+    source << "jmp indirect_jump\n";
+    source << "indirect_leader_dispatch:\n";
     for (std::uint32_t indirect_target : emittable_leaders) {
         source << "cmpl $" << indirect_target << ", %eax\n";
         source << "je p" << std::hex << indirect_target << std::dec << "\n";
@@ -969,8 +1060,9 @@ void MipsLinuxLowerer::lower(
             emit_schedule_load(rt);
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "ram_load_" << std::hex << address << std::dec << ": \n";
-            source << "cmpl $0x200000, %ecx\n";
+            source << "cmpl $0x800000, %ecx\n";
             source << "jae memory_fault_exit\n";
+            source << "andl $0x1FFFFF, %ecx\n";
             source << "cmpl $" << (0x200001u - access_size) << ", %ecx\n";
             source << "jae memory_fault_exit\n";
             source << "leaq ram(%rip), %rbx\n";
@@ -1040,8 +1132,9 @@ void MipsLinuxLowerer::lower(
             else source << "movl %edx, (%rbx,%rcx)\n";
             source << "mmio_store_done_" << std::hex << address << std::dec << ": \n";
             source << "ram_store_" << std::hex << address << std::dec << ": \n";
-            source << "cmpl $0x200000, %ecx\n";
+            source << "cmpl $0x800000, %ecx\n";
             source << "jae memory_fault_exit\n";
+            source << "andl $0x1FFFFF, %ecx\n";
             source << "cmpl $" << (0x200001u - access_size) << ", %ecx\n";
             source << "jae memory_fault_exit\n";
             source << "leaq ram(%rip), %rbx\n";
@@ -1063,8 +1156,9 @@ void MipsLinuxLowerer::lower(
             source << "leaq scratchpad(%rip), %rbx\n";
             source << "jmp gte_finish_" << std::hex << address << std::dec << "\n";
             source << "gte_ram_" << std::hex << address << std::dec << ": \n";
-            source << "cmpl $0x200000, %ecx\n";
+            source << "cmpl $0x800000, %ecx\n";
             source << "jae memory_fault_exit\n";
+            source << "andl $0x1FFFFF, %ecx\n";
             source << "leaq ram(%rip), %rbx\n";
             source << "gte_finish_" << std::hex << address << std::dec << ": \n";
             if (opcode == 0x32) {
@@ -1087,8 +1181,9 @@ void MipsLinuxLowerer::lower(
             source << "leaq scratchpad(%rip), %rbx\n";
             source << "jmp cop1_finish_" << std::hex << address << std::dec << "\n";
             source << "cop1_ram_" << std::hex << address << std::dec << ": \n";
-            source << "cmpl $0x200000, %ecx\n";
+            source << "cmpl $0x800000, %ecx\n";
             source << "jae memory_fault_exit\n";
+            source << "andl $0x1FFFFF, %ecx\n";
             source << "leaq ram(%rip), %rbx\n";
             source << "cop1_finish_" << std::hex << address << std::dec << ": \n";
             if (opcode == 0x31) {
@@ -1164,8 +1259,9 @@ void MipsLinuxLowerer::lower(
             source << "leaq scratchpad(%rip), %rbx\n";
             source << "jmp unaligned_loaded_" << std::hex << address << std::dec << "\n";
             source << "unaligned_ram_" << std::hex << address << std::dec << ": \n";
-            source << "cmpl $0x200000, %edi\n";
+            source << "cmpl $0x800000, %edi\n";
             source << "jae memory_fault_exit\n";
+            source << "andl $0x1FFFFF, %edi\n";
             source << "leaq ram(%rip), %rbx\n";
             source << "unaligned_loaded_" << std::hex << address << std::dec << ": \n";
             source << "movl " << rt * 4 << "(%r12), %esi\n";
@@ -1240,8 +1336,9 @@ void MipsLinuxLowerer::lower(
             source << "leaq scratchpad(%rip), %rbx\n";
             source << "jmp unaligned_store_loaded_" << std::hex << address << std::dec << "\n";
             source << "unaligned_store_ram_" << std::hex << address << std::dec << ": \n";
-            source << "cmpl $0x200000, %edi\n";
+            source << "cmpl $0x800000, %edi\n";
             source << "jae memory_fault_exit\n";
+            source << "andl $0x1FFFFF, %edi\n";
             source << "leaq ram(%rip), %rbx\n";
             source << "unaligned_store_loaded_" << std::hex << address << std::dec << ": \n";
             source << "movl " << rt * 4 << "(%r12), %esi\n";
@@ -1570,7 +1667,8 @@ void MipsLinuxLowerer::lower(
                 source << "call p" << std::hex << resolved_target << std::dec << "\n";
                 emit_label_jump(address + 8);
             } else {
-                source << "jmp unsupported_jump_exit\n";
+                source << "call indirect_jump\n";
+                emit_label_jump(address + 8);
             }
         } else {
             if (emitted_addresses.insert(address).second) {

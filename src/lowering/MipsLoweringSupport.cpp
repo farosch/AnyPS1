@@ -1,5 +1,6 @@
 #include "MipsLoweringSupport.h"
 #include "format/PsExe.h"
+#include "UnsupportedInstructions.h"
 
 #include <cstdint>
 #include <vector>
@@ -41,17 +42,25 @@ std::uint32_t resolve_static_indirect_target(
             }
         } else if (opcode == 0x09 || opcode == 0x08) {
             if (rt == target_register) {
-                if (rs != target_register) {
-                    initialized = false;
-                } else if (initialized) {
+                if (rs == 0) {
+                    value = static_cast<std::uint32_t>(
+                        static_cast<std::int32_t>(
+                            static_cast<std::int16_t>(immediate)));
+                    initialized = true;
+                } else if (rs == target_register && initialized) {
                     value = static_cast<std::uint32_t>(
                         static_cast<std::int64_t>(value) +
                         static_cast<std::int16_t>(immediate));
+                } else {
+                    initialized = false;
                 }
             }
         } else if (opcode == 0x0D) {
             if (rt == target_register) {
-                if (rs != target_register || !initialized) {
+                if (rs == 0) {
+                    value = immediate;
+                    initialized = true;
+                } else if (rs != target_register || !initialized) {
                     initialized = false;
                 } else {
                     value |= immediate;
@@ -146,6 +155,69 @@ std::vector<std::uint32_t> discover_indirect_table_targets(
             break;
         }
         targets.insert(target);
+    }
+    return {targets.begin(), targets.end()};
+}
+
+std::vector<std::uint32_t> discover_payload_pointer_targets(
+    const std::vector<unsigned char>& data,
+    std::uint32_t load_address,
+    std::uint32_t file_size)
+{
+    const std::uint32_t word_count = file_size / 4u;
+    std::vector<bool> pointer_candidate(word_count, false);
+    for (std::uint32_t index = 0; index < word_count; ++index) {
+        const std::uint32_t target = read_psx32(
+            data,
+            PSX_HEADER_SIZE + index * 4u);
+        if (target < load_address ||
+            target >= load_address + file_size ||
+            (target & 3u) != 0) {
+            continue;
+        }
+        const std::uint32_t target_index =
+            (target - load_address) / 4u;
+        if (target_index + 4u > word_count) continue;
+        std::size_t nonzero = 0;
+        bool supported = true;
+        bool entry_like = false;
+        for (std::uint32_t offset = 0; offset < 4u; ++offset) {
+            const std::uint32_t instruction = read_psx32(
+                data,
+                PSX_HEADER_SIZE + (target_index + offset) * 4u);
+            if (offset == 0) {
+                const std::uint32_t opcode = instruction >> 26;
+                const std::uint32_t rt = (instruction >> 16) & 31u;
+                entry_like =
+                    opcode == 0x0F ||
+                    ((opcode == 0x08 || opcode == 0x09) && rt == 29u);
+            }
+            nonzero += instruction != 0;
+            if (!is_supported_mips_instruction(instruction)) {
+                supported = false;
+                break;
+            }
+        }
+        pointer_candidate[index] =
+            entry_like && supported && nonzero >= 3u;
+    }
+
+    std::set<std::uint32_t> targets;
+    for (std::uint32_t index = 0; index < word_count;) {
+        if (!pointer_candidate[index]) {
+            ++index;
+            continue;
+        }
+        const std::uint32_t run_start = index;
+        while (index < word_count && pointer_candidate[index]) ++index;
+        if (index - run_start < 2u) continue;
+        for (std::uint32_t table_index = run_start;
+             table_index < index;
+             ++table_index) {
+            targets.insert(read_psx32(
+                data,
+                PSX_HEADER_SIZE + table_index * 4u));
+        }
     }
     return {targets.begin(), targets.end()};
 }

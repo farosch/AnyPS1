@@ -30,6 +30,11 @@ int main()
             std::string(close_call.windows_function) != "CloseHandle") {
             throw std::runtime_error("A0 close file call mapping failed");
         }
+        const anyps1::Ps1BiosCallPlan memcpy_call =
+            anyps1::map_ps1_bios_call(0xA0u, 0x39u);
+        if (memcpy_call.kind != anyps1::Ps1BiosCallKind::Memcpy) {
+            throw std::runtime_error("A0 memcpy BIOS call mapping failed");
+        }
         anyps1::NativeFileRuntime files;
         std::string host_error;
         const std::filesystem::path temp =

@@ -30,8 +30,10 @@ add_dependencies(anyps1_relinker_test generate_test_fixtures)
 add_test(NAME relinker_artifact COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/valid.ps-exe)
 add_test(NAME relinker_native_subset COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-subset.ps-exe)
 add_test(NAME relinker_native_memory COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-memory.ps-exe)
+add_test(NAME relinker_native_ram_mirror COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-ram-mirror.ps-exe)
 add_test(NAME relinker_native_host_integration COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-host-integration.ps-exe)
 add_test(NAME relinker_native_bios_vector COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-vector.ps-exe)
+add_test(NAME relinker_native_bios_memcpy COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-memcpy.ps-exe)
 add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-load-delay.ps-exe)
 add_test(NAME relinker_zero_register COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/zero-register.ps-exe)
 add_test(NAME relinker_taken_delay_slot COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/delay-slot-taken.ps-exe)
@@ -50,8 +52,10 @@ set_tests_properties(
     relinker_artifact
     relinker_native_subset
     relinker_native_memory
+    relinker_native_ram_mirror
     relinker_native_host_integration
     relinker_native_bios_vector
+    relinker_native_bios_memcpy
     relinker_native_load_delay
     relinker_zero_register
     relinker_taken_delay_slot
@@ -138,10 +142,18 @@ add_test(NAME pe_host_mmio_state
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-host-integration.ps-exe)
+add_test(NAME pe_native_bios_memcpy
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-bios-memcpy.ps-exe)
 add_test(NAME pe_memory_boundary
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/memory-boundary.ps-exe)
+add_test(NAME pe_native_ram_mirror
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-ram-mirror.ps-exe)
 add_test(NAME pe_platform_parity
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
@@ -162,6 +174,13 @@ add_test(NAME pe_unaligned_parity
 add_test(NAME relinker_static_jalr
     COMMAND anyps1_relinker_test
         ${FIXTURE_OUTPUT_DIR}/mips/native-static-jalr.ps-exe)
+add_test(NAME relinker_dynamic_jalr
+    COMMAND anyps1_relinker_test
+        ${FIXTURE_OUTPUT_DIR}/mips/native-dynamic-jalr.ps-exe)
+add_test(NAME pe_dynamic_jalr
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-dynamic-jalr.ps-exe)
 
 add_test(NAME relinker_native_cop1
     COMMAND anyps1_relinker_test
