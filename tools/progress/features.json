@@ -1,0 +1,127 @@
+{
+  "subsystems": [
+    {
+      "name": "MIPS arithmetic",
+      "items": [
+        {"name":"SLL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x00"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SRL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x02"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SRA","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x03"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SLLV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x04"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SRLV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x06"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SRAV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x07"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ADD","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x20"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ADDU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x21"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SUB","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x22"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SUBU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x23"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"AND","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x24"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"OR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x25"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"XOR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x26"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"NOR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x27"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SLT","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x2A"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SLTU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x2B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MULT","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x18"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MULTU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x19"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"DIV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x1A"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"DIVU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x1B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MFHI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x10"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MFLO","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x12"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MTHI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x11"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MTLO","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x13"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]}
+      ]
+    },
+    {
+      "name":"MIPS immediate/load/store",
+      "items":[
+        {"name":"ADDI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x08"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ADDIU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x09"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"ANDI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0C"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ORI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0D"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"XORI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0E"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"LUI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0F"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"LB","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x20"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LH","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x21"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LW","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x23"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LBU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x24"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LHU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x25"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"SB","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x28"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"SH","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x29"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"SW","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x2B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LWL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x22"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-unaligned"]}]},
+        {"name":"LWR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x26"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-unaligned"]}]}
+      ]
+    },
+    {
+      "name":"MIPS control",
+      "items":[
+        {"name":"BEQ","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x04"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"BNE","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x05"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"BLEZ","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x06"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"BGTZ","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x07"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"J","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x02"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"JAL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x03"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"JR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x08"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"JALR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x09"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]},{"path":"tests/RelinkerTest.cpp","patterns":["static JALR"]}]},
+        {"name":"SYSCALL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x0C"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["host-integration"]}]},
+        {"name":"BREAK","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x0D"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]}
+      ]
+    },
+    {
+      "name":"COP0/COP2",
+      "items":[
+        {"name":"MFC0","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x10"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["cop0_rs == 0"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
+        {"name":"MTC0","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x10"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["cop0_rs == 4"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
+        {"name":"RFE","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["0x10: 16"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
+        {"name":"COP2/GTE","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x12"]},{"path":"src/lowering/UnsupportedInstructions.cpp","patterns":["COP2","GTE"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_cop2_stub"]}]},
+        {"name":"COP1","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x11"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_cop1_stub"]}]},
+        {"name":"COP3","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x13"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_cop3_stub"]}]}
+      ]
+    },
+    {
+      "name":"PS-X format",
+      "items":[
+        {"name":"PS-X header","source_patterns":[{"path":"src/format/PsExe.cpp","patterns":["PS-X EXE"]},{"path":"src/format/PsExe.cpp","patterns":["read_psx32"]}],"test_patterns":[{"path":"tests/test_psx_exe.py","patterns":["test_parse_valid_header"]},{"path":"tests/RelinkerTest.cpp","patterns":["invalid"]}]},
+        {"name":"SYSTEM.CNF boot","source_patterns":[{"path":"src/format/PsExe.cpp","patterns":["system_cnf_boot"]},{"path":"src/format/PsExe.cpp","patterns":["BOOT"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["SYSTEM.CNF"]}]},
+        {"name":"Extracted directory","source_patterns":[{"path":"src/format/PsExe.cpp","patterns":["resolve_relink_input"]},{"path":"src/format/PsExe.cpp","patterns":["find_extracted_boot"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["relinker_artifact"]}]},
+        {"name":"Malformed header","source_patterns":[{"path":"src/relinker/Relinker.cpp","patterns":["declared size"]},{"path":"src/relinker/Relinker.cpp","patterns":["shorter than its header"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["invalid_fixture"]},{"path":"tests/RelinkerTest.cpp","patterns":["truncated_fixture"]}]}
+      ]
+    },
+    {
+      "name":"Executable writers",
+      "items":[
+        {"name":"Linux ELF","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["write_linux_native_cfg"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["gcc -nostdlib"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native ELF"]},{"path":"tests/RelinkerTest.cpp","patterns":["native_elF"]}]},
+        {"name":"Windows PE","source_patterns":[{"path":"src/executable/PeWriter.cpp","patterns":["write_pe_layout"]}],"unsupported_patterns":[{"path":"src/executable/PeWriter.cpp","patterns":["native Windows MIPS lowering is not implemented"]}]},
+        {"name":"Native diagnostics","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["native executable diagnostics"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_instructions"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native"]}]}
+      ]
+    },
+    {
+      "name":"GP0/GP1",
+      "items":[
+        {"name":"GP0 polygon","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 polygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
+        {"name":"GP0 textured polygon","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 textured polygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
+        {"name":"GP0 rectangle","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 rectangle"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
+        {"name":"GP0 VRAM transfer","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 VRAM"]},{"path":"src/gpu/Graphics.cpp","patterns":["VRAMTransfer"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
+        {"name":"GP1 display","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["SetDisplayArea"]},{"path":"src/gpu/Graphics.cpp","patterns":["SetDisplayMode"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
+        {"name":"Vulkan resource plan","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["lower_graphics_ir_to_vulkan"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["Vulkan"]}]}
+      ]
+    },
+    {
+      "name":"SPIR-V",
+      "items":[
+        {"name":"Graphics IR","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsIr lower_gp0_gp1"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
+        {"name":"SPIR-V emitter","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["emit_spirv_shader"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["SPIR-V"]}]},
+        {"name":"SPIR-V validation","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["validate_spirv_words"]},{"path":"src/gpu/Graphics.cpp","patterns":["SPIRV_MAGIC"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["spirv-val"]}]},
+        {"name":"Polygon shader","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsPrimitive::Polygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["Polygon"]}]},
+        {"name":"Textured shader","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsPrimitive::TexturedPolygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["TexturedPolygon"]}]},
+        {"name":"Framebuffer shader","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsPrimitive::Framebuffer"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["Framebuffer"]}]}
+      ]
+    },
+    {
+      "name":"Host integration",
+      "items":[
+        {"name":"Host I/O","source_patterns":[{"path":"src/host/HostServices.cpp","patterns":["HostService"]},{"path":"src/host/HostServices.cpp","patterns":["HostServiceKind"]}],"test_patterns":[{"path":"tests/HostIntegrationTest.cpp","patterns":["host"]}]},
+        {"name":"Input mapping","source_patterns":[{"path":"src/input/Input.cpp","patterns":["InputBinding"]},{"path":"src/input/Input.cpp","patterns":["SDL"]}],"test_patterns":[{"path":"tests/InputTest.cpp","patterns":["input"]},{"path":"tests/CMakeLists.txt","patterns":["input_mapping"]}]},
+        {"name":"Memory card","source_patterns":[{"path":"src/input/Input.cpp","patterns":["memory"]}],"not_applicable":true}
+      ]
+    }
+  ]
+}

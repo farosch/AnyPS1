@@ -56,3 +56,9 @@ if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
 
+add_custom_target(progress
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/progress/generate_progress.py
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Generating AnyPS1 implementation progress report"
+)
+

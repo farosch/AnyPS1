@@ -1,5 +1,15 @@
 # AnyPS1
 
+## Implementation status
+
+The code-derived implementation overview is available in
+[preview/progress.html](preview/progress.html). It is generated from source and
+test evidence, not TODO text:
+
+```sh
+cmake --build build --target progress
+```
+
 ## Overview
 
 AnyPS1 converts extracted PlayStation 1 executables into native Linux or Windows
