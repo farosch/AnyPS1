@@ -23,7 +23,7 @@
   branches, J/JAL/JR/JALR, MULT/MULTU/DIV/DIVU, MFHI/MFLO/MTHI/MTLO,
   SYSCALL/BREAK, and unaligned load/store operations.
 - [x] Add branch-delay-slot emission and PC-relative branch target lowering.
-- [ ] Add load-delay-slot behavior for LB/LH/LW/LBU/LHU loads.
+- [x] Add load-delay-slot behavior for LB/LH/LW/LBU/LHU loads.
 - [x] Implement arithmetic overflow and divide-by-zero exits in lowered ADD,
   ADDI, SUB, DIV, and DIVU paths.
 - [x] Add native control-flow graph discovery for entry blocks, static branch

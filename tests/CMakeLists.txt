@@ -29,6 +29,7 @@ add_test(NAME relinker_native_subset COMMAND anyps1_relinker_test ${FIXTURE_OUTP
 add_test(NAME relinker_native_memory COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-memory.ps-exe)
 add_test(NAME relinker_native_host_integration COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-host-integration.ps-exe)
 add_test(NAME relinker_native_bios_vector COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-vector.ps-exe)
+add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-load-delay.ps-exe)
 add_test(NAME relinker_invalid_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/invalid.ps-exe)
 add_test(NAME relinker_truncated_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/truncated.ps-exe)
 
