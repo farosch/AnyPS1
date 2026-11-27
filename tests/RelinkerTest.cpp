@@ -141,6 +141,11 @@ int main(int argc, char** argv)
              terminal_output.find("first_unsupported_gap=0x") == std::string::npos)) {
             throw std::runtime_error("partial native ELF lacks unsupported lowering diagnostics");
         }
+        if (terminal_output.find("lowered_coverage_percent=") == std::string::npos ||
+            terminal_output.find("call_edges=") == std::string::npos ||
+            terminal_output.find("unresolved_indirect_transfers=") == std::string::npos) {
+            throw std::runtime_error("native ELF lacks CFG coverage diagnostics");
+        }
 
         anyps1::RelinkOptions windows_options;
         windows_options.input = game_root;

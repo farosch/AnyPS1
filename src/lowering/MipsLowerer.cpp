@@ -17,8 +17,6 @@
 
 namespace anyps1 {
 
-constexpr std::uint32_t MAX_NATIVE_LEADERS = 512u;
-
 void write_linux_native_cfg(
     const RelinkOptions& options,
     const std::vector<unsigned char>& data
@@ -48,6 +46,8 @@ void write_linux_native_cfg(
     std::uint32_t unsupported_count = 0;
     std::uint32_t first_unsupported_address = 0;
     std::uint32_t first_unsupported_word = 0;
+    std::uint32_t call_edges = 0;
+    std::uint32_t unresolved_indirect_transfers = 0;
     leaders.insert(initial_pc);
     work.push(initial_pc);
     while (!work.empty()) {
@@ -82,6 +82,12 @@ void write_linux_native_cfg(
         } else if (jump) {
             const std::uint32_t target =
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
+            if (opcode == 0x03) {
+                ++call_edges;
+                if (target < load_address || target >= load_address + file_size) {
+                    ++unresolved_indirect_transfers;
+                }
+            }
             if ((target & 0xFF000000u) == 0xA0000000u
                 || (target & 0xFF000000u) == 0xB0000000u
                 || (target & 0xFF000000u) == 0xC0000000u) {
@@ -99,6 +105,9 @@ void write_linux_native_cfg(
             leaders.insert(address + 4);
             work.push(address + 4);
         }
+        if (jr || jalr) {
+            ++unresolved_indirect_transfers;
+        }
         if (branch || jump || jr || jalr) {
             const std::uint32_t delay_address = address + 4;
             if (delay_address >= load_address && delay_address < load_address + file_size) {
@@ -107,15 +116,12 @@ void write_linux_native_cfg(
                 work.push(delay_address);
             }
         }
-        if (leaders.size() >= MAX_NATIVE_LEADERS) {
-            while (!work.empty()) work.pop();
-            break;
-        }
-
     }
 
-    for (std::uint32_t offset = 0; offset + 4 <= file_size; offset += 4) {
-        const std::uint32_t address = load_address + offset;
+    for (std::uint32_t address : leaders) {
+        if (address < load_address || address >= load_address + file_size) continue;
+        const std::uint32_t offset = address - load_address;
+        if (offset + 4 > file_size) continue;
         const std::uint32_t instruction = read_psx32(data, PSX_HEADER_SIZE + offset);
         const std::uint32_t opcode = instruction >> 26;
         const std::uint32_t rs = (instruction >> 21) & 31u;
@@ -178,6 +184,19 @@ void write_linux_native_cfg(
     const std::string sp = "initial_sp=" + hex32(initial_sp) + "\n";
     const std::string payload_size = "payload_size=" + std::to_string(file_size) + "\n";
     const std::string lowered = "lowered_words=" + std::to_string(leaders.size()) + "\n";
+    const std::uint32_t payload_words = file_size / 4u;
+    const std::uint32_t coverage_percent =
+        payload_words == 0
+            ? 0u
+            : static_cast<std::uint32_t>(
+                  leaders.size() * 100u / payload_words);
+    const std::string coverage =
+        "lowered_coverage_percent=" + std::to_string(coverage_percent) + "\n";
+    const std::string edges =
+        "call_edges=" + std::to_string(call_edges) + "\n";
+    const std::string unresolved =
+        "unresolved_indirect_transfers=" +
+        std::to_string(unresolved_indirect_transfers) + "\n";
     const std::string unsupported =
         "unsupported_instructions=" + std::to_string(unsupported_count) + "\n";
     const std::string first_gap =
@@ -198,6 +217,9 @@ void write_linux_native_cfg(
     source << "diag_sp:.asciz \"" << escape_assembly_string(sp) << "\"\n";
     source << "diag_payload:.asciz \"" << escape_assembly_string(payload_size) << "\"\n";
     source << "diag_lowered:.asciz \"" << escape_assembly_string(lowered) << "\"\n";
+    source << "diag_coverage:.asciz \"" << escape_assembly_string(coverage) << "\"\n";
+    source << "diag_edges:.asciz \"" << escape_assembly_string(edges) << "\"\n";
+    source << "diag_unresolved:.asciz \"" << escape_assembly_string(unresolved) << "\"\n";
     source << "diag_unsupported:.asciz \"" << escape_assembly_string(unsupported) << "\"\n";
     source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
@@ -210,6 +232,9 @@ void write_linux_native_cfg(
     source << "leaq diag_sp(%rip), %rsi\nmov $" << sp.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_payload(%rip), %rsi\nmov $" << payload_size.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_lowered(%rip), %rsi\nmov $" << lowered.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_coverage(%rip), %rsi\nmov $" << coverage.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_edges(%rip), %rsi\nmov $" << edges.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_unresolved(%rip), %rsi\nmov $" << unresolved.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_unsupported(%rip), %rsi\nmov $" << unsupported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";

@@ -52,3 +52,10 @@ target_link_libraries(anyps1_input_test PRIVATE anyps1_input)
 add_test(NAME input_mapping
     COMMAND anyps1_input_test ${CMAKE_SOURCE_DIR}/tests/fixtures/anyps1-input.ini)
 
+add_executable(anyps1_host_integration_test HostIntegrationTest.cpp)
+target_include_directories(anyps1_host_integration_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(anyps1_host_integration_test
+    PRIVATE anyps1_host anyps1_input anyps1_gpu)
+add_test(NAME host_integration_ir
+    COMMAND anyps1_host_integration_test)
+
