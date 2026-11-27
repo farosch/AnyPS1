@@ -84,6 +84,29 @@ The optional `tools/report_relink_gaps.py` helper scans locally extracted
 executables found through `SYSTEM.CNF` and reports their first native conversion
 gap. It is format-generic and contains no title-specific relinker behavior.
 
+## Input mapping
+
+Native Linux and Windows builds can use SDL3 for PS1-style controller input,
+including analog sticks and triggers, plus keyboard and mouse mappings.
+Create `anyps1-input.ini` beside the relinked executable to override bindings:
+
+```ini
+[keyboard]
+up=w
+down=s
+left=a
+right=d
+cross=j
+
+[controller]
+cross=controller:south
+left_x=controller_axis:leftx
+left_y=controller_axis:lefty
+
+[mouse]
+circle=mouse:left
+```
+
 ## Disclaimer
 This project is intended for interoperability, research, preservation, and compatibility purposes. It does not include, distribute, or require copyrighted software, firmware, cryptographic keys, or proprietary libraries. Users are responsible for ensuring that any binaries used with this project are obtained and used in accordance with applicable laws and their respective license terms.
 

@@ -35,6 +35,14 @@ if(ANYPS1_ENABLE_GLSLANG)
     add_subdirectory(3rdparty/glslang)
 endif()
 
+if(NOT TARGET SDL3::SDL3)
+    set(SDL_SHARED ON)
+    set(SDL_STATIC OFF)
+    set(SDL_TEST_LIBRARY OFF)
+    set(SDL_TESTS OFF)
+    add_subdirectory(3rdparty/SDL)
+endif()
+
 add_subdirectory(src)
 
 add_executable(anyps1
