@@ -46,7 +46,6 @@
 - [x] Classify exact reserved opcodes and SPECIAL functions.
 - [x] Inventory unsupported instruction words and families across executable
   payloads.
-
 - [x] Add native COP1 MFC1/MTC1/CFC1/CTC1, add/sub/mul/div/sqrt, Cvt.S.W,
   Cvt.W.S, C.EQ/LT/LE, BC1 branches, and checked LWC1/SWC1 memory paths.
 - [x] Add remaining COP1 conversions/comparison variants and exhaustive
@@ -82,7 +81,6 @@
 - [x] Exit at unsupported instructions with a dedicated native status and
   first-gap diagnostic.
 - [x] Keep native executable permissions on generated Linux artifacts.
-
 - [ ] Remove all legacy assembly lowering and fixed-block code duplication.
 - [x] Eliminate shell-string linker invocation and use a repository-owned
   argument-safe toolchain API.
@@ -105,7 +103,6 @@
 - [x] Route out-of-range and MMIO accesses to explicit fault/unsupported exits.
 - [x] Preserve executable payload bytes for native payload copying.
 - [x] Remove title-specific, BIOS-dependent, and virtualized-memory behavior.
-
 - [x] Implement page/range validation for executable sections and RAM boundaries.
 - [x] Add executable-section protection and separate code/data/rodata mappings.
 - [x] Add a generic MMIO map with documented native implementations.
@@ -128,7 +125,6 @@
 - [x] Add `anyps1-input.ini` parsing and default bindings.
 - [x] Add host mapping and input integration fixtures.
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
-
 - [x] Implement native file lowering for open/read/write/seek/close operations.
 - [x] Integrate input polling into the actual generated executable loop.
 - [x] Implement SDL3 window creation and event pumping in the Linux/Windows
@@ -152,7 +148,6 @@
   fixture validation.
 - [x] Add `objdump`/`llvm-readobj` format-inspector support.
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
-
 - [ ] Implement native Windows MIPS lowering equivalent to Linux lowering.
 - [ ] Generate imports and relocations for real Windows host-native code.
 - [ ] Add PE32 support if an x86 compatibility target is required.
@@ -172,7 +167,6 @@
 - [x] Add Vulkan/Linux and Vulkan/Windows platform enums without CUDA/NVIDIA
   dependencies.
 - [x] Preserve unsupported GPU commands as explicit conversion failures.
-
 - [ ] Model GP0/GP1 command payloads completely, including VRAM transfers,
   draw areas, texture windows, display areas, display modes, DMA direction,
   and display enable state.
@@ -199,7 +193,6 @@
 - [x] Add a JSON inventory tool for exact instruction words, addresses, and
   family counts.
 - [x] Add fixture tests for COP1/COP2/COP3 and reserved-opcode classification.
-
 - [x] Replace separate Python and C++ opcode-name tables with one generated or
   shared canonical opcode registry.
 - [x] Add exact MIPS function names and operand decoding for every reserved
@@ -221,7 +214,6 @@
   tests.
 - [x] Add an opt-in generic reference-executable inventory/report tool.
 - [x] Add CMake, CTest, layout, fixture, build, and format validation targets.
-
 - [x] Relink available reference executables and record first reachable
   unsupported gaps in build artifacts, never in title-specific test code.
 - [x] Add minimal copyright-safe fixtures for every new real-executable blocker.
