@@ -11,7 +11,7 @@ include(CTest)
 add_subdirectory(core/relinker)
 
 add_executable(anyps1
-    core/anyps1.cpp
+    core/relinker/main.cpp
 )
 
 target_include_directories(anyps1 PRIVATE core)

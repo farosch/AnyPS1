@@ -12,7 +12,9 @@ def required_directories(root: Path) -> tuple[Path, ...]:
 
 def required_files(root: Path) -> tuple[Path, ...]:
     return (
-        root / "core" / "anyps1.cpp",
+        root / "core" / "relinker" / "Relinker.h",
+        root / "core" / "relinker" / "Relinker.cpp",
+        root / "core" / "relinker" / "main.cpp",
     )
 
 

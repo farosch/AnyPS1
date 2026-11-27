@@ -17,7 +17,7 @@ instruction lowering. It does not execute or interpret PS-X behavior.
 ## Layout
 
 - `core/relinker`: executable decoding and relinking implementation
-- `core/anyps1.cpp`: main command-line relinker application
+- `core/relinker/main.cpp`: main command-line relinker entrypoint
 - `tools`: command-line and analysis utilities
 - `TODO.md`: known implementation gaps and validation work
 - `tests`: integration and unit tests

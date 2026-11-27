@@ -1,4 +1,4 @@
-#include "relinker/Relinker.h"
+#include "Relinker.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -17,6 +17,7 @@ int main(int argc, char** argv)
             std::cerr << "Error: --target must be linux or windows\n";
             return 2;
         }
+
         anyps1::RelinkOptions options;
         options.input = argv[3];
         options.target = target;
@@ -25,12 +26,13 @@ int main(int argc, char** argv)
                 return 1;
             }
             std::cout << "Native executable written to " << options.output << "\n";
+            return 0;
         } catch (const std::exception& error) {
             std::cerr << "Error: " << error.what() << "\n";
             return 1;
         }
-        return 0;
     }
+
     if (argc == 2) {
         anyps1::RelinkOptions options;
         options.input = argv[1];
@@ -44,14 +46,11 @@ int main(int argc, char** argv)
             return 1;
         }
     }
-    if (argc != 2) {
-        std::cerr
-            << "Usage:\n"
-            << "  anyps1 <extracted-game-root>\n"
-            << "  anyps1 --target linux <extracted-game-root>\n"
-            << "  anyps1 --target windows <extracted-game-root>\n";
-        return 2;
-    }
 
+    std::cerr
+        << "Usage:\n"
+        << "  anyps1 <extracted-game-root>\n"
+        << "  anyps1 --target linux <extracted-game-root>\n"
+        << "  anyps1 --target windows <extracted-game-root>\n";
     return 2;
 }
