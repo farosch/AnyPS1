@@ -75,6 +75,20 @@ class TargetParityTest(unittest.TestCase):
                 f"Windows MIPS lowerer does not contain {name}",
             )
 
+        for pattern in (
+            "resolve_static_indirect_target",
+            "call_edges=",
+            "unresolved_indirect_transfers=",
+            "sdl3_library",
+            "SDL_Vulkan_LoadLibrary",
+            "LoadLibraryA",
+        ):
+            self.assertIn(
+                pattern,
+                windows,
+                f"Windows lowerer is missing host/CFG parity feature {pattern}",
+            )
+
         graphics = ROOT / "src" / "gpu" / "Graphics.cpp"
         graphics_text = graphics.read_text(encoding="utf-8")
         for primitive in fixture["gpu"]["primitives"]:

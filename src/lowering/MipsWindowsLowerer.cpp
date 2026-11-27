@@ -2,6 +2,7 @@
 #include "relinker/Relinker.h"
 #include "format/PsExe.h"
 #include "UnsupportedInstructions.h"
+#include "PayloadRegion.h"
 #include "executable/PeWriter.h"
 #include "host/HostServices.h"
 
@@ -23,6 +24,47 @@
 namespace anyps1 {
 
 namespace {
+
+std::uint32_t resolve_static_indirect_target(
+    const std::vector<unsigned char>& data,
+    std::uint32_t load_address,
+    std::uint32_t file_size,
+    std::uint32_t instruction_address,
+    std::uint32_t target_register)
+{
+    std::uint32_t value = 0;
+    bool initialized = false;
+    for (std::int32_t distance = -16; distance <= 0; distance += 4) {
+        const std::int64_t word_address =
+            static_cast<std::int64_t>(instruction_address) + distance;
+        if (word_address < load_address ||
+            word_address >= static_cast<std::int64_t>(load_address) + file_size) {
+            continue;
+        }
+        const std::uint32_t offset =
+            static_cast<std::uint32_t>(word_address - load_address);
+        const std::uint32_t instruction =
+            read_psx32(data, PSX_HEADER_SIZE + offset);
+        const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t rt = (instruction >> 16) & 31u;
+        const std::uint32_t immediate = instruction & 0xFFFFu;
+        if (rt != target_register) continue;
+        if (opcode == 0x0F) {
+            value = immediate << 16;
+            initialized = true;
+        } else if (opcode == 0x09) {
+            const std::int32_t signed_immediate =
+                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate));
+            value = static_cast<std::uint32_t>(
+                static_cast<std::int64_t>(value) + signed_immediate);
+            initialized = true;
+        } else if (opcode == 0x0D) {
+            value |= immediate;
+            initialized = true;
+        }
+    }
+    return initialized ? value : 0;
+}
 
 #ifdef _WIN32
 std::filesystem::path find_windows_tool(const char* name)
@@ -228,9 +270,16 @@ void MipsWindowsLowerer::lower(
     leaders.insert(initial_pc);
     work.push(initial_pc);
     std::uint32_t unsupported_count = 0;
+    std::uint32_t reachable_count = 0;
+    std::uint32_t supported_count = 0;
+    std::uint32_t embedded_data_count = 0;
+    std::uint32_t unknown_region_count = 0;
+    std::uint32_t call_edges = 0;
+    std::uint32_t unresolved_indirect_transfers = 0;
     std::uint32_t first_unsupported_address = 0;
     std::uint32_t first_unsupported_word = 0;
     std::string first_unsupported_name;
+    std::set<std::string> unsupported_family_names;
 
     while (!work.empty()) {
         const std::uint32_t address = work.front();
@@ -246,11 +295,13 @@ void MipsWindowsLowerer::lower(
         const std::uint32_t opcode = instruction >> 26;
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
+        const std::uint32_t rs = (instruction >> 21) & 31u;
         const bool branch = opcode == 0x01 ||
             opcode == 0x04 || opcode == 0x05 ||
             opcode == 0x06 || opcode == 0x07 ||
             opcode == 0x14 || opcode == 0x15 ||
-            opcode == 0x16 || opcode == 0x17;
+            opcode == 0x16 || opcode == 0x17 ||
+            (opcode == 0x11 && (rs == 8 || rs == 12));
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
         const bool jalr = opcode == 0 && special == 0x09;
@@ -271,13 +322,40 @@ void MipsWindowsLowerer::lower(
             const std::uint32_t target =
                 ((address + 4) & 0xF0000000u) |
                 ((instruction & 0x03FFFFFFu) << 2);
-            leaders.insert(target);
-            leaders.insert(address + 8);
-            work.push(target);
-            work.push(address + 8);
+            if (opcode == 0x03) ++call_edges;
+            if ((target & 0xFF000000u) == 0xA0000000u ||
+                (target & 0xFF000000u) == 0xB0000000u ||
+                (target & 0xFF000000u) == 0xC0000000u) {
+                leaders.insert(address + 8);
+                work.push(address + 8);
+            } else {
+                leaders.insert(target);
+                work.push(target);
+            }
+            if (opcode == 0x03) {
+                leaders.insert(address + 8);
+                work.push(address + 8);
+            }
         } else if (!jr && !jalr && !stop) {
             leaders.insert(address + 4);
             work.push(address + 4);
+        }
+        if (jr || jalr) {
+            const std::uint32_t resolved_target =
+                resolve_static_indirect_target(
+                    data,
+                    load_address,
+                    file_size,
+                    address,
+                    rs);
+            if (resolved_target >= load_address &&
+                resolved_target < static_cast<std::uint64_t>(load_address) + file_size &&
+                (resolved_target & 3u) == 0) {
+                leaders.insert(resolved_target);
+                work.push(resolved_target);
+            } else {
+                ++unresolved_indirect_transfers;
+            }
         }
         if (branch || jump || jr || jalr) {
             const std::uint32_t delay_address = address + 4;
@@ -298,14 +376,26 @@ void MipsWindowsLowerer::lower(
         if (offset + 4 > file_size) continue;
         const std::uint32_t instruction =
             read_psx32(data, PSX_HEADER_SIZE + offset);
+        const PayloadRegionKind region =
+            classify_payload_region(address, instruction, true);
+        if (region == PayloadRegionKind::EmbeddedData) {
+            ++embedded_data_count;
+            continue;
+        }
+        if (region == PayloadRegionKind::Unknown) ++unknown_region_count;
+        ++reachable_count;
         if (!is_supported_mips_instruction(instruction)) {
             ++unsupported_count;
+            unsupported_family_names.insert(
+                classify_unsupported_instruction(instruction).name);
             if (first_unsupported_address == 0) {
                 first_unsupported_address = address;
                 first_unsupported_word = instruction;
                 first_unsupported_name =
                     classify_unsupported_instruction(instruction).name;
             }
+        } else {
+            ++supported_count;
         }
     }
 
@@ -327,6 +417,8 @@ void MipsWindowsLowerer::lower(
     source << "scratchpad db 1024 dup(0)\n";
     source << "cop0 db 128 dup(0)\n";
     source << "fregs dd 32 dup(0)\n";
+    source << "gte_data dd 32 dup(0)\n";
+    source << "gte_ctrl dd 32 dup(0)\n";
     source << "fpcsr dd 0\n";
     source << "written dq 0\n";
 
@@ -346,6 +438,31 @@ void MipsWindowsLowerer::lower(
     emit_string(source, "diag_unsupported",
                 "unsupported_instructions=" +
                 std::to_string(unsupported_count) + "\n");
+    emit_string(source, "diag_lowered",
+                "lowered_words=" + std::to_string(leaders.size()) + "\n");
+    const std::uint32_t payload_words = file_size / 4u;
+    const std::uint32_t coverage_percent =
+        payload_words == 0 ? 0u :
+        static_cast<std::uint32_t>(leaders.size() * 100u / payload_words);
+    emit_string(source, "diag_coverage",
+                "lowered_coverage_percent=" +
+                std::to_string(coverage_percent) + "\n");
+    emit_string(source, "diag_edges",
+                "call_edges=" + std::to_string(call_edges) + "\n");
+    emit_string(source, "diag_unresolved",
+                "unresolved_indirect_transfers=" +
+                std::to_string(unresolved_indirect_transfers) + "\n");
+    emit_string(source, "diag_reachable",
+                "reachable_words=" + std::to_string(reachable_count) + "\n");
+    emit_string(source, "diag_supported",
+                "supported_reachable_words=" +
+                std::to_string(supported_count) + "\n");
+    emit_string(source, "diag_embedded",
+                "embedded_data_words=" +
+                std::to_string(embedded_data_count) + "\n");
+    emit_string(source, "diag_unknown",
+                "unknown_region_words=" +
+                std::to_string(unknown_region_count) + "\n");
     emit_string(source, "diag_first_gap",
                 first_unsupported_address == 0
                     ? "first_unsupported_gap=none\n"
@@ -363,6 +480,12 @@ void MipsWindowsLowerer::lower(
                 " disc=" + std::to_string(host_loop.disc) + "\n");
     emit_string(source, "diag_completed",
                 "native lowering complete\n");
+    emit_string(source, "sdl3_library", "SDL3.dll");
+    emit_string(source, "sdl_init_symbol", "SDL_Init");
+    emit_string(source, "sdl_poll_symbol", "SDL_PollEvent");
+    emit_string(source, "sdl_quit_symbol", "SDL_Quit");
+    emit_string(source, "sdl_vulkan_symbol", "SDL_Vulkan_LoadLibrary");
+    source << "host_event db 1024 dup(0)\n";
 
     source << "payload db ";
     for (std::uint32_t offset = 0; offset < file_size; ++offset) {
@@ -382,6 +505,8 @@ void MipsWindowsLowerer::lower(
     source << "EXTERN ReadFile:PROC\n";
     source << "EXTERN SetFilePointer:PROC\n";
     source << "EXTERN CloseHandle:PROC\n";
+    source << "EXTERN LoadLibraryA:PROC\n";
+    source << "EXTERN GetProcAddress:PROC\n";
     source << ".code\n";
     source << "print_diag PROC\n";
     source << "sub rsp,40\n";
@@ -405,6 +530,8 @@ void MipsWindowsLowerer::lower(
     const char* diagnostics[] = {
         "diag_banner", "diag_target", "diag_load", "diag_entry",
         "diag_gp", "diag_sp", "diag_payload", "diag_unsupported",
+        "diag_lowered", "diag_coverage", "diag_edges", "diag_unresolved",
+        "diag_reachable", "diag_supported", "diag_embedded", "diag_unknown",
         "diag_first_gap", "diag_host_loop"
     };
     for (const char* label : diagnostics) {
@@ -414,6 +541,41 @@ void MipsWindowsLowerer::lower(
         source << "mov r9,OFFSET written\n";
         source << "mov qword ptr [rsp+32],0\n";
         source << "call WriteFile\n";
+    }
+
+    if (host_loop.input_polling ||
+        host_loop.window_events ||
+        host_loop.audio ||
+        host_loop.framebuffer ||
+        host_loop.vulkan) {
+        source << "lea rcx,sdl3_library\n";
+        source << "call LoadLibraryA\n";
+        source << "test rax,rax\n";
+        source << "jz normal_exit\n";
+        source << "mov rbx,rax\n";
+        source << "mov rcx,rbx\n";
+        source << "lea rdx,sdl_init_symbol\n";
+        source << "call GetProcAddress\n";
+        source << "test rax,rax\n";
+        source << "jz normal_exit\n";
+        source << "mov rcx,6020h\n";
+        source << "call rax\n";
+        source << "mov rcx,rbx\n";
+        source << "lea rdx,sdl_poll_symbol\n";
+        source << "call GetProcAddress\n";
+        source << "test rax,rax\n";
+        source << "jz normal_exit\n";
+        source << "mov rcx,OFFSET host_event\n";
+        source << "call rax\n";
+        if (host_loop.vulkan) {
+            source << "mov rcx,rbx\n";
+            source << "lea rdx,sdl_vulkan_symbol\n";
+            source << "call GetProcAddress\n";
+            source << "test rax,rax\n";
+            source << "jz normal_exit\n";
+            source << "xor rcx,rcx\n";
+            source << "call rax\n";
+        }
     }
 
     if (unsupported_count != 0) {
@@ -464,6 +626,62 @@ void MipsWindowsLowerer::lower(
             } else if (special == 0x03) {
                 source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
                 source << "sar eax," << shamt << "\n";
+                source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
+            } else if (special == 0x04) {
+                source << "mov ecx,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "shl eax,cl\n";
+                source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
+            } else if (special == 0x06) {
+                source << "mov ecx,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "shr eax,cl\n";
+                source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
+            } else if (special == 0x07) {
+                source << "mov ecx,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "sar eax,cl\n";
+                source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
+            } else if (special == 0x18) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov ecx,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "imul ecx\n";
+                source << "mov dword ptr hi_lo,eax\n";
+                source << "mov dword ptr hi_lo+4,edx\n";
+            } else if (special == 0x19) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov ecx,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mul ecx\n";
+                source << "mov dword ptr hi_lo,eax\n";
+                source << "mov dword ptr hi_lo+4,edx\n";
+            } else if (special == 0x1A || special == 0x1B) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov ecx,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "test ecx,ecx\n";
+                source << "je divide_zero_exit\n";
+                if (special == 0x1A) source << "cdq\nidiv ecx\n";
+                else source << "xor edx,edx\ndiv ecx\n";
+                source << "mov dword ptr hi_lo,eax\n";
+                source << "mov dword ptr hi_lo+4,edx\n";
+            } else if (special == 0x10) {
+                source << "mov eax,dword ptr hi_lo+4\n";
+                source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
+            } else if (special == 0x11) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov dword ptr hi_lo+4,eax\n";
+            } else if (special == 0x12) {
+                source << "mov eax,dword ptr hi_lo\n";
+                source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
+            } else if (special == 0x13) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov dword ptr hi_lo,eax\n";
+            } else if (special == 0x20) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "add eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
+            } else if (special == 0x22) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "sub eax,dword ptr [r12+" << rt * 4 << "]\n";
                 source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
             } else if (special == 0x21 || special == 0x23 ||
                        special == 0x24 || special == 0x25 ||
@@ -541,16 +759,79 @@ void MipsWindowsLowerer::lower(
         } else if (opcode == 0x0F) {
             source << "mov dword ptr [r12+" << rt * 4 << "],"
                    << (immediate << 16) << "\n";
+        } else if (opcode == 0x10) {
+            const std::uint32_t cop0_register = rd;
+            if (rs == 0) {
+                source << "mov eax,dword ptr cop0+" << cop0_register * 4 << "\n";
+                source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+            } else if (rs == 4) {
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov dword ptr cop0+" << cop0_register * 4 << ",eax\n";
+            } else if (rs == 16 && special == 0x10) {
+                source << "mov eax,dword ptr cop0+48\n";
+                source << "and eax,0FFFFFFFCh\n";
+                source << "mov dword ptr cop0+48,eax\n";
+            } else {
+                source << "jmp unsupported_exit\n";
+            }
+        } else if (opcode == 0x11) {
+            const std::uint32_t cop1_fd = rd;
+            if (rs == 0) {
+                source << "mov eax,dword ptr fregs+" << cop1_fd * 4 << "\n";
+                source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+            } else if (rs == 2) {
+                source << "mov eax,dword ptr fpcsr\n";
+                source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+            } else if (rs == 4) {
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov dword ptr fregs+" << cop1_fd * 4 << ",eax\n";
+            } else if (rs == 6) {
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov dword ptr fpcsr,eax\n";
+            } else {
+                source << "jmp unsupported_exit\n";
+            }
+        } else if (opcode == 0x12) {
+            const std::uint32_t gte_register = rd;
+            if (rs == 0) {
+                source << "mov eax,dword ptr gte_data+" << gte_register * 4 << "\n";
+                source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+            } else if (rs == 2) {
+                source << "mov eax,dword ptr gte_ctrl+" << gte_register * 4 << "\n";
+                source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+            } else if (rs == 4) {
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov dword ptr gte_data+" << gte_register * 4 << ",eax\n";
+            } else if (rs == 6) {
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov dword ptr gte_ctrl+" << gte_register * 4 << ",eax\n";
+            } else {
+                source << "jmp unsupported_exit\n";
+            }
         } else if (opcode == 0x04 || opcode == 0x05 ||
                    opcode == 0x06 || opcode == 0x07 ||
                    opcode == 0x14 || opcode == 0x15 ||
-                   opcode == 0x16 || opcode == 0x17) {
+                   opcode == 0x16 || opcode == 0x17 ||
+                   opcode == 0x01 || opcode == 0x11) {
             const std::int32_t displacement =
                 static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
             const std::uint32_t target =
                 static_cast<std::uint32_t>(
                     static_cast<std::int64_t>(address) + 4 + displacement);
-            if (opcode == 0x04) {
+            if (opcode == 0x01) {
+                source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
+                if ((rt & 1u) == 0) source << "jl p" << std::hex << target << std::dec << "\n";
+                else source << "jge p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x11) {
+                source << "mov eax,dword ptr fpcsr\n";
+                if (rs == 8) {
+                    source << "test eax,1\n";
+                    source << "jnz p" << std::hex << target << std::dec << "\n";
+                } else if (rs == 12) {
+                    source << "test eax,1\n";
+                    source << "jz p" << std::hex << target << std::dec << "\n";
+                }
+            } else if (opcode == 0x04) {
                 source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
                 source << "cmp eax,dword ptr [r12+" << rt * 4 << "]\n";
                 source << "je p" << std::hex << target << std::dec << "\n";
@@ -622,7 +903,9 @@ void MipsWindowsLowerer::lower(
                 source << "jmp p" << std::hex << target << std::dec << "\n";
             }
         } else if (opcode == 0x23 || opcode == 0x21 ||
-                   opcode == 0x20 || opcode == 0x24 || opcode == 0x25) {
+                   opcode == 0x20 || opcode == 0x24 || opcode == 0x25 ||
+                   opcode == 0x22 || opcode == 0x26 ||
+                   opcode == 0x31 || opcode == 0x32) {
             source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
             source << "add eax," << static_cast<std::int32_t>(
                 static_cast<std::int16_t>(immediate)) << "\n";
@@ -632,9 +915,20 @@ void MipsWindowsLowerer::lower(
             else if (opcode == 0x21) source << "movsx edx,word ptr [rbx+rax]\n";
             else if (opcode == 0x23) source << "mov edx,dword ptr [rbx+rax]\n";
             else if (opcode == 0x24) source << "movzx edx,byte ptr [rbx+rax]\n";
-            else source << "movzx edx,word ptr [rbx+rax]\n";
-            source << "mov dword ptr [r12+" << rt * 4 << "],edx\n";
-        } else if (opcode == 0x2B || opcode == 0x29 || opcode == 0x28) {
+            else if (opcode == 0x25) source << "movzx edx,word ptr [rbx+rax]\n";
+            else if (opcode == 0x22 || opcode == 0x26) {
+                source << "mov edx,dword ptr [rbx+rax]\n";
+            } else if (opcode == 0x31 || opcode == 0x32) {
+                source << "mov edx,dword ptr [rbx+rax]\n";
+                source << "mov dword ptr fregs+" << rt * 4 << ",edx\n";
+            }
+            if (opcode == 0x31 || opcode == 0x32) {
+                // LWC1/LWC2/ SWC2-style value transfers are represented in PS1 memory.
+            } else {
+                source << "mov dword ptr [r12+" << rt * 4 << "],edx\n";
+            }
+        } else if (opcode == 0x2B || opcode == 0x29 || opcode == 0x28 ||
+                   opcode == 0x2E || opcode == 0x39 || opcode == 0x3A) {
             source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
             source << "add eax," << static_cast<std::int32_t>(
                 static_cast<std::int16_t>(immediate)) << "\n";
@@ -643,13 +937,37 @@ void MipsWindowsLowerer::lower(
             source << "mov edx,dword ptr [r12+" << rt * 4 << "]\n";
             if (opcode == 0x28) source << "mov byte ptr [rbx+rax],dl\n";
             else if (opcode == 0x29) source << "mov word ptr [rbx+rax],dx\n";
+            else if (opcode == 0x39 || opcode == 0x3A) {
+                source << "mov edx,dword ptr fregs+" << rt * 4 << "\n";
+                source << "mov dword ptr [rbx+rax],edx\n";
+            } else if (opcode == 0x2E) {
+                source << "mov dword ptr [rbx+rax],edx\n";
+            }
             else source << "mov dword ptr [rbx+rax],edx\n";
         } else {
             source << "jmp unsupported_exit\n";
         }
     }
 
+    source << "divide_zero_exit:\n";
+    source << "mov ecx,11\n";
+    source << "call ExitProcess\n";
     source << "normal_exit:\n";
+    if (host_loop.input_polling || host_loop.window_events ||
+        host_loop.audio || host_loop.framebuffer || host_loop.vulkan) {
+        source << "lea rcx,sdl3_library\n";
+        source << "call LoadLibraryA\n";
+        source << "test rax,rax\n";
+        source << "jz host_loop_quit_done\n";
+        source << "mov rbx,rax\n";
+        source << "mov rcx,rbx\n";
+        source << "lea rdx,sdl_quit_symbol\n";
+        source << "call GetProcAddress\n";
+        source << "test rax,rax\n";
+        source << "jz host_loop_quit_done\n";
+        source << "call rax\n";
+        source << "host_loop_quit_done:\n";
+    }
     source << "lea rdx,diag_completed\n";
     source << "mov r8d,LENGTHOF diag_completed\n";
     source << "mov rcx,r12\n";
