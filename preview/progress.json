@@ -1,13 +1,13 @@
 {
   "summary": {
-    "commit": "57fc718",
-    "total": 78,
+    "commit": "2b87ddf",
+    "total": 115,
     "status_counts": {
-      "tested": 17,
-      "implemented": 55,
-      "partial": 3,
-      "unsupported": 0,
-      "missing": 2,
+      "tested": 22,
+      "implemented": 65,
+      "partial": 13,
+      "unsupported": 4,
+      "missing": 10,
       "not_applicable": 1
     },
     "subsystems": {
@@ -28,8 +28,8 @@
         "not_applicable": 0
       },
       "MIPS control": {
-        "tested": 0,
-        "implemented": 10,
+        "tested": 1,
+        "implemented": 9,
         "partial": 0,
         "unsupported": 0,
         "missing": 0,
@@ -59,20 +59,44 @@
         "missing": 0,
         "not_applicable": 0
       },
-      "GP0/GP1": {
+      "GP0 state and transfers": {
         "tested": 5,
-        "implemented": 0,
-        "partial": 0,
+        "implemented": 2,
+        "partial": 1,
         "unsupported": 0,
+        "missing": 3,
+        "not_applicable": 0
+      },
+      "GP0 primitives": {
+        "tested": 1,
+        "implemented": 2,
+        "partial": 7,
+        "unsupported": 0,
+        "missing": 4,
+        "not_applicable": 0
+      },
+      "GP1 commands": {
+        "tested": 4,
+        "implemented": 4,
+        "partial": 1,
+        "unsupported": 0,
+        "missing": 0,
+        "not_applicable": 0
+      },
+      "Vulkan graphics pipeline": {
+        "tested": 2,
+        "implemented": 3,
+        "partial": 0,
+        "unsupported": 2,
         "missing": 1,
         "not_applicable": 0
       },
-      "SPIR-V": {
-        "tested": 6,
+      "SPIR-V shaders": {
+        "tested": 3,
         "implemented": 0,
-        "partial": 0,
-        "unsupported": 0,
-        "missing": 0,
+        "partial": 1,
+        "unsupported": 2,
+        "missing": 1,
         "not_applicable": 0
       },
       "Host integration": {
@@ -84,17 +108,22 @@
         "not_applicable": 1
       }
     },
-    "rasterized_png": true,
+    "rasterized_png": false,
     "ctest_names": [
       "layout",
       "psx_exe_header",
-      "target_parity_fixture",
+      "lowering_inventory",
       "relinker_artifact",
       "relinker_native_subset",
       "relinker_native_memory",
       "relinker_native_host_integration",
       "relinker_native_bios_vector",
       "relinker_native_load_delay",
+      "relinker_zero_register",
+      "relinker_taken_delay_slot",
+      "relinker_delay_slot_data_boundary",
+      "relinker_memory_boundary",
+      "relinker_platform_parity",
       "relinker_native_cfg_cop0",
       "relinker_native_unaligned",
       "relinker_native_comprehensive",
@@ -109,6 +138,16 @@
       "pe_format_inspector",
       "pe_format_comprehensive",
       "pe_format_partial",
+      "pe_semantic_load_delay",
+      "pe_semantic_zero_register",
+      "pe_semantic_taken_delay_slot",
+      "pe_delay_slot_data_boundary",
+      "pe_host_mmio_state",
+      "pe_memory_boundary",
+      "pe_platform_parity",
+      "pe_cop1_parity",
+      "pe_cop1_edge_parity",
+      "pe_unaligned_parity",
       "relinker_static_jalr",
       "relinker_native_cop1",
       "relinker_native_cop1_edge_cases",
@@ -119,13 +158,15 @@
       "relinker_mips_edge_cases",
       "relinker_native_likely_branches",
       "payload_region_classifier",
+      "mips_lowering_support",
       "validation_tools",
       "cfg_timeout",
-      "memory_map_mmio_dma"
+      "memory_map_mmio_dma",
+      "gte_runtime"
     ],
-    "implemented_percent": 97.4,
-    "tested_percent": 22.1,
-    "stale_test_coverage": 1
+    "implemented_percent": 87.7,
+    "tested_percent": 19.3,
+    "stale_test_coverage": 0
   },
   "features": [
     {
@@ -135,7 +176,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 402,
+          "line": 427,
           "pattern": "special == 0x00"
         }
       ],
@@ -149,7 +190,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 404,
+          "line": 429,
           "pattern": "special == 0x02"
         }
       ],
@@ -163,7 +204,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 406,
+          "line": 431,
           "pattern": "special == 0x03"
         }
       ],
@@ -177,7 +218,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 408,
+          "line": 433,
           "pattern": "special == 0x04"
         }
       ],
@@ -191,7 +232,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 410,
+          "line": 435,
           "pattern": "special == 0x06"
         }
       ],
@@ -205,7 +246,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 412,
+          "line": 437,
           "pattern": "special == 0x07"
         }
       ],
@@ -219,7 +260,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 414,
+          "line": 439,
           "pattern": "special == 0x20"
         }
       ],
@@ -233,7 +274,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 416,
+          "line": 441,
           "pattern": "special == 0x21"
         }
       ],
@@ -247,7 +288,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 418,
+          "line": 443,
           "pattern": "special == 0x22"
         }
       ],
@@ -261,7 +302,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 420,
+          "line": 445,
           "pattern": "special == 0x23"
         }
       ],
@@ -275,7 +316,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 422,
+          "line": 447,
           "pattern": "special == 0x24"
         }
       ],
@@ -289,7 +330,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 424,
+          "line": 449,
           "pattern": "special == 0x25"
         }
       ],
@@ -303,7 +344,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 426,
+          "line": 451,
           "pattern": "special == 0x26"
         }
       ],
@@ -317,7 +358,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 428,
+          "line": 453,
           "pattern": "special == 0x27"
         }
       ],
@@ -331,7 +372,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 430,
+          "line": 455,
           "pattern": "special == 0x2A"
         }
       ],
@@ -345,7 +386,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 432,
+          "line": 457,
           "pattern": "special == 0x2B"
         }
       ],
@@ -359,7 +400,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 434,
+          "line": 459,
           "pattern": "special == 0x18"
         }
       ],
@@ -373,7 +414,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 436,
+          "line": 461,
           "pattern": "special == 0x19"
         }
       ],
@@ -387,7 +428,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 438,
+          "line": 463,
           "pattern": "special == 0x1A"
         }
       ],
@@ -401,7 +442,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 438,
+          "line": 463,
           "pattern": "special == 0x1B"
         }
       ],
@@ -415,7 +456,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 443,
+          "line": 468,
           "pattern": "special == 0x10"
         }
       ],
@@ -429,7 +470,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 447,
+          "line": 472,
           "pattern": "special == 0x12"
         }
       ],
@@ -443,7 +484,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 445,
+          "line": 470,
           "pattern": "special == 0x11"
         }
       ],
@@ -457,7 +498,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 449,
+          "line": 474,
           "pattern": "special == 0x13"
         }
       ],
@@ -471,7 +512,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 784,
+          "line": 855,
           "pattern": "opcode == 0x08"
         }
       ],
@@ -485,7 +526,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 62,
+          "line": 857,
           "pattern": "opcode == 0x09"
         }
       ],
@@ -499,7 +540,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 788,
+          "line": 859,
           "pattern": "opcode == 0x0C"
         }
       ],
@@ -513,7 +554,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 68,
+          "line": 861,
           "pattern": "opcode == 0x0D"
         }
       ],
@@ -527,7 +568,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 792,
+          "line": 863,
           "pattern": "opcode == 0x0E"
         }
       ],
@@ -541,7 +582,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 59,
+          "line": 853,
           "pattern": "opcode == 0x0F"
         }
       ],
@@ -555,7 +596,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 816,
+          "line": 91,
           "pattern": "opcode == 0x20"
         }
       ],
@@ -569,7 +610,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 816,
+          "line": 91,
           "pattern": "opcode == 0x21"
         }
       ],
@@ -583,7 +624,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 816,
+          "line": 91,
           "pattern": "opcode == 0x23"
         }
       ],
@@ -597,7 +638,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 816,
+          "line": 92,
           "pattern": "opcode == 0x24"
         }
       ],
@@ -611,7 +652,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 816,
+          "line": 92,
           "pattern": "opcode == 0x25"
         }
       ],
@@ -625,7 +666,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 839,
+          "line": 92,
           "pattern": "opcode == 0x28"
         }
       ],
@@ -639,7 +680,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 839,
+          "line": 93,
           "pattern": "opcode == 0x29"
         }
       ],
@@ -653,7 +694,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 839,
+          "line": 93,
           "pattern": "opcode == 0x2B"
         }
       ],
@@ -667,7 +708,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 908,
+          "line": 1148,
           "pattern": "opcode == 0x22"
         }
       ],
@@ -681,7 +722,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 908,
+          "line": 1148,
           "pattern": "opcode == 0x26"
         }
       ],
@@ -695,7 +736,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 132,
+          "line": 102,
           "pattern": "opcode == 0x04"
         }
       ],
@@ -709,7 +750,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 132,
+          "line": 102,
           "pattern": "opcode == 0x05"
         }
       ],
@@ -723,7 +764,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 133,
+          "line": 103,
           "pattern": "opcode == 0x06"
         }
       ],
@@ -737,7 +778,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 133,
+          "line": 103,
           "pattern": "opcode == 0x07"
         }
       ],
@@ -751,7 +792,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 137,
+          "line": 107,
           "pattern": "opcode == 0x02"
         }
       ],
@@ -765,7 +806,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 137,
+          "line": 107,
           "pattern": "opcode == 0x03"
         }
       ],
@@ -779,7 +820,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 138,
+          "line": 108,
           "pattern": "special == 0x08"
         }
       ],
@@ -793,7 +834,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 139,
+          "line": 109,
           "pattern": "special == 0x09"
         }
       ],
@@ -803,15 +844,21 @@
     {
       "subsystem": "MIPS control",
       "name": "SYSCALL",
-      "status": "implemented",
+      "status": "tested",
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 140,
+          "line": 110,
           "pattern": "special == 0x0C"
         }
       ],
-      "tests": [],
+      "tests": [
+        {
+          "path": "tests/RelinkerTest.cpp",
+          "line": 213,
+          "pattern": "host-integration"
+        }
+      ],
       "unsupported": []
     },
     {
@@ -821,7 +868,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 140,
+          "line": 110,
           "pattern": "special == 0x0D"
         }
       ],
@@ -835,7 +882,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 460,
+          "line": 490,
           "pattern": "opcode == 0x10"
         }
       ],
@@ -849,7 +896,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 460,
+          "line": 490,
           "pattern": "opcode == 0x10"
         }
       ],
@@ -871,7 +918,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 479,
+          "line": 511,
           "pattern": "opcode == 0x12"
         }
       ],
@@ -885,7 +932,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 136,
+          "line": 106,
           "pattern": "opcode == 0x11"
         }
       ],
@@ -899,7 +946,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 780,
+          "line": 836,
           "pattern": "opcode == 0x13"
         }
       ],
@@ -1006,12 +1053,12 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 78,
+          "line": 38,
           "pattern": "MipsLinuxLowerer::lower"
         },
         {
           "path": "src/executable/ElfWriter.cpp",
-          "line": 192,
+          "line": 218,
           "pattern": "ElfWriter::write"
         }
       ],
@@ -1036,7 +1083,7 @@
         },
         {
           "path": "src/lowering/MipsWindowsLowerer.cpp",
-          "line": 193,
+          "line": 203,
           "pattern": "MipsWindowsLowerer::lower"
         }
       ],
@@ -1050,17 +1097,17 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 244,
+          "line": 231,
           "pattern": "native executable diagnostics"
         },
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 281,
+          "line": 268,
           "pattern": "unsupported_instructions"
         },
         {
           "path": "src/lowering/MipsWindowsLowerer.cpp",
-          "line": 334,
+          "line": 423,
           "pattern": "native executable diagnostics"
         }
       ],
@@ -1074,131 +1121,501 @@
       "unsupported": []
     },
     {
-      "subsystem": "GP0/GP1",
-      "name": "GP0 polygon",
-      "status": "tested",
-      "source": [
-        {
-          "path": "src/gpu/Graphics.cpp",
-          "line": 315,
-          "pattern": "GP0 polygon"
-        }
-      ],
-      "tests": [
-        {
-          "path": "tests/GraphicsTest.cpp",
-          "line": 38,
-          "pattern": "graphics IR"
-        }
-      ],
-      "unsupported": []
-    },
-    {
-      "subsystem": "GP0/GP1",
-      "name": "GP0 textured polygon",
-      "status": "tested",
-      "source": [
-        {
-          "path": "src/gpu/Graphics.cpp",
-          "line": 330,
-          "pattern": "GP0 textured polygon"
-        }
-      ],
-      "tests": [
-        {
-          "path": "tests/GraphicsTest.cpp",
-          "line": 38,
-          "pattern": "graphics IR"
-        }
-      ],
-      "unsupported": []
-    },
-    {
-      "subsystem": "GP0/GP1",
-      "name": "GP0 rectangle",
+      "subsystem": "GP0 state and transfers",
+      "name": "NOP 00",
       "status": "missing",
       "source": [],
-      "tests": [
-        {
-          "path": "tests/GraphicsTest.cpp",
-          "line": 38,
-          "pattern": "graphics IR"
-        }
-      ],
+      "tests": [],
       "unsupported": []
     },
     {
-      "subsystem": "GP0/GP1",
-      "name": "GP0 VRAM transfer",
+      "subsystem": "GP0 state and transfers",
+      "name": "Clear cache 01",
+      "status": "missing",
+      "source": [],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "Fill rectangle 02",
+      "status": "missing",
+      "source": [],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "Draw mode E1",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 239,
+          "pattern": "case 0xE1"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "Draw area start E2",
       "status": "tested",
       "source": [
         {
           "path": "src/gpu/Graphics.cpp",
-          "line": 466,
-          "pattern": "GP0 VRAM"
-        },
-        {
-          "path": "src/gpu/Graphics.cpp",
-          "line": 441,
-          "pattern": "VRAMTransfer"
+          "line": 264,
+          "pattern": "case 0xE2"
         }
       ],
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 38,
-          "pattern": "graphics IR"
+          "line": 140,
+          "pattern": "0xE2000000u"
         }
       ],
       "unsupported": []
     },
     {
-      "subsystem": "GP0/GP1",
-      "name": "GP1 display",
+      "subsystem": "GP0 state and transfers",
+      "name": "Draw area end E3",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 265,
+          "pattern": "case 0xE3"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 141,
+          "pattern": "0xE3002000u"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "Draw offset E4",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 288,
+          "pattern": "case 0xE4"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 142,
+          "pattern": "0xE4000100u"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "Mask bits E5-E6",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 305,
+          "pattern": "case 0xE5"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "CPU to VRAM A0",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 439,
+          "pattern": "case 0xA0"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 143,
+          "pattern": "0xA0000000u"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "VRAM to CPU C0",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 465,
+          "pattern": "case 0xC0"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 148,
+          "pattern": "0xC0000000u"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 state and transfers",
+      "name": "VRAM copy 80",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 482,
+          "pattern": "case 0x80"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Flat triangle 20-23",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 311,
+          "pattern": "case 0x20"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 27,
+          "pattern": "0x20FFFFFFu"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Textured triangle 24-27",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 326,
+          "pattern": "case 0x24"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Flat quad 28-2B",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 348,
+          "pattern": "case 0x28"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Textured quad 2C-2F",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 350,
+          "pattern": "case 0x2C"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Shaded triangle 30-33",
+      "status": "missing",
+      "source": [],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Shaded textured triangle 34-37",
+      "status": "missing",
+      "source": [],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Shaded quad 38-3B",
+      "status": "missing",
+      "source": [],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Shaded textured quad 3C-3F",
+      "status": "missing",
+      "source": [],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Line 40-43",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 410,
+          "pattern": "case 0x40"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Polyline 48-4B",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 414,
+          "pattern": "case 0x48"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Shaded line 50-53",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 418,
+          "pattern": "case 0x50"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Shaded polyline 58-5B",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 422,
+          "pattern": "case 0x58"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Variable rectangle 60-63",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 400,
+          "pattern": "case 0x60"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP0 primitives",
+      "name": "Fixed sprite 64-7F",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 361,
+          "pattern": "case 0x64"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP1 commands",
+      "name": "Reset GPU 00",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 159,
+          "pattern": "GraphicsCommandType::ResetGpu"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP1 commands",
+      "name": "Reset FIFO 01",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 166,
+          "pattern": "GraphicsCommandType::ResetCommandBuffer"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP1 commands",
+      "name": "Acknowledge IRQ 02",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 171,
+          "pattern": "GraphicsCommandType::AcknowledgeInterrupt"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP1 commands",
+      "name": "Display enable 03",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 176,
+          "pattern": "GraphicsCommandType::SetDisplayEnable"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 22,
+          "pattern": "0x03000000u"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP1 commands",
+      "name": "DMA direction 04",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 183,
+          "pattern": "GraphicsCommandType::SetDmaDirection"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 154,
+          "pattern": "0x04000002u"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP1 commands",
+      "name": "Display origin 05",
       "status": "tested",
       "source": [
         {
           "path": "src/gpu/Graphics.cpp",
           "line": 190,
-          "pattern": "SetDisplayArea"
-        },
-        {
-          "path": "src/gpu/Graphics.cpp",
-          "line": 202,
-          "pattern": "SetDisplayMode"
+          "pattern": "GraphicsCommandType::SetDisplayArea"
         }
       ],
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 38,
-          "pattern": "graphics IR"
+          "line": 23,
+          "pattern": "0x05010040u"
         }
       ],
       "unsupported": []
     },
     {
-      "subsystem": "GP0/GP1",
-      "name": "Vulkan resource plan",
+      "subsystem": "GP1 commands",
+      "name": "Horizontal range 06",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 201,
+          "pattern": "case 0x06"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "GP1 commands",
+      "name": "Vertical range 07",
       "status": "tested",
       "source": [
         {
           "path": "src/gpu/Graphics.cpp",
-          "line": 507,
-          "pattern": "lower_graphics_ir_to_vulkan"
+          "line": 207,
+          "pattern": "case 0x07"
         }
       ],
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 16,
-          "pattern": "Vulkan"
+          "line": 24,
+          "pattern": "0x07000000u"
         }
       ],
       "unsupported": []
     },
     {
-      "subsystem": "SPIR-V",
+      "subsystem": "GP1 commands",
+      "name": "Display mode 08",
+      "status": "partial",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 215,
+          "pattern": "case 0x08"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "Vulkan graphics pipeline",
       "name": "Graphics IR",
       "status": "tested",
       "source": [
@@ -1218,7 +1635,117 @@
       "unsupported": []
     },
     {
-      "subsystem": "SPIR-V",
+      "subsystem": "Vulkan graphics pipeline",
+      "name": "Resource plan",
+      "status": "tested",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 507,
+          "pattern": "lower_graphics_ir_to_vulkan"
+        }
+      ],
+      "tests": [
+        {
+          "path": "tests/GraphicsTest.cpp",
+          "line": 46,
+          "pattern": "Vulkan resource plan"
+        }
+      ],
+      "unsupported": []
+    },
+    {
+      "subsystem": "Vulkan graphics pipeline",
+      "name": "Surface and swapchain",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 665,
+          "pattern": "VulkanSwapchainRuntime::initialize"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "Vulkan graphics pipeline",
+      "name": "Primitive pipelines",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 1121,
+          "pattern": "primitive_pipelines.reserve"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "Vulkan graphics pipeline",
+      "name": "Shader stage attachment",
+      "status": "unsupported",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 1130,
+          "pattern": "VkGraphicsPipelineCreateInfo"
+        }
+      ],
+      "tests": [],
+      "unsupported": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 1132,
+          "pattern": "stageCount = 0"
+        }
+      ]
+    },
+    {
+      "subsystem": "Vulkan graphics pipeline",
+      "name": "Rasterization",
+      "status": "unsupported",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 1107,
+          "pattern": "rasterizerDiscardEnable"
+        }
+      ],
+      "tests": [],
+      "unsupported": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 1107,
+          "pattern": "rasterizerDiscardEnable = VK_TRUE"
+        }
+      ]
+    },
+    {
+      "subsystem": "Vulkan graphics pipeline",
+      "name": "Draw command submission",
+      "status": "missing",
+      "source": [],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "Vulkan graphics pipeline",
+      "name": "Present swapchain",
+      "status": "implemented",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 1162,
+          "pattern": "VulkanSwapchainRuntime::present"
+        }
+      ],
+      "tests": [],
+      "unsupported": []
+    },
+    {
+      "subsystem": "SPIR-V shaders",
       "name": "SPIR-V emitter",
       "status": "tested",
       "source": [
@@ -1232,25 +1759,20 @@
         {
           "path": "tests/GraphicsTest.cpp",
           "line": 83,
-          "pattern": "SPIR-V"
+          "pattern": "SPIR-V module"
         }
       ],
       "unsupported": []
     },
     {
-      "subsystem": "SPIR-V",
-      "name": "SPIR-V validation",
+      "subsystem": "SPIR-V shaders",
+      "name": "SPIR-V structural validation",
       "status": "tested",
       "source": [
         {
           "path": "src/gpu/Graphics.cpp",
           "line": 538,
           "pattern": "validate_spirv_words"
-        },
-        {
-          "path": "src/gpu/Graphics.cpp",
-          "line": 16,
-          "pattern": "SPIRV_MAGIC"
         }
       ],
       "tests": [
@@ -1263,63 +1785,85 @@
       "unsupported": []
     },
     {
-      "subsystem": "SPIR-V",
-      "name": "Polygon shader",
+      "subsystem": "SPIR-V shaders",
+      "name": "Six primitive variants",
       "status": "tested",
       "source": [
         {
           "path": "src/gpu/Graphics.cpp",
-          "line": 317,
-          "pattern": "GraphicsPrimitive::Polygon"
+          "line": 580,
+          "pattern": "primitive_alpha"
         }
       ],
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 71,
-          "pattern": "Polygon"
+          "line": 134,
+          "pattern": "primitive_shaders.size() != 6u"
         }
       ],
       "unsupported": []
     },
     {
-      "subsystem": "SPIR-V",
-      "name": "Textured shader",
-      "status": "tested",
+      "subsystem": "SPIR-V shaders",
+      "name": "Texture sampling",
+      "status": "unsupported",
       "source": [
         {
           "path": "src/gpu/Graphics.cpp",
-          "line": 332,
-          "pattern": "GraphicsPrimitive::TexturedPolygon"
+          "line": 548,
+          "pattern": "emit_spirv_shader"
         }
       ],
-      "tests": [
+      "tests": [],
+      "unsupported": [
         {
-          "path": "tests/GraphicsTest.cpp",
-          "line": 72,
-          "pattern": "TexturedPolygon"
+          "path": "src/gpu/Graphics.cpp",
+          "line": 553,
+          "pattern": "\\(void\\)textured"
+        }
+      ]
+    },
+    {
+      "subsystem": "SPIR-V shaders",
+      "name": "Semi-transparent blending",
+      "status": "unsupported",
+      "source": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 548,
+          "pattern": "emit_spirv_shader"
         }
       ],
+      "tests": [],
+      "unsupported": [
+        {
+          "path": "src/gpu/Graphics.cpp",
+          "line": 554,
+          "pattern": "\\(void\\)blending"
+        }
+      ]
+    },
+    {
+      "subsystem": "SPIR-V shaders",
+      "name": "Vertex shader",
+      "status": "missing",
+      "source": [],
+      "tests": [],
       "unsupported": []
     },
     {
-      "subsystem": "SPIR-V",
-      "name": "Framebuffer shader",
-      "status": "tested",
+      "subsystem": "SPIR-V shaders",
+      "name": "Fragment shader implementation",
+      "status": "partial",
       "source": [
         {
           "path": "src/gpu/Graphics.cpp",
-          "line": 468,
-          "pattern": "GraphicsPrimitive::Framebuffer"
+          "line": 558,
+          "pattern": "Direct-emitted minimal Vulkan fragment shader"
         }
       ],
-      "tests": [
-        {
-          "path": "tests/GraphicsTest.cpp",
-          "line": 76,
-          "pattern": "Framebuffer"
-        }
-      ],
+      "tests": [],
       "unsupported": []
     },
     {
@@ -1334,7 +1878,7 @@
         },
         {
           "path": "src/host/HostServices.cpp",
-          "line": 57,
+          "line": 75,
           "pattern": "HostServiceKind"
         }
       ],
@@ -1371,7 +1915,7 @@
         },
         {
           "path": "tests/CMakeLists.txt",
-          "line": 55,
+          "line": 83,
           "pattern": "input_mapping"
         }
       ],

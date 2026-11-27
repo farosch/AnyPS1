@@ -225,10 +225,10 @@ def main():
     for record in records:
         grouped.setdefault(record["subsystem"], []).append(record)
 
-    cell_w = 72
-    cell_h = 56
-    left = 210
-    top = 82
+    cell_w = 88
+    cell_h = 64
+    left = 240
+    top = 92
     width = left + max(len(items) for items in grouped.values()) * cell_w + 50
     height = top + len(grouped) * cell_h + 96
 
@@ -236,9 +236,9 @@ def main():
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="AnyPS1 implementation raster">',
         '<rect width="100%" height="100%" fill="#0d1117"/>',
         '<style>',
-        '.label{fill:#c9d1d9;font-family:sans-serif;font-size:12px}',
-        '.title{fill:#f0f6fc;font-family:sans-serif;font-size:18px;font-weight:bold}',
-        '.legend{fill:#c9d1d9;font-family:sans-serif;font-size:11px}',
+        '.label{fill:#c9d1d9;font-family:sans-serif;font-size:15px}',
+        '.title{fill:#f0f6fc;font-family:sans-serif;font-size:22px;font-weight:bold}',
+        '.legend{fill:#c9d1d9;font-family:sans-serif;font-size:13px}',
         '</style>',
         '<text x="20" y="34" class="title">AnyPS1 implementation raster</text>',
         '<text x="20" y="56" class="label">Source-derived implementation and test coverage</text>',
@@ -275,10 +275,11 @@ def main():
         legend_x += 118
     svg.append("</svg>")
 
-    svg_path = OUT_ROOT / "progress.svg"
+    svg_path = OUT_ROOT / ".progress.svg"
     png_path = OUT_ROOT / "progress.png"
     svg_path.write_text("\n".join(svg), encoding="utf-8")
     rasterized = rasterize_svg(svg_path, png_path)
+    svg_path.unlink(missing_ok=True)
 
     counts = {}
     totals = {"tested": 0, "implemented": 0, "partial": 0, "unsupported": 0, "missing": 0, "not_applicable": 0}
@@ -384,7 +385,8 @@ a {{ color:#58a6ff; }}
 .filters {{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }}
 .filter {{ background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:6px 10px; cursor:pointer; }}
 .filter.active {{ border-color:#58a6ff; }}
-.raster {{ max-width:100%; border:1px solid #30363d; margin-bottom:16px; }}
+.raster-wrap {{ overflow-x:auto; margin-bottom:16px; }}
+.raster {{ display:block; max-width:none; border:1px solid #30363d; }}
 table {{ border-collapse:collapse; width:100%; }} th,td {{ border:1px solid #30363d; padding:7px 9px; vertical-align:top; }} th {{ position:sticky; top:0; background:#161b22; }}
 tr.hidden {{ display:none; }}
 .status {{ font-weight:bold; }}
@@ -393,7 +395,7 @@ tr.hidden {{ display:none; }}
 <p>Commit <code>{html.escape(summary['commit'])}</code>: source-derived implementation and test coverage.</p>
 <div class="summary">{''.join(cards)}</div>
 <div class="filters"><button class="filter active" data-status="all">all</button>{''.join(filters)}</div>
-<img class="raster" src="progress.svg" alt="AnyPS1 implementation raster">
+<div class="raster-wrap"><img class="raster" src="progress.png" alt="AnyPS1 implementation raster"></div>
 <table><thead><tr><th>Subsystem</th><th>Feature</th><th>Status</th><th>Source evidence</th><th>Test evidence</th><th>Unsupported evidence</th></tr></thead>
 <tbody>{''.join(table_rows)}</tbody></table>
 <script>

@@ -94,25 +94,77 @@
       ]
     },
     {
-      "name":"GP0/GP1",
+      "name":"GP0 state and transfers",
       "items":[
-        {"name":"GP0 polygon","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 polygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
-        {"name":"GP0 textured polygon","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 textured polygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
-        {"name":"GP0 rectangle","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 rectangle"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
-        {"name":"GP0 VRAM transfer","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GP0 VRAM"]},{"path":"src/gpu/Graphics.cpp","patterns":["VRAMTransfer"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
-        {"name":"GP1 display","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["SetDisplayArea"]},{"path":"src/gpu/Graphics.cpp","patterns":["SetDisplayMode"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
-        {"name":"Vulkan resource plan","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["lower_graphics_ir_to_vulkan"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["Vulkan"]}]}
+        {"name":"NOP 00","source_patterns":[]},
+        {"name":"Clear cache 01","source_patterns":[]},
+        {"name":"Fill rectangle 02","source_patterns":[]},
+        {"name":"Draw mode E1","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0xE1"]}]},
+        {"name":"Draw area start E2","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0xE2"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0xE2000000u"]}]},
+        {"name":"Draw area end E3","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0xE3"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0xE3002000u"]}]},
+        {"name":"Draw offset E4","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0xE4"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0xE4000100u"]}]},
+        {"name":"Mask bits E5-E6","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0xE5","case 0xE6"]}],"partial":true},
+        {"name":"CPU to VRAM A0","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0xA0","HostToVram"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0xA0000000u","host-to-VRAM"]}]},
+        {"name":"VRAM to CPU C0","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0xC0","VramToHost"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0xC0000000u","VRAM-to-host"]}]},
+        {"name":"VRAM copy 80","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x80","VramToVram"]}]}
       ]
     },
     {
-      "name":"SPIR-V",
+      "name":"GP0 primitives",
+      "items":[
+        {"name":"Flat triangle 20-23","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x20","GP0 polygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0x20FFFFFFu","unexpected graphics IR"]}]},
+        {"name":"Textured triangle 24-27","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x24","GP0 textured polygon"]}]},
+        {"name":"Flat quad 28-2B","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x28","GP0 variable rectangle"]}],"partial":true},
+        {"name":"Textured quad 2C-2F","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x2C","GP0 variable rectangle"]}],"partial":true},
+        {"name":"Shaded triangle 30-33","source_patterns":[]},
+        {"name":"Shaded textured triangle 34-37","source_patterns":[]},
+        {"name":"Shaded quad 38-3B","source_patterns":[]},
+        {"name":"Shaded textured quad 3C-3F","source_patterns":[]},
+        {"name":"Line 40-43","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x40","GP0 line"]}]},
+        {"name":"Polyline 48-4B","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x48","GP0 line"]}],"partial":true},
+        {"name":"Shaded line 50-53","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x50","GP0 line"]}],"partial":true},
+        {"name":"Shaded polyline 58-5B","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x58","GP0 line"]}],"partial":true},
+        {"name":"Variable rectangle 60-63","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x60","GP0 sprite"]}],"partial":true},
+        {"name":"Fixed sprite 64-7F","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x64","GP0 fixed-size rectangle/sprite"]}],"partial":true}
+      ]
+    },
+    {
+      "name":"GP1 commands",
+      "items":[
+        {"name":"Reset GPU 00","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsCommandType::ResetGpu"]}]},
+        {"name":"Reset FIFO 01","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsCommandType::ResetCommandBuffer"]}]},
+        {"name":"Acknowledge IRQ 02","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsCommandType::AcknowledgeInterrupt"]}]},
+        {"name":"Display enable 03","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsCommandType::SetDisplayEnable"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0x03000000u"]}]},
+        {"name":"DMA direction 04","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsCommandType::SetDmaDirection"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0x04000002u"]}]},
+        {"name":"Display origin 05","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsCommandType::SetDisplayArea"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0x05010040u"]}]},
+        {"name":"Horizontal range 06","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x06"]}]},
+        {"name":"Vertical range 07","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x07","display_height"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["0x07000000u","0x07000008u"]}]},
+        {"name":"Display mode 08","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["case 0x08","display_mode"]}],"partial":true}
+      ]
+    },
+    {
+      "name":"Vulkan graphics pipeline",
       "items":[
         {"name":"Graphics IR","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsIr lower_gp0_gp1"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["graphics IR"]}]},
-        {"name":"SPIR-V emitter","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["emit_spirv_shader"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["SPIR-V"]}]},
-        {"name":"SPIR-V validation","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["validate_spirv_words"]},{"path":"src/gpu/Graphics.cpp","patterns":["SPIRV_MAGIC"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["spirv-val"]}]},
-        {"name":"Polygon shader","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsPrimitive::Polygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["Polygon"]}]},
-        {"name":"Textured shader","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsPrimitive::TexturedPolygon"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["TexturedPolygon"]}]},
-        {"name":"Framebuffer shader","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["GraphicsPrimitive::Framebuffer"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["Framebuffer"]}]}
+        {"name":"Resource plan","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["lower_graphics_ir_to_vulkan"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["Vulkan resource plan"]}]},
+        {"name":"Surface and swapchain","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["VulkanSwapchainRuntime::initialize","vkCreateSwapchainKHR"]}]},
+        {"name":"Primitive pipelines","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["primitive_pipelines.reserve","create_graphics_pipelines"]}]},
+        {"name":"Shader stage attachment","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["VkGraphicsPipelineCreateInfo"]}],"unsupported_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["stageCount = 0"]}]},
+        {"name":"Rasterization","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["rasterizerDiscardEnable"]}],"unsupported_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["rasterizerDiscardEnable = VK_TRUE"]}]},
+        {"name":"Draw command submission","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["vkCmdDraw"]}]},
+        {"name":"Present swapchain","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["VulkanSwapchainRuntime::present","vkQueuePresentKHR"]}]}
+      ]
+    },
+    {
+      "name":"SPIR-V shaders",
+      "items":[
+        {"name":"SPIR-V emitter","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["emit_spirv_shader"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["SPIR-V module"]}]},
+        {"name":"SPIR-V structural validation","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["validate_spirv_words","SPIRV_MAGIC"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["spirv-val"]}]},
+        {"name":"Six primitive variants","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["primitive_alpha","GraphicsPrimitive::Framebuffer"]}],"test_patterns":[{"path":"tests/GraphicsTest.cpp","patterns":["primitive_shaders.size() != 6u","primitive SPIR-V modules are identical"]}]},
+        {"name":"Texture sampling","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["emit_spirv_shader"]}],"unsupported_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["\\(void\\)textured"]}]},
+        {"name":"Semi-transparent blending","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["emit_spirv_shader"]}],"unsupported_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["\\(void\\)blending"]}]},
+        {"name":"Vertex shader","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["VK_SHADER_STAGE_VERTEX_BIT","vertex shader"]}]},
+        {"name":"Fragment shader implementation","source_patterns":[{"path":"src/gpu/Graphics.cpp","patterns":["Direct-emitted minimal Vulkan fragment shader","shader.words = \\{"]}],"partial":true}
       ]
     },
     {
