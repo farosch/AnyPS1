@@ -48,6 +48,12 @@
   endianness, unaligned access, and HI/LO semantics with focused fixtures.
 - [x] Add support for sparse control-flow regions and discontinuous executable
   sections in CFG discovery.
+- [ ] Implement native PS1 COP2/GTE matrix, vector, color, perspective,
+  interpolation, saturation, and flag behavior on Linux and Windows.
+- [ ] Reconstruct bounded indirect jump-table targets and preserve explicit exits
+  for unresolved runtime control-flow destinations.
+- [ ] Add semantic fixtures for every COP2/GTE operation reached by real
+  executable inventories.
 
 ## Linux executable conversion
 
@@ -138,6 +144,14 @@
   into generated executable loops.
 - [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.
+- [ ] Implement generated-loop timer, interrupt, DMA, controller, CD-ROM,
+  GPU, and SPU state progression.
+- [ ] Verify generated executables progress through real host frames with
+  VBlank scheduling, event/input polling, audio, and framebuffer presentation.
+- [ ] Integrate memory-card and disc runtime APIs through the actual PS1
+  controller and CD-ROM/MMIO protocols.
+- [ ] Advance real-executable conversion past the first unsupported COP2/MMIO
+  family and record the next concrete runtime blocker.
 
 ## Windows executable conversion
 
