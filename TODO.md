@@ -169,7 +169,7 @@
 - [x] Add `objdump`/`llvm-readobj` format-inspector support.
 - [x] Add a shared semantic parity fixture that executes on Linux and Windows.
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
-- [ ] Implement native Windows MIPS lowering equivalent to Linux lowering.
+- [x] Implement native Windows MIPS lowering equivalent to Linux lowering.
 - [x] Generate imports and relocations for real Windows host-native code.
 - [x] Document PE32 support as optional: no PE32-only x86 compatibility target
   is required because the native backend emits AMD64 PE32+.

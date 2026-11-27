@@ -384,6 +384,7 @@ void MipsWindowsLowerer::lower(
     source << "ram db 2097152 dup(0)\n";
     source << "scratchpad db 1024 dup(0)\n";
     source << "cop0 db 128 dup(0)\n";
+    source << "cop3_data db 128 dup(0)\n";
     source << "fregs dd 32 dup(0)\n";
     source << "gte_data dd 32 dup(0)\n";
     source << "gte_ctrl dd 32 dup(0)\n";
@@ -738,6 +739,12 @@ void MipsWindowsLowerer::lower(
             } else {
                 source << "jmp unsupported_exit\n";
             }
+        } else if (opcode == 0x08) {
+            source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+            source << "add eax," << static_cast<std::int32_t>(
+                static_cast<std::int16_t>(immediate)) << "\n";
+            source << "jo overflow_exit\n";
+            source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
         } else if (opcode == 0x09) {
             source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
             source << "add eax," << static_cast<std::int32_t>(
@@ -773,10 +780,10 @@ void MipsWindowsLowerer::lower(
                    << (immediate << 16) << "\n";
         } else if (opcode == 0x10) {
             const std::uint32_t cop0_register = rd;
-            if (rs == 0) {
+            if (rs == 0 || rs == 2) {
                 source << "mov eax,dword ptr cop0+" << cop0_register * 4 << "\n";
                 source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
-            } else if (rs == 4) {
+            } else if (rs == 4 || rs == 6) {
                 source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
                 source << "mov dword ptr cop0+" << cop0_register * 4 << ",eax\n";
             } else if (rs == 16 && special == 0x10) {
@@ -800,6 +807,77 @@ void MipsWindowsLowerer::lower(
             } else if (rs == 6) {
                 source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
                 source << "mov dword ptr fpcsr,eax\n";
+            } else if (rs == 16) {
+                const std::uint32_t ft = rt;
+                const std::uint32_t fs = rd;
+                const std::uint32_t fd = shamt;
+                if (special == 0 || special == 1 ||
+                    special == 2 || special == 3) {
+                    source << "movss xmm0,dword ptr fregs+" << fs * 4 << "\n";
+                    if (special == 0) source << "addss xmm0,dword ptr fregs+" << ft * 4 << "\n";
+                    if (special == 1) source << "subss xmm0,dword ptr fregs+" << ft * 4 << "\n";
+                    if (special == 2) source << "mulss xmm0,dword ptr fregs+" << ft * 4 << "\n";
+                    if (special == 3) source << "divss xmm0,dword ptr fregs+" << ft * 4 << "\n";
+                    source << "movss dword ptr fregs+" << fd * 4 << ",xmm0\n";
+                } else if (special == 4) {
+                    source << "sqrtss xmm0,dword ptr fregs+" << fs * 4 << "\n";
+                    source << "movss dword ptr fregs+" << fd * 4 << ",xmm0\n";
+                } else if (special == 5) {
+                    source << "mov eax,dword ptr fregs+" << fs * 4 << "\n";
+                    source << "and eax,7FFFFFFFh\n";
+                    source << "mov dword ptr fregs+" << fd * 4 << ",eax\n";
+                } else if (special == 6) {
+                    source << "mov eax,dword ptr fregs+" << fs * 4 << "\n";
+                    source << "mov dword ptr fregs+" << fd * 4 << ",eax\n";
+                } else if (special == 7) {
+                    source << "mov eax,dword ptr fregs+" << fs * 4 << "\n";
+                    source << "xor eax,80000000h\n";
+                    source << "mov dword ptr fregs+" << fd * 4 << ",eax\n";
+                } else if (special >= 12 && special <= 15) {
+                    const unsigned mode =
+                        special == 12 ? 0u :
+                        special == 14 ? 2u :
+                        special == 15 ? 1u : 0u;
+                    source << "roundss xmm0,dword ptr fregs+" << fs * 4 << "," << mode << "\n";
+                    source << "cvttss2si eax,xmm0\n";
+                    source << "mov dword ptr fregs+" << fd * 4 << ",eax\n";
+                } else if (special == 0x20) {
+                    source << "cvttss2si eax,dword ptr fregs+" << fs * 4 << "\n";
+                    source << "mov dword ptr fregs+" << fd * 4 << ",eax\n";
+                } else if (special == 0x24) {
+                    source << "cvtsi2ss xmm0,dword ptr fregs+" << fs * 4 << "\n";
+                    source << "movss dword ptr fregs+" << fd * 4 << ",xmm0\n";
+                } else if (special >= 0x30) {
+                    source << "mov eax,dword ptr fpcsr\n";
+                    source << "and eax,0FFFFFFFEh\n";
+                    if (special != 0x30) {
+                        source << "movss xmm0,dword ptr fregs+" << fs * 4 << "\n";
+                        source << "ucomiss xmm0,dword ptr fregs+" << ft * 4 << "\n";
+                        if (special == 0x31 || special == 0x38 || special == 0x3A) {
+                            source << "setp dl\n";
+                        } else if (special == 0x32 || special == 0x35 ||
+                                   special == 0x39) {
+                            source << "sete dl\n";
+                        } else if (special == 0x33 || special == 0x3B) {
+                            source << "setnp dl\n";
+                        } else if (special == 0x34 || special == 0x3C) {
+                            source << "setb dl\n";
+                        } else if (special == 0x36 || special == 0x3D) {
+                            source << "setae dl\n";
+                        } else if (special == 0x37 || special == 0x3E) {
+                            source << "setbe dl\n";
+                        } else if (special == 0x3F) {
+                            source << "seta dl\n";
+                        } else {
+                            source << "xor dl,dl\n";
+                        }
+                        source << "movzx edx,dl\n";
+                        source << "or eax,edx\n";
+                    }
+                    source << "mov dword ptr fpcsr,eax\n";
+                } else {
+                    source << "jmp unsupported_exit\n";
+                }
             } else {
                 source << "jmp unsupported_exit\n";
             }
@@ -817,6 +895,16 @@ void MipsWindowsLowerer::lower(
             } else if (rs == 6) {
                 source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
                 source << "mov dword ptr gte_ctrl+" << gte_register * 4 << ",eax\n";
+            } else {
+                source << "jmp unsupported_exit\n";
+            }
+        } else if (opcode == 0x13) {
+            if (rs == 0 || rs == 2) {
+                source << "mov eax,dword ptr cop3_data+" << rd * 4 << "\n";
+                source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+            } else if (rs == 4 || rs == 6) {
+                source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov dword ptr cop3_data+" << rd * 4 << ",eax\n";
             } else {
                 source << "jmp unsupported_exit\n";
             }
@@ -982,18 +1070,49 @@ void MipsWindowsLowerer::lower(
             source << "jae host_address_continue_" << std::hex << address << std::dec << "\n";
             source << "jmp unsupported_host_exit\n";
             source << "host_address_continue_" << std::hex << address << std::dec << ":\n";
+            source << "cmp eax,1F800000h\n";
+            source << "jb ram_load_" << std::hex << address << std::dec << "\n";
+            source << "cmp eax,1F800400h\n";
+            source << "jae memory_fault_exit\n";
+            source << "sub eax,1F800000h\n";
+            source << "cmp eax," << (0x400u - access_size) << "\n";
+            source << "ja memory_fault_exit\n";
+            source << "lea rbx,scratchpad\n";
+            source << "jmp load_region_" << std::hex << address << std::dec << "\n";
+            source << "ram_load_" << std::hex << address << std::dec << ":\n";
             source << "cmp eax," << (0x200000u - access_size) << "\n";
             source << "ja memory_fault_exit\n";
-            source << "and eax,01FFFFFh\n";
             source << "lea rbx,ram\n";
-            if (opcode == 0x20) source << "movsx edx,byte ptr [rbx+rax]\n";
+            source << "load_region_" << std::hex << address << std::dec << ":\n";
+            if (opcode == 0x22 || opcode == 0x26) {
+                source << "mov r10d,eax\n";
+                source << "and eax,0FFFFFFFCh\n";
+                source << "mov edx,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "mov ecx,dword ptr [rbx+rax]\n";
+                source << "and r10d,3\n";
+                if (opcode == 0x22) {
+                    source << "cmp r10d,0\nje lwl0_" << std::hex << address << std::dec << "\n";
+                    source << "cmp r10d,1\nje lwl1_" << std::hex << address << std::dec << "\n";
+                    source << "cmp r10d,2\nje lwl2_" << std::hex << address << std::dec << "\n";
+                    source << "mov edx,ecx\njmp lwl_done_" << std::hex << address << std::dec << "\n";
+                    source << "lwl0_" << std::hex << address << std::dec << ": shl ecx,24\nand edx,00FFFFFFh\nor edx,ecx\njmp lwl_done_" << std::hex << address << std::dec << "\n";
+                    source << "lwl1_" << std::hex << address << std::dec << ": shl ecx,16\nand edx,0000FFFFh\nor edx,ecx\njmp lwl_done_" << std::hex << address << std::dec << "\n";
+                    source << "lwl2_" << std::hex << address << std::dec << ": shl ecx,8\nand edx,000000FFh\nor edx,ecx\nlwl_done_" << std::hex << address << std::dec << ":\n";
+                } else {
+                    source << "cmp r10d,0\nje lwr0_" << std::hex << address << std::dec << "\n";
+                    source << "cmp r10d,1\nje lwr1_" << std::hex << address << std::dec << "\n";
+                    source << "cmp r10d,2\nje lwr2_" << std::hex << address << std::dec << "\n";
+                    source << "shr ecx,24\nand edx,0FFFFFF00h\nor edx,ecx\njmp lwr_done_" << std::hex << address << std::dec << "\n";
+                    source << "lwr0_" << std::hex << address << std::dec << ": mov edx,ecx\njmp lwr_done_" << std::hex << address << std::dec << "\n";
+                    source << "lwr1_" << std::hex << address << std::dec << ": shr ecx,8\nand edx,0FF000000h\nor edx,ecx\njmp lwr_done_" << std::hex << address << std::dec << "\n";
+                    source << "lwr2_" << std::hex << address << std::dec << ": shr ecx,16\nand edx,0FFFF0000h\nor edx,ecx\nlwr_done_" << std::hex << address << std::dec << ":\n";
+                }
+            } else if (opcode == 0x20) source << "movsx edx,byte ptr [rbx+rax]\n";
             else if (opcode == 0x21) source << "movsx edx,word ptr [rbx+rax]\n";
             else if (opcode == 0x23) source << "mov edx,dword ptr [rbx+rax]\n";
             else if (opcode == 0x24) source << "movzx edx,byte ptr [rbx+rax]\n";
             else if (opcode == 0x25) source << "movzx edx,word ptr [rbx+rax]\n";
-            else if (opcode == 0x22 || opcode == 0x26) {
-                source << "mov edx,dword ptr [rbx+rax]\n";
-            } else if (opcode == 0x31 || opcode == 0x32) {
+            else if (opcode == 0x31 || opcode == 0x32) {
                 source << "mov edx,dword ptr [rbx+rax]\n";
                 source << "mov dword ptr fregs+" << rt * 4 << ",edx\n";
             }
@@ -1005,7 +1124,8 @@ void MipsWindowsLowerer::lower(
                 source << "mov byte ptr pending_load_valid,1\n";
             }
         } else if (opcode == 0x2B || opcode == 0x29 || opcode == 0x28 ||
-                   opcode == 0x2E || opcode == 0x39 || opcode == 0x3A) {
+                   opcode == 0x2E || opcode == 0x39 || opcode == 0x3A ||
+                   opcode == 0x2A) {
             const std::uint32_t access_size =
                 opcode == 0x28 ? 1u : opcode == 0x29 ? 2u : 4u;
             source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
@@ -1018,20 +1138,55 @@ void MipsWindowsLowerer::lower(
             source << "jae host_store_continue_" << std::hex << address << std::dec << "\n";
             source << "jmp unsupported_host_exit\n";
             source << "host_store_continue_" << std::hex << address << std::dec << ":\n";
+            source << "cmp eax,1F800000h\n";
+            source << "jb ram_store_" << std::hex << address << std::dec << "\n";
+            source << "cmp eax,1F800400h\n";
+            source << "jae memory_fault_exit\n";
+            source << "sub eax,1F800000h\n";
+            source << "cmp eax," << (0x400u - access_size) << "\n";
+            source << "ja memory_fault_exit\n";
+            source << "lea rbx,scratchpad\n";
+            source << "jmp store_region_" << std::hex << address << std::dec << "\n";
+            source << "ram_store_" << std::hex << address << std::dec << ":\n";
             source << "cmp eax," << (0x200000u - access_size) << "\n";
             source << "ja memory_fault_exit\n";
-            source << "and eax,01FFFFFh\n";
             source << "lea rbx,ram\n";
+            source << "store_region_" << std::hex << address << std::dec << ":\n";
             source << "mov edx,dword ptr [r12+" << rt * 4 << "]\n";
-            if (opcode == 0x28) source << "mov byte ptr [rbx+rax],dl\n";
+            if (opcode == 0x2A) {
+                source << "mov r10d,eax\n";
+                source << "and eax,0FFFFFFFCh\n";
+                source << "mov ecx,dword ptr [rbx+rax]\n";
+                source << "and r10d,3\n";
+                source << "cmp r10d,0\nje swl0_" << std::hex << address << std::dec << "\n";
+                source << "cmp r10d,1\nje swl1_" << std::hex << address << std::dec << "\n";
+                source << "cmp r10d,2\nje swl2_" << std::hex << address << std::dec << "\n";
+                source << "mov ecx,edx\njmp swl_done_" << std::hex << address << std::dec << "\n";
+                source << "swl0_" << std::hex << address << std::dec << ": and ecx,0FFFFFF00h\nmov r9d,edx\nshr r9d,24\nor ecx,r9d\njmp swl_done_" << std::hex << address << std::dec << "\n";
+                source << "swl1_" << std::hex << address << std::dec << ": and ecx,0FFFF0000h\nmov r9d,edx\nshr r9d,16\nor ecx,r9d\njmp swl_done_" << std::hex << address << std::dec << "\n";
+                source << "swl2_" << std::hex << address << std::dec << ": and ecx,0FF000000h\nmov r9d,edx\nshr r9d,8\nor ecx,r9d\nswl_done_" << std::hex << address << std::dec << ":\n";
+                source << "mov dword ptr [rbx+rax],ecx\n";
+            } else if (opcode == 0x2E) {
+                source << "mov r10d,eax\n";
+                source << "and eax,0FFFFFFFCh\n";
+                source << "mov ecx,dword ptr [rbx+rax]\n";
+                source << "and r10d,3\n";
+                source << "cmp r10d,0\nje swr0_" << std::hex << address << std::dec << "\n";
+                source << "cmp r10d,1\nje swr1_" << std::hex << address << std::dec << "\n";
+                source << "cmp r10d,2\nje swr2_" << std::hex << address << std::dec << "\n";
+                source << "and ecx,00FFFFFFh\nmov r9d,edx\nshl r9d,24\nor ecx,r9d\njmp swr_done_" << std::hex << address << std::dec << "\n";
+                source << "swr0_" << std::hex << address << std::dec << ": mov ecx,edx\njmp swr_done_" << std::hex << address << std::dec << "\n";
+                source << "swr1_" << std::hex << address << std::dec << ": and ecx,000000FFh\nmov r9d,edx\nshl r9d,8\nor ecx,r9d\njmp swr_done_" << std::hex << address << std::dec << "\n";
+                source << "swr2_" << std::hex << address << std::dec << ": and ecx,0000FFFFh\nmov r9d,edx\nshl r9d,16\nor ecx,r9d\nswr_done_" << std::hex << address << std::dec << ":\n";
+                source << "mov dword ptr [rbx+rax],ecx\n";
+            } else if (opcode == 0x28) source << "mov byte ptr [rbx+rax],dl\n";
             else if (opcode == 0x29) source << "mov word ptr [rbx+rax],dx\n";
             else if (opcode == 0x39 || opcode == 0x3A) {
                 source << "mov edx,dword ptr fregs+" << rt * 4 << "\n";
                 source << "mov dword ptr [rbx+rax],edx\n";
-            } else if (opcode == 0x2E) {
+            } else {
                 source << "mov dword ptr [rbx+rax],edx\n";
             }
-            else source << "mov dword ptr [rbx+rax],edx\n";
         } else {
             source << "jmp unsupported_exit\n";
         }
@@ -1105,6 +1260,9 @@ void MipsWindowsLowerer::lower(
     source << "jmp normal_exit\n";
     source << "divide_zero_exit:\n";
     source << "mov ecx,11\n";
+    source << "call ExitProcess\n";
+    source << "overflow_exit:\n";
+    source << "mov ecx,12\n";
     source << "call ExitProcess\n";
     source << "unsupported_host_exit:\n";
     source << "mov ecx,17\n";
