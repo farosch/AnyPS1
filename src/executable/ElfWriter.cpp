@@ -38,35 +38,13 @@ int ElfWriter::link(
         std::vector<const char*> linker_args = {
             "gcc",
             "-nostdlib",
+            "-static",
             "-no-pie",
             "-Wl,-e,_start,-z,noexecstack,-z,relro,-z,now,-z,notext,--build-id=none",
         };
-#ifdef ANYPS1_BUILD_DIR
-        const std::string build_dir = ANYPS1_BUILD_DIR;
-        const std::string host_lib_dir = build_dir + "/src";
-        const std::string sdl_lib_dir = build_dir + "/3rdparty/SDL";
-        linker_args.push_back("-L");
-        linker_args.push_back(host_lib_dir.c_str());
-        linker_args.push_back("-L");
-        linker_args.push_back(sdl_lib_dir.c_str());
-        const std::string rpath = "-Wl,-rpath," + sdl_lib_dir;
-        linker_args.push_back(rpath.c_str());
-#else
-        const std::string host_lib_dir;
-#endif
         linker_args.push_back("-o");
         linker_args.push_back(output.c_str());
         linker_args.push_back(assembly.c_str());
-        linker_args.push_back("-lanyps1_host");
-        linker_args.push_back("-lanyps1_input");
-        linker_args.push_back("-lSDL3");
-        linker_args.push_back("-lstdc++");
-        linker_args.push_back("-lm");
-        linker_args.push_back("-lpthread");
-        linker_args.push_back("-ldl");
-        linker_args.push_back("-lc");
-        linker_args.push_back("-lgcc");
-        linker_args.push_back("-lgcc_s");
         linker_args.push_back(nullptr);
         execvp(linker_args[0], const_cast<char* const*>(linker_args.data()));
         _exit(127);

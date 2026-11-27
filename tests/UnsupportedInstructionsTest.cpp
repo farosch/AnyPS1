@@ -98,6 +98,20 @@ int main()
                     }(word));
             }
         }
+        const std::uint32_t ldc_sdc_words[] = {
+                    0xD4200000u,
+                    0xD8200000u,
+                    0xDC200000u,
+                    0xF4200000u,
+                    0xF8200000u,
+                    0xFC200000u
+        };
+        for (const std::uint32_t word : ldc_sdc_words) {
+                    if (!anyps1::is_supported_mips_instruction(word)) {
+                        throw std::runtime_error(
+                            "64-bit coprocessor load/store was classified as unsupported");
+                    }
+        }
 
         const anyps1::UnsupportedInstruction lwc1 =
             anyps1::classify_unsupported_instruction(0xC4200000u);

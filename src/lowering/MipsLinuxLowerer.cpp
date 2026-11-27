@@ -393,13 +393,6 @@ void MipsLinuxLowerer::lower(
     source << "leaq diag_host_loop(%rip), %rsi\n";
     source << "mov $" << host_loop_diag.size() << ", %rdx\n";
     source << "call print_diag\n";
-    source << "leaq diag_host_title(%rip), %rdi\n";
-    source << "call anyps1_host_loop_init\n";
-    source << "call anyps1_host_loop_poll\n";
-    source << "leaq ram(%rip), %rdi\n";
-    source << "mov $" << 640 << ", %esi\n";
-    source << "mov $" << 480 << ", %edx\n";
-    source << "call anyps1_host_loop_present\n";
     source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
     source << "host_runtime_exit:\n";
     source << "call anyps1_host_loop_shutdown\n";
@@ -529,10 +522,14 @@ void MipsLinuxLowerer::lower(
                 switch (instruction) {
                 case 0x48C0C000u: // NCLIP
                     source << "movl gte_data+0(%rip), %eax\n";
-                    source << "movl gte_data+4(%rip), %ecx\n";
-                    source << "movl gte_data+8(%rip), %edx\n";
+                    source << "movl gte_data+20(%rip), %ecx\n";
                     source << "imull %ecx\n";
-                    source << "movl %eax, gte_data+12(%rip)\n";
+                    source << "movl %eax, %esi\n";
+                    source << "movl gte_data+4(%rip), %eax\n";
+                    source << "movl gte_data+16(%rip), %ecx\n";
+                    source << "imull %ecx\n";
+                    source << "subl %eax, %esi\n";
+                    source << "movl %esi, gte_data+12(%rip)\n";
                     break;
                 case 0x48C0C800u: // OP
                     source << "movl gte_data+0(%rip), %eax\n";
@@ -567,8 +564,12 @@ void MipsLinuxLowerer::lower(
                     source << "movl gte_data+0(%rip), %eax\n";
                     source << "movl gte_data+4(%rip), %ecx\n";
                     source << "movl gte_data+8(%rip), %edx\n";
+                    source << "sarl $12, %eax\n";
+                    source << "sarl $12, %ecx\n";
+                    source << "sarl $12, %edx\n";
                     source << "addl %ecx, %eax\n";
                     source << "addl %edx, %eax\n";
+                    source << "shll $12, %eax\n";
                     source << "movl %eax, gte_data+36(%rip)\n";
                     source << "movl %eax, gte_data+40(%rip)\n";
                     source << "movl %eax, gte_data+44(%rip)\n";
@@ -588,6 +589,15 @@ void MipsLinuxLowerer::lower(
                     source << "movl gte_data+0(%rip), %eax\n";
                     source << "movl gte_data+4(%rip), %ecx\n";
                     source << "movl gte_data+8(%rip), %edx\n";
+                    source << "sarl $12, %eax\n";
+                    source << "sarl $12, %ecx\n";
+                    source << "sarl $12, %edx\n";
+                    source << "addl gte_ctrl+48(%rip), %eax\n";
+                    source << "addl gte_ctrl+52(%rip), %ecx\n";
+                    source << "addl gte_ctrl+56(%rip), %edx\n";
+                    source << "shll $12, %eax\n";
+                    source << "shll $12, %ecx\n";
+                    source << "shll $12, %edx\n";
                     source << "movl %eax, gte_data+36(%rip)\n";
                     source << "movl %ecx, gte_data+40(%rip)\n";
                     source << "movl %edx, gte_data+44(%rip)\n";
@@ -1073,7 +1083,9 @@ void MipsLinuxLowerer::lower(
             }
         } else if (opcode == 0x30 || opcode == 0x33 ||
                    opcode == 0x38 || opcode == 0x3B ||
-                   opcode == 0x3E) {
+                   opcode == 0x35 || opcode == 0x36 ||
+                   opcode == 0x37 || opcode == 0x3D ||
+                   opcode == 0x3E || opcode == 0x3F) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
             source << "andl $0x1FFFFFFF, %eax\n";
@@ -1083,6 +1095,15 @@ void MipsLinuxLowerer::lower(
             if (opcode == 0x30) {
                 source << "movl (%rbx,%rax), %eax\n";
                 source << "movl %eax, cop0+" << rt * 4 << "(%rip)\n";
+            } else if (opcode == 0x35) {
+                source << "movq (%rbx,%rax), %xmm0\n";
+                source << "movq %xmm0, fregs+" << rt * 4 << "(%rip)\n";
+            } else if (opcode == 0x36) {
+                source << "movq (%rbx,%rax), %xmm0\n";
+                source << "movq %xmm0, gte_data+" << rt * 4 << "(%rip)\n";
+            } else if (opcode == 0x37) {
+                source << "movq (%rbx,%rax), %xmm0\n";
+                source << "movq %xmm0, cop3_data+" << rt * 4 << "(%rip)\n";
             } else if (opcode == 0x33) {
                 source << "movl (%rbx,%rax), %eax\n";
                 source << "movl %eax, cop3_data+" << rt * 4 << "(%rip)\n";
@@ -1092,6 +1113,15 @@ void MipsLinuxLowerer::lower(
             } else if (opcode == 0x3B) {
                 source << "movl cop3_data+" << rt * 4 << "(%rip), %edx\n";
                 source << "movl %edx, (%rbx,%rax)\n";
+            } else if (opcode == 0x3D) {
+                source << "movq fregs+" << rt * 4 << "(%rip), %xmm0\n";
+                source << "movq %xmm0, (%rbx,%rax)\n";
+            } else if (opcode == 0x3E) {
+                source << "movq gte_data+" << rt * 4 << "(%rip), %xmm0\n";
+                source << "movq %xmm0, (%rbx,%rax)\n";
+            } else if (opcode == 0x3F) {
+                source << "movq cop3_data+" << rt * 4 << "(%rip), %xmm0\n";
+                source << "movq %xmm0, (%rbx,%rax)\n";
             } else {
                 source << "movl gte_data+" << rt * 4 << "(%rip), %edx\n";
                 source << "movl %edx, (%rbx,%rax)\n";
