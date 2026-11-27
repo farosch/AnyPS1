@@ -2,6 +2,8 @@
 
 ## Current relinker blockers
 
+- [x] Split native relinking dispatch into platform-specific `MipsLinuxLowerer`
+  and `MipsWindowsLowerer` classes behind a shared `MipsLowerer` interface.
 - [ ] Replace partial Linux lowering with complete native lowering for every
   statically reachable PS-X instruction and host operation.
 - [x] Remove the legacy fixed-block `write_linux_native` path and make

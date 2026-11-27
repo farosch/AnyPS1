@@ -57,14 +57,14 @@ bool relink(RelinkOptions& options)
     if (load_address < 0x80000000 || load_address >= 0x80200000) throw std::runtime_error("PS-X EXE load address is outside PS1 KSEG0");
     if (initial_pc != 0 && (initial_pc < load_address || initial_pc >= load_address + file_size)) throw std::runtime_error("PS-X EXE entry point is outside the executable image");
 
-    if (*resolved.target == TargetPlatform::Windows) {
-        write_windows_native_cfg(resolved, data);
-        return true;
+    try {
+        create_mips_lowerer(*resolved.target)->lower(resolved, data);
     }
-    try { write_linux_native_cfg(resolved, data); }
     catch (...) {
-        std::filesystem::remove(resolved.output + ".native.s");
-        std::filesystem::remove(resolved.output + ".native.bin");
+        if (*resolved.target == TargetPlatform::Linux) {
+            std::filesystem::remove(resolved.output + ".native.s");
+            std::filesystem::remove(resolved.output + ".native.bin");
+        }
         throw;
     }
     return true;

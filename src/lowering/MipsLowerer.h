@@ -1,13 +1,23 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace anyps1 {
 
 struct RelinkOptions;
-void write_linux_native_cfg(const RelinkOptions& options, const std::vector<unsigned char>& data);
-void write_windows_native_cfg(const RelinkOptions& options, const std::vector<unsigned char>& data);
+enum class TargetPlatform;
+
+class MipsLowerer {
+public:
+    virtual ~MipsLowerer() = default;
+    virtual void lower(
+        const RelinkOptions& options,
+        const std::vector<unsigned char>& data) = 0;
+};
+
+std::unique_ptr<MipsLowerer> create_mips_lowerer(TargetPlatform target);
 
 }

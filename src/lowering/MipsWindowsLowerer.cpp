@@ -1,4 +1,4 @@
-#include "MipsLowerer.h"
+#include "MipsWindowsLowerer.h"
 #include "relinker/Relinker.h"
 #include "format/PsExe.h"
 #include "UnsupportedInstructions.h"
@@ -22,9 +22,9 @@ namespace anyps1 {
 
 namespace {
 
+#ifdef _WIN32
 std::filesystem::path find_windows_tool(const char* name)
 {
-#ifdef _WIN32
     char* tools = nullptr;
     size_t tools_length = 0;
     if (_dupenv_s(&tools, &tools_length, "VCToolsInstallDir") == 0 &&
@@ -34,7 +34,6 @@ std::filesystem::path find_windows_tool(const char* name)
         if (std::filesystem::is_regular_file(candidate)) return candidate;
         std::free(tools);
     }
-#endif
     const std::filesystem::path roots[] = {
         "C:\\Program Files (x86)\\Microsoft Visual Studio",
         "C:\\Program Files\\Microsoft Visual Studio",
@@ -65,7 +64,9 @@ std::filesystem::path find_windows_tool(const char* name)
     throw std::runtime_error(
         std::string("cannot locate MSVC Windows tool: ") + name);
 }
+#endif
 
+#ifdef _WIN32
 std::vector<std::filesystem::path> find_windows_library_dirs()
 {
     std::vector<std::filesystem::path> directories;
@@ -133,7 +134,9 @@ std::vector<std::filesystem::path> find_windows_library_dirs()
 #endif
     return directories;
 }
+#endif
 
+#ifdef _WIN32
 void emit_string(std::ofstream& source,
                  const std::string& label,
                  const std::string& value)
@@ -148,6 +151,7 @@ void emit_string(std::ofstream& source,
     if (!first) source << ',';
     source << "0\n";
 }
+#endif
 
 #ifdef _WIN32
 bool run_windows_tool(const std::filesystem::path& tool,
@@ -184,11 +188,13 @@ bool run_windows_tool(const std::filesystem::path& tool,
 
 }
 
-void write_windows_native_cfg(
+void MipsWindowsLowerer::lower(
     const RelinkOptions& options,
     const std::vector<unsigned char>& data)
 {
 #ifndef _WIN32
+    (void)options;
+    (void)data;
     throw std::runtime_error(
         "native Windows lowering requires an MSVC/ML64 Windows build");
 #else
