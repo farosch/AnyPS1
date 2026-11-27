@@ -693,6 +693,37 @@ void write_linux_native_cfg(
                     source << "roundss $1, fregs+" << fs * 4 << "(%rip), %xmm0\n";
                     source << "cvttss2si %xmm0, %eax\n";
                     source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 5) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "andl $0x7FFFFFFF, %eax\n";
+                    source << "movd %xmm0, %eax\n";
+                    source << "andl $0x7FFFFFFF, %eax\n";
+                    source << "movd %eax, %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 6) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 7) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "movd %xmm0, %eax\n";
+                    source << "xorl $0x80000000, %eax\n";
+                    source << "movd %eax, %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 12) {
+                    source << "roundss $0, fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "cvttss2si %xmm0, %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 13) {
+                    source << "cvttss2si fregs+" << fs * 4 << "(%rip), %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 14) {
+                    source << "roundss $2, fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "cvttss2si %xmm0, %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 15) {
+                    source << "roundss $1, fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "cvttss2si %xmm0, %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
                 } else if (special == 0x20) {
                     source << "cvttss2si fregs+" << fs * 4 << "(%rip), %eax\n";
                     source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
@@ -749,6 +780,54 @@ void write_linux_native_cfg(
                     source << "movl fpcsr(%rip), %eax\n";
                     source << "andl $~1, %eax\n";
                     source << "setbe %dl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
+                } else if (special == 0x35) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "ucomiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "sete %dl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
+                } else if (special == 0x37) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "ucomiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "setbe %dl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
+                } else if (special >= 0x38) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "ucomiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    if (special == 0x38) {
+                        source << "seto %dl\n";
+                    } else if (special == 0x39) {
+                        source << "setne %dl\n";
+                    } else if (special == 0x3A) {
+                        source << "sete %dl\n";
+                    } else if (special == 0x3B) {
+                        source << "setne %dl\n";
+                    } else if (special == 0x3C) {
+                        source << "setl %dl\n";
+                    } else if (special == 0x3D) {
+                        source << "setge %dl\n";
+                    } else if (special == 0x3E) {
+                        source << "setle %dl\n";
+                    } else if (special == 0x3F) {
+                        source << "setg %dl\n";
+                    } else {
+                        source << "movzbl %dl, %edx\n";
+                        source << "movl %eax, fpcsr(%rip)\n";
+                        emit_unsupported_stub(instruction);
+                        return;
+                    }
                     source << "movzbl %dl, %edx\n";
                     source << "orl %edx, %eax\n";
                     source << "movl %eax, fpcsr(%rip)\n";
