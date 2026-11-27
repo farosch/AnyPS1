@@ -33,11 +33,10 @@
 
 ## Linux executable conversion
 
-- [ ] Complete native Linux ELF32/ELF64 executable generation with valid
-  entrypoint, program headers, section headers, permissions, and required
-  host linking.
-- [ ] Link each lowered executable with only host-native code and host-native
-  data.
+- [x] Complete native Linux ELF64 executable generation with valid entrypoint,
+  program headers, section headers, permissions, and static host linking.
+- [x] Link each lowered executable with host-native code and host-native data;
+  reject dynamic dependencies and unsupported executable layout state.
 - [x] Add real Linux launch fixtures and verify them with `file`, `readelf`,
   execution, and exit status.
 - [x] Add native executable terminal diagnostics with target, addresses, GP/SP,

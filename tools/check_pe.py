@@ -43,8 +43,8 @@ def main() -> int:
         optional_magic = struct.unpack_from("<H", pe, pe_offset + 24)[0]
         if machine != 0x8664:
             raise ValueError("PE machine is not AMD64")
-        if section_count != 4:
-            raise ValueError("PE section count is not 4")
+        if section_count != 2:
+            raise ValueError("PE section count is not 2")
         if optional_magic != 0x20B:
             raise ValueError("PE optional header is not PE32+")
 

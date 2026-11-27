@@ -44,6 +44,8 @@ Relink a Linux executable:
 
 The relinker reads `SYSTEM.CNF`, locates the boot PS-X executable, and writes
 `game.elf` in the supplied directory.
+Linux output is an ELF64, statically linked, non-PIE x86-64 executable with
+native `_start`, ELF program/section headers, and no dynamic library dependencies.
 
 Windows conversion emits a PE32+ console artifact with native Windows host
 diagnostics:

@@ -113,6 +113,29 @@ int main(int argc, char** argv)
             || elf_magic[2] != 'L' || elf_magic[3] != 'F') {
             throw std::runtime_error("invalid native ELF output");
         }
+        FILE* elf_header = popen(
+            "readelf -h -l -S -d /tmp/anyps1-relinker-test/game.elf",
+            "r");
+        if (elf_header == nullptr) {
+            throw std::runtime_error("cannot inspect generated ELF");
+        }
+        std::string elf_diagnostics;
+        std::array<char, 256> elf_capture{};
+        while (std::fgets(elf_capture.data(), static_cast<int>(elf_capture.size()), elf_header) != nullptr) {
+            elf_diagnostics += elf_capture.data();
+        }
+        const int elf_status = pclose(elf_header);
+        if (elf_status != 0) {
+            throw std::runtime_error("readelf rejected generated ELF");
+        }
+        if (elf_diagnostics.find("ELF64") == std::string::npos
+            || elf_diagnostics.find("Advanced Micro Devices X86-64") == std::string::npos
+            || elf_diagnostics.find("Start of program headers:") == std::string::npos
+            || elf_diagnostics.find("Start of section headers:") == std::string::npos
+            || elf_diagnostics.find("NEEDED") != std::string::npos
+            || elf_diagnostics.find("Dynamic section") != std::string::npos) {
+            throw std::runtime_error("generated ELF lacks valid static host-native metadata");
+        }
         FILE* executable = popen(output_path, "r");
         if (executable == nullptr) {
             throw std::runtime_error("cannot start native ELF artifact");
@@ -187,10 +210,10 @@ int main(int argc, char** argv)
         }
         const std::uint32_t optional_offset = pe_offset + 24;
         const std::uint32_t number_of_rva =
-            static_cast<std::uint32_t>(pe_bytes[optional_offset + 112])
-            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 113]) << 8)
-            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 114]) << 16)
-            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 115]) << 24);
+            static_cast<std::uint32_t>(pe_bytes[optional_offset + 108])
+            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 109]) << 8)
+            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 110]) << 16)
+            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 111]) << 24);
         if (number_of_rva != 16) {
             throw std::runtime_error("Windows PE output has invalid RVA directory count");
         }
