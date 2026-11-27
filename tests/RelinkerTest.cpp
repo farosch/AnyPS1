@@ -85,7 +85,7 @@ int main(int argc, char** argv)
             if (!anyps1::relink(bios_windows_options)) {
                 throw std::runtime_error("partial BIOS-vector fixture Windows relink failed");
             }
-            std::ifstream bios_pe("/tmp/anyps1-relinker-test/game.exe", std::ios::binary);
+            std::ifstream bios_pe(windows_output_path, std::ios::binary);
             char bios_magic[2]{};
             bios_pe.read(bios_magic, 2);
             if (bios_pe.gcount() != 2 || bios_magic[0] != 'M' || bios_magic[1] != 'Z') {

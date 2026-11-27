@@ -2,6 +2,7 @@
 #include "relinker/Relinker.h"
 #include "format/PsExe.h"
 #include "UnsupportedInstructions.h"
+#include "executable/PeWriter.h"
 #include "host/HostServices.h"
 
 #include <cstdint>
@@ -194,10 +195,11 @@ void MipsWindowsLowerer::lower(
     const std::vector<unsigned char>& data)
 {
 #ifndef _WIN32
-    (void)options;
-    (void)data;
-    throw std::runtime_error(
-        "native Windows lowering requires an MSVC/ML64 Windows build");
+    write_pe_layout(
+        options,
+        data,
+        read_psx32(data, 0x18),
+        read_psx32(data, 0x1C));
 #else
     const std::uint32_t file_size = read_psx32(data, 0x1C);
     const std::uint32_t load_address = read_psx32(data, 0x18);
