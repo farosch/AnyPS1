@@ -248,6 +248,7 @@ void MipsWindowsLowerer::lower(
     std::uint32_t first_unsupported_word = 0;
     std::string first_unsupported_name;
     std::set<std::string> unsupported_family_names;
+    std::set<std::uint32_t> emittable_leaders;
 
     while (!work.empty()) {
         const std::uint32_t address = work.front();
@@ -350,6 +351,7 @@ void MipsWindowsLowerer::lower(
             ++embedded_data_count;
             continue;
         }
+        emittable_leaders.insert(address);
         if (region == PayloadRegionKind::Unknown) ++unknown_region_count;
         ++reachable_count;
         if (!is_supported_mips_instruction(instruction)) {
@@ -489,6 +491,16 @@ void MipsWindowsLowerer::lower(
     source << "mov ecx,16\n";
     source << "call ExitProcess\n";
     source << "unsupported_exit ENDP\n";
+    source << "indirect_jump PROC\n";
+    for (std::uint32_t target : emittable_leaders) {
+        if (target >= load_address &&
+            target < static_cast<std::uint64_t>(load_address) + file_size) {
+            source << "cmp eax," << target << "\n";
+            source << "je p" << std::hex << target << std::dec << "\n";
+        }
+    }
+    source << "jmp unsupported_exit\n";
+    source << "indirect_jump ENDP\n";
     source << "main PROC\n";
     source << "sub rsp,40\n";
     source << "mov ecx,-11\n";
@@ -525,6 +537,14 @@ void MipsWindowsLowerer::lower(
     source << "lea r12,regs\n";
     source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
 
+    auto emit_label_jump = [&](std::uint32_t target) {
+        if (emittable_leaders.find(target) != emittable_leaders.end()) {
+            source << "jmp p" << std::hex << target << std::dec << "\n";
+        } else {
+            source << "jmp unsupported_exit\n";
+        }
+    };
+
     for (std::uint32_t address : leaders) {
         if (address < load_address ||
             address >= static_cast<std::uint64_t>(load_address) + file_size ||
@@ -540,7 +560,7 @@ void MipsWindowsLowerer::lower(
         const std::uint32_t shamt = (instruction >> 6) & 31u;
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
-        source << "p" << std::hex << address << std::dec << ":\n";
+        source << "p" << std::hex << address << std::dec << "::\n";
         source << "mov al,byte ptr pending_load_valid\n";
         source << "mov byte ptr previous_load_valid,al\n";
         source << "mov al,byte ptr pending_load_register\n";
@@ -572,27 +592,34 @@ void MipsWindowsLowerer::lower(
                         ((predecessor + 4) & 0xF0000000u) |
                         ((predecessor_instruction & 0x03FFFFFFu) << 2);
                     source << "cmp byte ptr delay_redirect_valid,0\n";
-                    source << "je p"
-                           << std::hex << (address + 4) << std::dec << "\n";
-                    source << "jmp p"
-                           << std::hex << target << std::dec << "\n";
+                    if (emittable_leaders.find(address + 4) !=
+                        emittable_leaders.end()) {
+                        source << "je p"
+                               << std::hex << (address + 4) << std::dec << "\n";
+                    } else {
+                        source << "je unsupported_exit\n";
+                    }
+                    if (target >= load_address &&
+                        target < static_cast<std::uint64_t>(load_address) + file_size &&
+                        emittable_leaders.find(target) != emittable_leaders.end()) {
+                        source << "jmp p"
+                               << std::hex << target << std::dec << "\n";
+                    } else {
+                        source << "jmp unsupported_exit\n";
+                    }
                 } else if (predecessor_opcode == 0 &&
                            ((predecessor_instruction & 63u) == 0x08 ||
                             (predecessor_instruction & 63u) == 0x09)) {
                     source << "cmp byte ptr delay_redirect_valid,0\n";
-                    source << "je p"
-                           << std::hex << (address + 4) << std::dec << "\n";
-                    source << "mov eax,dword ptr delay_redirect_address\n";
-                    for (std::uint32_t target : leaders) {
-                        if (target >= load_address &&
-                            target < static_cast<std::uint64_t>(
-                                load_address) + file_size) {
-                            source << "cmp eax," << target << "\n";
-                            source << "je p"
-                                   << std::hex << target << std::dec << "\n";
-                        }
+                    if (emittable_leaders.find(address + 4) !=
+                        emittable_leaders.end()) {
+                        source << "je p"
+                               << std::hex << (address + 4) << std::dec << "\n";
+                    } else {
+                        source << "je unsupported_exit\n";
                     }
-                    source << "jmp unsupported_exit\n";
+                    source << "mov eax,dword ptr delay_redirect_address\n";
+                    source << "jmp indirect_jump\n";
                 } else if ((predecessor_opcode >= 0x04 &&
                      predecessor_opcode <= 0x07) ||
                     predecessor_opcode == 0x01 ||
@@ -608,10 +635,21 @@ void MipsWindowsLowerer::lower(
                             static_cast<std::int64_t>(predecessor) +
                             4 + displacement);
                     source << "cmp byte ptr delay_redirect_valid,0\n";
-                    source << "je p"
-                           << std::hex << (address + 4) << std::dec << "\n";
-                    source << "jmp p"
-                           << std::hex << target << std::dec << "\n";
+                    if (emittable_leaders.find(address + 4) !=
+                        emittable_leaders.end()) {
+                        source << "je p"
+                               << std::hex << (address + 4) << std::dec << "\n";
+                    } else {
+                        source << "je unsupported_exit\n";
+                    }
+                    if (target >= load_address &&
+                        target < static_cast<std::uint64_t>(load_address) + file_size &&
+                        emittable_leaders.find(target) != emittable_leaders.end()) {
+                        source << "jmp p"
+                               << std::hex << target << std::dec << "\n";
+                    } else {
+                        source << "jmp unsupported_exit\n";
+                    }
                 }
             }
             continue;
@@ -716,7 +754,7 @@ void MipsWindowsLowerer::lower(
                 source << "mov byte ptr pending_load_register,al\n";
                 source << "mov eax,dword ptr previous_load_value\n";
                 source << "mov dword ptr pending_load_value,eax\n";
-                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+                emit_label_jump(address + 4);
             } else if (special == 0x09) {
                 source << "mov dword ptr [r12+" << rd * 4 << "],"
                        << address + 8 << "\n";
@@ -729,7 +767,7 @@ void MipsWindowsLowerer::lower(
                 source << "mov byte ptr pending_load_register,al\n";
                 source << "mov eax,dword ptr previous_load_value\n";
                 source << "mov dword ptr pending_load_value,eax\n";
-                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+                emit_label_jump(address + 4);
             } else if (special == 0x0C) {
                 source << "mov ecx,0\n";
                 source << "call ExitProcess\n";
@@ -913,6 +951,16 @@ void MipsWindowsLowerer::lower(
                    opcode == 0x14 || opcode == 0x15 ||
                    opcode == 0x16 || opcode == 0x17 ||
                    opcode == 0x01 || opcode == 0x11) {
+            const std::int32_t displacement =
+                static_cast<std::int32_t>(
+                    static_cast<std::int16_t>(immediate)) * 4;
+            const std::uint32_t target =
+                static_cast<std::uint32_t>(
+                    static_cast<std::int64_t>(address) + 4 + displacement);
+            const bool valid_target =
+                target >= load_address &&
+                target < static_cast<std::uint64_t>(load_address) + file_size &&
+                emittable_leaders.find(target) != emittable_leaders.end();
             source << "mov byte ptr delay_redirect_valid,0\n";
             const std::string taken_label =
                 "branch_taken_" + std::to_string(address);
@@ -964,20 +1012,28 @@ void MipsWindowsLowerer::lower(
             source << "mov byte ptr pending_load_register,al\n";
             source << "mov eax,dword ptr previous_load_value\n";
             source << "mov dword ptr pending_load_value,eax\n";
-            source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+            emit_label_jump(address + 4);
             source << taken_label << ":\n";
-            source << "mov byte ptr delay_redirect_valid,1\n";
-            source << "mov al,byte ptr previous_load_valid\n";
-            source << "mov byte ptr pending_load_valid,al\n";
-            source << "mov al,byte ptr previous_load_register\n";
-            source << "mov byte ptr pending_load_register,al\n";
-            source << "mov eax,dword ptr previous_load_value\n";
-            source << "mov dword ptr pending_load_value,eax\n";
-            source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+            if (!valid_target) {
+                source << "jmp unsupported_exit\n";
+            } else {
+                source << "mov byte ptr delay_redirect_valid,1\n";
+                source << "mov al,byte ptr previous_load_valid\n";
+                source << "mov byte ptr pending_load_valid,al\n";
+                source << "mov al,byte ptr previous_load_register\n";
+                source << "mov byte ptr pending_load_register,al\n";
+                source << "mov eax,dword ptr previous_load_value\n";
+                source << "mov dword ptr pending_load_value,eax\n";
+                emit_label_jump(address + 4);
+            }
         } else if (opcode == 0x02 || opcode == 0x03) {
             const std::uint32_t target =
                 ((address + 4) & 0xF0000000u) |
                 ((instruction & 0x03FFFFFFu) << 2);
+            const bool valid_target =
+                target >= load_address &&
+                target < static_cast<std::uint64_t>(load_address) + file_size &&
+                emittable_leaders.find(target) != emittable_leaders.end();
             if (opcode == 0x03) {
                 source << "mov dword ptr [r12+124]," << address + 8 << "\n";
                 const Ps1FileCallPlan file_call =
@@ -1033,7 +1089,7 @@ void MipsWindowsLowerer::lower(
                         source << "mov r8d,dword ptr [r12+24]\n";
                         source << "call CreateFileA\n";
                     }
-                } else {
+                } else if (valid_target) {
                     source << "mov byte ptr delay_redirect_valid,1\n";
                     source << "mov al,byte ptr previous_load_valid\n";
                     source << "mov byte ptr pending_load_valid,al\n";
@@ -1041,17 +1097,23 @@ void MipsWindowsLowerer::lower(
                     source << "mov byte ptr pending_load_register,al\n";
                     source << "mov eax,dword ptr previous_load_value\n";
                     source << "mov dword ptr pending_load_value,eax\n";
-                    source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+                    emit_label_jump(address + 4);
+                } else {
+                    source << "jmp unsupported_exit\n";
                 }
             } else {
-                source << "mov byte ptr delay_redirect_valid,1\n";
+                if (!valid_target) {
+                    source << "jmp unsupported_exit\n";
+                } else {
+                    source << "mov byte ptr delay_redirect_valid,1\n";
                 source << "mov al,byte ptr previous_load_valid\n";
                 source << "mov byte ptr pending_load_valid,al\n";
                 source << "mov al,byte ptr previous_load_register\n";
                 source << "mov byte ptr pending_load_register,al\n";
                 source << "mov eax,dword ptr previous_load_value\n";
                 source << "mov dword ptr pending_load_value,eax\n";
-                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+                    emit_label_jump(address + 4);
+                }
             }
         } else if (opcode == 0x23 || opcode == 0x21 ||
                    opcode == 0x20 || opcode == 0x24 || opcode == 0x25 ||
@@ -1212,27 +1274,34 @@ void MipsWindowsLowerer::lower(
                         ((predecessor + 4) & 0xF0000000u) |
                         ((predecessor_instruction & 0x03FFFFFFu) << 2);
                     source << "cmp byte ptr delay_redirect_valid,0\n";
-                    source << "je p"
-                           << std::hex << (address + 4) << std::dec << "\n";
-                    source << "jmp p"
-                           << std::hex << target << std::dec << "\n";
+                    if (emittable_leaders.find(address + 4) !=
+                        emittable_leaders.end()) {
+                        source << "je p"
+                               << std::hex << (address + 4) << std::dec << "\n";
+                    } else {
+                        source << "je unsupported_exit\n";
+                    }
+                    if (target >= load_address &&
+                        target < static_cast<std::uint64_t>(load_address) + file_size &&
+                        emittable_leaders.find(target) != emittable_leaders.end()) {
+                        source << "jmp p"
+                               << std::hex << target << std::dec << "\n";
+                    } else {
+                        source << "jmp unsupported_exit\n";
+                    }
                 } else if (predecessor_opcode == 0 &&
                            ((predecessor_instruction & 63u) == 0x08 ||
                             (predecessor_instruction & 63u) == 0x09)) {
                     source << "cmp byte ptr delay_redirect_valid,0\n";
-                    source << "je p"
-                           << std::hex << (address + 4) << std::dec << "\n";
-                    source << "mov eax,dword ptr delay_redirect_address\n";
-                    for (std::uint32_t target : leaders) {
-                        if (target >= load_address &&
-                            target < static_cast<std::uint64_t>(
-                                load_address) + file_size) {
-                            source << "cmp eax," << target << "\n";
-                            source << "je p"
-                                   << std::hex << target << std::dec << "\n";
-                        }
+                    if (emittable_leaders.find(address + 4) !=
+                        emittable_leaders.end()) {
+                        source << "je p"
+                               << std::hex << (address + 4) << std::dec << "\n";
+                    } else {
+                        source << "je unsupported_exit\n";
                     }
-                    source << "jmp unsupported_exit\n";
+                    source << "mov eax,dword ptr delay_redirect_address\n";
+                    source << "jmp indirect_jump\n";
                 } else if ((predecessor_opcode >= 0x04 &&
                      predecessor_opcode <= 0x07) ||
                     predecessor_opcode == 0x01 ||
@@ -1250,8 +1319,14 @@ void MipsWindowsLowerer::lower(
                     source << "cmp byte ptr delay_redirect_valid,0\n";
                     source << "je p"
                            << std::hex << (address + 4) << std::dec << "\n";
-                    source << "jmp p"
-                           << std::hex << target << std::dec << "\n";
+                    if (target >= load_address &&
+                        target < static_cast<std::uint64_t>(load_address) + file_size &&
+                        emittable_leaders.find(target) != emittable_leaders.end()) {
+                        source << "jmp p"
+                               << std::hex << target << std::dec << "\n";
+                    } else {
+                        source << "jmp unsupported_exit\n";
+                    }
                 }
             }
         }
@@ -1305,8 +1380,19 @@ void MipsWindowsLowerer::lower(
         throw std::runtime_error(
             "native Windows lowering linker failed");
     }
-    std::filesystem::remove(assembly);
-    std::filesystem::remove(object);
+    char* keep_assembly = nullptr;
+    size_t keep_assembly_length = 0;
+    const bool keep =
+        _dupenv_s(
+            &keep_assembly,
+            &keep_assembly_length,
+            "ANYPS1_KEEP_ASSEMBLY") == 0 &&
+        keep_assembly != nullptr;
+    std::free(keep_assembly);
+    if (!keep) {
+        std::filesystem::remove(assembly);
+        std::filesystem::remove(object);
+    }
 #endif
 }
 

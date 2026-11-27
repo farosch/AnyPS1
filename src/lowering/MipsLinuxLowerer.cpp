@@ -72,6 +72,7 @@ void MipsLinuxLowerer::lower(
     std::uint32_t call_edges = 0;
     std::uint32_t unresolved_indirect_transfers = 0;
     std::set<std::string> unsupported_family_names;
+    std::set<std::uint32_t> emittable_leaders;
     bool native_host_loop_required = false;
     leaders.insert(initial_pc);
     work.push(initial_pc);
@@ -180,6 +181,7 @@ void MipsLinuxLowerer::lower(
             ++embedded_data_count;
             continue;
         }
+        emittable_leaders.insert(address);
         if (region == PayloadRegionKind::Unknown) {
             ++unknown_region_count;
         }
@@ -371,6 +373,12 @@ void MipsLinuxLowerer::lower(
     source << "mov $1, %eax\n";
     source << "syscall\n";
     source << "ret\n";
+    source << "indirect_jump:\n";
+    for (std::uint32_t indirect_target : emittable_leaders) {
+        source << "cmpl $" << indirect_target << ", %eax\n";
+        source << "je p" << std::hex << indirect_target << std::dec << "\n";
+    }
+    source << "jmp unsupported_jump_exit\n";
     auto emit_unsupported_stub = [&](std::uint32_t instruction) {
         const UnsupportedInstruction unsupported =
             classify_unsupported_instruction(instruction);
@@ -1286,6 +1294,13 @@ void MipsLinuxLowerer::lower(
         source << "movl $0, 0(%r12)\n";
     };
     std::set<std::uint32_t> emitted_delay_slots;
+    auto emit_label_jump = [&](std::uint32_t target) {
+        if (emittable_leaders.find(target) != emittable_leaders.end()) {
+            source << "jmp p" << std::hex << target << std::dec << "\n";
+        } else {
+            source << "jmp unsupported_jump_exit\n";
+        }
+    };
     for (std::uint32_t address : leaders) {
         if (address < load_address || address >= load_address + file_size) continue;
         const std::uint32_t offset = address - load_address;
@@ -1324,7 +1339,7 @@ void MipsLinuxLowerer::lower(
             }
             emitted_delay_slots.insert(address);
             if (!address_is_control) {
-                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+                emit_label_jump(address + 4);
                 continue;
             }
         }
@@ -1354,8 +1369,8 @@ void MipsLinuxLowerer::lower(
                 static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
             const std::uint32_t branch_target =
                 static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
-            if (branch_target < load_address || branch_target >= load_address + file_size ||
-                leaders.find(branch_target) == leaders.end()) {
+            if (emittable_leaders.find(branch_target) ==
+                emittable_leaders.end()) {
                 source << "jmp unsupported_jump_exit\n";
             } else if (opcode == 0x11 && (rs == 8 || rs == 12)) {
                 source << "movl fpcsr(%rip), %eax\n";
@@ -1405,7 +1420,7 @@ void MipsLinuxLowerer::lower(
                     emit_unsupported_stub(instruction);
                 }
             }
-            source << "jmp p" << std::hex << (address + 8) << std::dec << "\n";
+            emit_label_jump(address + 8);
         } else if (jump) {
             const std::uint32_t jump_target =
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
@@ -1474,15 +1489,15 @@ void MipsLinuxLowerer::lower(
                         source << "syscall\n";
                         source << "movl %eax, 8(%r12)\n";
                     }
-                } else if (jump_target >= load_address && jump_target < load_address + file_size &&
-                    leaders.find(jump_target) != leaders.end()) {
+                } else if (emittable_leaders.find(jump_target) !=
+                           emittable_leaders.end()) {
                     source << "call p" << std::hex << jump_target << std::dec << "\n";
                 } else {
                     source << "jmp unsupported_jump_exit\n";
                 }
             } else {
-                if (jump_target >= load_address && jump_target < load_address + file_size &&
-                    leaders.find(jump_target) != leaders.end()) {
+                if (emittable_leaders.find(jump_target) !=
+                    emittable_leaders.end()) {
                     source << "jmp p" << std::hex << jump_target << std::dec << "\n";
                 } else {
                     source << "jmp unsupported_jump_exit\n";
@@ -1493,13 +1508,7 @@ void MipsLinuxLowerer::lower(
                 source << "ret\n";
             } else {
                 source << "movl " << rs * 4 << "(%r12), %eax\n";
-                for (std::uint32_t leader_target : leaders) {
-                    if (leader_target >= load_address && leader_target < load_address + file_size) {
-                        source << "cmpl $" << leader_target << ", %eax\n";
-                        source << "je p" << std::hex << leader_target << std::dec << "\n";
-                    }
-                }
-                source << "jmp unsupported_jump_exit\n";
+                source << "jmp indirect_jump\n";
             }
         } else if (jalr) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
@@ -1511,11 +1520,10 @@ void MipsLinuxLowerer::lower(
                     file_size,
                     address,
                     rs);
-            if (resolved_target >= load_address &&
-                resolved_target < load_address + file_size &&
-                leaders.find(resolved_target) != leaders.end()) {
+            if (emittable_leaders.find(resolved_target) !=
+                emittable_leaders.end()) {
                 source << "call p" << std::hex << resolved_target << std::dec << "\n";
-                source << "jmp p" << std::hex << address + 8 << std::dec << "\n";
+                emit_label_jump(address + 8);
             } else {
                 source << "jmp unsupported_jump_exit\n";
             }

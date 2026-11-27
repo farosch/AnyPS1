@@ -85,6 +85,26 @@ class LoweringInventoryTest(unittest.TestCase):
                 windows,
                 f"Windows lowerer is missing host/CFG parity feature {pattern}",
             )
+        self.assertEqual(
+            windows.count('source << "indirect_jump PROC\\n";'),
+            1,
+            "Windows indirect dispatch must use one shared leader table",
+        )
+        self.assertNotIn(
+            "for (std::uint32_t target : leaders)",
+            windows,
+            "Windows lowering must not duplicate leader scans per instruction",
+        )
+        self.assertEqual(
+            linux.count('source << "indirect_jump:\\n";'),
+            1,
+            "Linux indirect dispatch must use one shared leader table",
+        )
+        self.assertNotIn(
+            "for (std::uint32_t leader_target : leaders)",
+            linux,
+            "Linux lowering must not duplicate leader scans per JR",
+        )
 
         graphics = ROOT / "src" / "gpu" / "Graphics.cpp"
         graphics_text = graphics.read_text(encoding="utf-8")

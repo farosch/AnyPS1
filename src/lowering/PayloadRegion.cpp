@@ -44,16 +44,15 @@ PayloadRegionKind classify_payload_region(
     (void)address;
     if (!reached_by_cfg) return PayloadRegionKind::EmbeddedData;
     if (word == 0) return PayloadRegionKind::Instruction;
-    if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {
-        return PayloadRegionKind::EmbeddedData;
-    }
-
     const std::uint32_t opcode = word >> 26;
     if (opcode == 0x00 || opcode == 0x01 ||
         opcode == 0x02 || opcode == 0x03 ||
         (opcode >= 0x04 && opcode <= 0x0F) ||
         (opcode >= 0x20 && opcode <= 0x2E)) {
         return PayloadRegionKind::Instruction;
+    }
+    if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {
+        return PayloadRegionKind::EmbeddedData;
     }
     return PayloadRegionKind::Unknown;
 }
