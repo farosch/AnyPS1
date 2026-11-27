@@ -6,8 +6,8 @@
   and `MipsWindowsLowerer` classes behind a shared `MipsLowerer` interface.
 - [ ] Replace partial Linux lowering with complete native lowering for every
   statically reachable PS-X instruction and host operation.
-- [x] Remove the legacy fixed-block `write_linux_native` path and make
-  `write_linux_native_cfg` the only Linux lowering implementation.
+- [x] Remove legacy fixed-block Linux lowering paths; route Linux relinking
+  exclusively through `MipsLinuxLowerer::lower`.
 - [x] Improve CFG discovery beyond static leaders. Resolve JALR targets when
   they are statically provable, preserve indirect-call edges, and emit explicit
   unsupported exits for unresolved indirect control flow.
@@ -130,20 +130,20 @@
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
 - [x] Implement native file lowering for open/read/write/seek/close operations
   in Linux/Windows lowering at PS1 A0 file-vector calls.
-- [x] Integrate input polling into the actual generated executable loop.
-- [x] Integrate SDL3 window creation and event pumping into the Linux/Windows
+- [ ] Integrate input polling into the actual generated executable loop.
+- [ ] Integrate SDL3 window creation and event pumping into the Linux/Windows
   generated executable loop.
-- [x] Integrate native audio lowering for PS1 SPU operations into generated
+- [ ] Integrate native audio lowering for PS1 SPU operations into generated
   executable loops.
-- [x] Integrate native video framebuffer presentation into generated executable
+- [ ] Integrate native video framebuffer presentation into generated executable
   loops.
-- [x] Integrate native Vulkan swapchain, image, sampler, pipeline, and
+- [ ] Integrate native Vulkan swapchain, image, sampler, pipeline, and
   command-buffer resources.
-- [x] Expose host-native diagnostics through generated executable structured
+- [ ] Expose host-native diagnostics through generated executable structured
   exit codes and logs.
-- [x] Integrate title-independent memory-card storage mapping into generated
+- [ ] Integrate title-independent memory-card storage mapping into generated
   executable loops.
-- [x] Integrate title-independent CD/disc filesystem and asset access mapping
+- [ ] Integrate title-independent CD/disc filesystem and asset access mapping
   into generated executable loops.
 - [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.

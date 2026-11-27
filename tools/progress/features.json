@@ -3,77 +3,77 @@
     {
       "name": "MIPS arithmetic",
       "items": [
-        {"name":"SLL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x00"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
-        {"name":"SRL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x02"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
-        {"name":"SRA","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x03"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
-        {"name":"SLLV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x04"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"SRLV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x06"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"SRAV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x07"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"ADD","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x20"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"ADDU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x21"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
-        {"name":"SUB","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x22"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"SUBU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x23"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"AND","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x24"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"OR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x25"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"XOR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x26"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"NOR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x27"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"SLT","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x2A"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"SLTU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x2B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"MULT","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x18"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"MULTU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x19"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"DIV","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x1A"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"DIVU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x1B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"MFHI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x10"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"MFLO","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x12"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"MTHI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x11"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"MTLO","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x13"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]}
+        {"name":"SLL","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x00"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SRL","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x02"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SRA","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x03"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SLLV","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x04"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SRLV","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x06"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SRAV","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x07"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ADD","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x20"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ADDU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x21"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"SUB","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x22"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SUBU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x23"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"AND","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x24"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"OR","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x25"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"XOR","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x26"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"NOR","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x27"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SLT","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x2A"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"SLTU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x2B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MULT","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x18"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MULTU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x19"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"DIV","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x1A"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"DIVU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x1B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MFHI","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x10"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MFLO","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x12"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MTHI","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x11"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"MTLO","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x13"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]}
       ]
     },
     {
       "name":"MIPS immediate/load/store",
       "items":[
-        {"name":"ADDI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x08"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"ADDIU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x09"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
-        {"name":"ANDI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0C"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"ORI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0D"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"XORI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0E"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"LUI","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x0F"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"LB","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x20"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"LH","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x21"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"LW","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x23"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"LBU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x24"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"LHU","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x25"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"SB","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x28"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"SH","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x29"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"SW","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x2B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
-        {"name":"LWL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x22"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-unaligned"]}]},
-        {"name":"LWR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x26"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-unaligned"]}]}
+        {"name":"ADDI","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x08"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ADDIU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x09"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-subset"]}]},
+        {"name":"ANDI","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x0C"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"ORI","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x0D"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"XORI","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x0E"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"LUI","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x0F"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"LB","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x20"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LH","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x21"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LW","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x23"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LBU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x24"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LHU","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x25"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"SB","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x28"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"SH","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x29"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"SW","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x2B"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-memory"]}]},
+        {"name":"LWL","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x22"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-unaligned"]}]},
+        {"name":"LWR","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x26"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-unaligned"]}]}
       ]
     },
     {
       "name":"MIPS control",
       "items":[
-        {"name":"BEQ","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x04"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"BNE","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x05"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"BLEZ","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x06"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"BGTZ","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x07"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"J","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x02"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"JAL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x03"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"JR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x08"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
-        {"name":"JALR","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x09"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]},{"path":"tests/RelinkerTest.cpp","patterns":["static JALR"]}]},
-        {"name":"SYSCALL","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x0C"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["host-integration"]}]},
-        {"name":"BREAK","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["special == 0x0D"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]}
+        {"name":"BEQ","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x04"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"BNE","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x05"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"BLEZ","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x06"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"BGTZ","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x07"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"J","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x02"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"JAL","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x03"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"JR","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x08"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]},
+        {"name":"JALR","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x09"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]},{"path":"tests/RelinkerTest.cpp","patterns":["static JALR"]}]},
+        {"name":"SYSCALL","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x0C"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["host-integration"]}]},
+        {"name":"BREAK","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["special == 0x0D"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native-comprehensive"]}]}
       ]
     },
     {
       "name":"COP0/COP2",
       "items":[
-        {"name":"MFC0","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x10"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["cop0_rs == 0"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
-        {"name":"MTC0","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x10"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["cop0_rs == 4"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
-        {"name":"RFE","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["0x10: 16"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
-        {"name":"COP2/GTE","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x12"]},{"path":"src/lowering/UnsupportedInstructions.cpp","patterns":["COP2","GTE"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_cop2_stub"]}]},
-        {"name":"COP1","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x11"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_cop1_stub"]}]},
-        {"name":"COP3","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["opcode == 0x13"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_cop3_stub"]}]}
+        {"name":"MFC0","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x10"]},{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["cop0_rs == 0"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
+        {"name":"MTC0","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x10"]},{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["cop0_rs == 4"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
+        {"name":"RFE","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["0x10: 16"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["cfg_cop0"]}]},
+        {"name":"COP2/GTE","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x12"]},{"path":"src/lowering/UnsupportedInstructions.cpp","patterns":["COP2","GTE"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["unsupported_cop2_stub"]}]},
+        {"name":"COP1","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x11"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["unsupported_cop1_stub"]}]},
+        {"name":"COP3","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["opcode == 0x13"]}],"unsupported_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["unsupported_cop3_stub"]}]}
       ]
     },
     {
@@ -88,9 +88,9 @@
     {
       "name":"Executable writers",
       "items":[
-        {"name":"Linux ELF","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["write_linux_native_cfg"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["gcc -nostdlib"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native ELF"]},{"path":"tests/RelinkerTest.cpp","patterns":["native_elF"]}]},
-        {"name":"Windows PE","source_patterns":[{"path":"src/executable/PeWriter.cpp","patterns":["write_pe_layout"]}],"unsupported_patterns":[{"path":"src/executable/PeWriter.cpp","patterns":["native Windows MIPS lowering is not implemented"]}]},
-        {"name":"Native diagnostics","source_patterns":[{"path":"src/lowering/MipsLowerer.cpp","patterns":["native executable diagnostics"]},{"path":"src/lowering/MipsLowerer.cpp","patterns":["unsupported_instructions"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native"]}]}
+        {"name":"Linux ELF","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["MipsLinuxLowerer::lower"]},{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["gcc -nostdlib"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native ELF"]},{"path":"tests/RelinkerTest.cpp","patterns":["native_elF"]}]},
+        {"name":"Windows PE","source_patterns":[{"path":"src/executable/PeWriter.cpp","patterns":["write_pe_layout"]},{"path":"src/lowering/MipsWindowsLowerer.cpp","patterns":["MipsWindowsLowerer::lower"]}]},
+        {"name":"Native diagnostics","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["native executable diagnostics"]},{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["unsupported_instructions"]},{"path":"src/lowering/MipsWindowsLowerer.cpp","patterns":["native executable diagnostics"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native"]}]}
       ]
     },
     {
