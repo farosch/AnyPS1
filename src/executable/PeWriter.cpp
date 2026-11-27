@@ -102,9 +102,6 @@ void write_pe_layout(const RelinkOptions& options,
         "initial_sp=" + hex32(initial_sp) + "\n"
         "payload_size=" + std::to_string(file_size) + "\n"
         "native Windows MIPS lowering is not implemented\n";
-    if (diagnostics.size() > 128u) {
-        diagnostics.resize(128u);
-    }
 
     std::vector<unsigned char> pe(RAW_HEADERS_SIZE, 0);
     pe[0] = 'M';
@@ -132,10 +129,14 @@ void write_pe_layout(const RelinkOptions& options,
     write_u32(pe, OPTIONAL_OFFSET + 32, SECTION_ALIGNMENT);
     write_u32(pe, OPTIONAL_OFFSET + 36, FILE_ALIGNMENT);
     write_u16(pe, OPTIONAL_OFFSET + 40, 6);
+    write_u16(pe, OPTIONAL_OFFSET + 42, 0);
+    write_u16(pe, OPTIONAL_OFFSET + 44, 6);
+    write_u16(pe, OPTIONAL_OFFSET + 46, 0);
     write_u16(pe, OPTIONAL_OFFSET + 48, 6);
-    write_u16(pe, OPTIONAL_OFFSET + 56, 0);
-    write_u32(pe, OPTIONAL_OFFSET + 60, IMAGE_SIZE);
-    write_u32(pe, OPTIONAL_OFFSET + 64, RAW_HEADERS_SIZE);
+    write_u16(pe, OPTIONAL_OFFSET + 50, 0);
+    write_u32(pe, OPTIONAL_OFFSET + 56, IMAGE_SIZE);
+    write_u32(pe, OPTIONAL_OFFSET + 60, RAW_HEADERS_SIZE);
+    write_u32(pe, OPTIONAL_OFFSET + 64, 0);
     write_u16(pe, OPTIONAL_OFFSET + 68, 3);
     write_u16(pe, OPTIONAL_OFFSET + 70, 0);
     write_u64(pe, OPTIONAL_OFFSET + 72, 0x100000u);
@@ -144,6 +145,8 @@ void write_pe_layout(const RelinkOptions& options,
     write_u64(pe, OPTIONAL_OFFSET + 96, 0x1000u);
     write_u32(pe, OPTIONAL_OFFSET + 104, 0);
     write_u32(pe, OPTIONAL_OFFSET + 108, 16);
+    write_u32(pe, OPTIONAL_OFFSET + 112, 0);
+    write_u32(pe, OPTIONAL_OFFSET + 116, 0);
     write_u32(pe, OPTIONAL_OFFSET + 120, RDATA_RVA + 0x40);
     write_u32(pe, OPTIONAL_OFFSET + 124, 20);
 
@@ -155,15 +158,15 @@ void write_pe_layout(const RelinkOptions& options,
     write_u32(pe, SECTION_TABLE_OFFSET + 36, 0x60000020);
 
     std::memcpy(pe.data() + SECTION_TABLE_OFFSET + 40, ".rdata", 6);
-    write_u32(pe, SECTION_TABLE_OFFSET + 48, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 48, 0x400);
     write_u32(pe, SECTION_TABLE_OFFSET + 52, RDATA_RVA);
-    write_u32(pe, SECTION_TABLE_OFFSET + 56, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 56, 0x400);
     write_u32(pe, SECTION_TABLE_OFFSET + 60, RAW_HEADERS_SIZE + 0x200);
     write_u32(pe, SECTION_TABLE_OFFSET + 76, 0x40000040);
 
     pe.resize(RAW_HEADERS_SIZE);
     pe.resize(RAW_HEADERS_SIZE + 0x200, 0);
-    pe.resize(RAW_HEADERS_SIZE + 0x400, 0);
+    pe.resize(RAW_HEADERS_SIZE + 0x600, 0);
 
     constexpr std::uint32_t import_descriptor_rva = RDATA_RVA + 0x40;
     constexpr std::uint32_t dll_name_rva = RDATA_RVA + 0xC0;
@@ -177,7 +180,6 @@ void write_pe_layout(const RelinkOptions& options,
 
     std::vector<unsigned char> code;
     code.push_back(0x48); code.push_back(0x83); code.push_back(0xEC); code.push_back(0x28);
-
     code.push_back(0xB9);
     append_u32(code, 0xFFFFFFF5u);
     std::size_t call_offset = code.size();
@@ -191,22 +193,19 @@ void write_pe_layout(const RelinkOptions& options,
     code.push_back(0x48); code.push_back(0x8D); code.push_back(0x15);
     append_u32(code, 0);
     append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, diagnostic_rva);
+
     code.push_back(0x41); code.push_back(0xB8);
     append_u32(code, static_cast<std::uint32_t>(diagnostics.size()));
     code.push_back(0x45); code.push_back(0x31); code.push_back(0xC9);
-
-    call_offset = code.size();
-    code.push_back(0x48); code.push_back(0x8D); code.push_back(0x05);
-    append_u32(code, 0);
-    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, written_rva);
-    code.push_back(0x48); code.push_back(0x89); code.push_back(0x44); code.push_back(0x24);
-    code.push_back(0x20);
 
     call_offset = code.size();
     code.push_back(0x48); code.push_back(0x8B); code.push_back(0x05);
     append_u32(code, 0);
     append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, iat_rva + 8);
     code.push_back(0xFF); code.push_back(0xD0);
+
+    code.push_back(0x48); code.push_back(0xC7); code.push_back(0x44); code.push_back(0x24);
+    code.push_back(0x20); append_u32(code, 0);
 
     code.push_back(0xB9);
     append_u32(code, 16);
@@ -221,7 +220,7 @@ void write_pe_layout(const RelinkOptions& options,
     while (code.size() < 0x200) code.push_back(0xCC);
     std::memcpy(pe.data() + RAW_HEADERS_SIZE, code.data(), code.size());
 
-    std::vector<unsigned char> rdata(0x200, 0);
+    std::vector<unsigned char> rdata(0x400, 0);
     write_u32(rdata, 0x40, int_rva);
     write_u32(rdata, 0x4C, dll_name_rva);
     write_u32(rdata, 0x50, iat_rva);

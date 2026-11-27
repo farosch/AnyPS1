@@ -185,6 +185,7 @@ int main(int argc, char** argv)
             std::istreambuf_iterator<char>(pe),
             std::istreambuf_iterator<char>()
         };
+        pe.close();
         if (pe_bytes.size() < 392
             || pe_bytes[0] != 'M'
             || pe_bytes[1] != 'Z') {
