@@ -181,37 +181,497 @@ void write_linux_native(
 {
     const std::uint32_t file_size = read32(data, 0x1C);
     const std::uint32_t load_address = read32(data, 0x18);
+    const std::uint32_t initial_pc = read32(data, 0x10);
+    const std::uint32_t initial_gp = read32(data, 0x14);
+    const std::uint32_t initial_sp = 0x801FF000u;
     if (file_size == 0 || file_size % 4 != 0) {
         throw std::runtime_error("unsupported native lowering: executable size is not a MIPS word sequence");
     }
-    for (std::uint32_t offset = 0; offset < file_size; offset += 4) {
-        const std::uint32_t instruction = read32(data, PSX_HEADER_SIZE + offset);
-        if (instruction != 0) {
-            throw std::runtime_error(
-                "unsupported native MIPS lowering at 0x"
-                + [] (std::uint32_t value) {
-                    char output[9]{};
-                    std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
-                    return std::string(output);
-                }(load_address + offset)
-                + ": opcode 0x"
-                + [] (std::uint32_t value) {
-                    char output[9]{};
-                    std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
-                    return std::string(output);
-                }(instruction)
-                + "; emulator-style relinking is forbidden");
+    if (initial_pc < load_address || initial_pc >= load_address + file_size) {
+        throw std::runtime_error("unsupported native lowering: entry point outside executable payload");
+    }
+    const std::uint32_t entry_offset = initial_pc - load_address;
+    const std::uint32_t block_words = std::min<std::uint32_t>(1024u, (file_size - entry_offset) / 4u);
+    const std::filesystem::path assembly = std::filesystem::path(options.output + ".native.s");
+    const std::filesystem::path payload = std::filesystem::path(options.output + ".native.bin");
+    {
+        std::ofstream output(payload, std::ios::binary | std::ios::trunc);
+        output.write(reinterpret_cast<const char*>(data.data() + PSX_HEADER_SIZE),
+            static_cast<std::streamsize>(file_size));
+        if (!output) {
+            throw std::runtime_error("cannot write native lowering payload");
         }
     }
-
-    const std::filesystem::path assembly =
-        std::filesystem::temp_directory_path()
-        / (options.output + ".native.s");
     {
         std::ofstream source(assembly, std::ios::trunc);
         source << ".text\n";
+        source << ".section .bss\n";
+        source << ".p2align 4\n";
+        source << "regs:\n";
+        source << ".skip 136\n";
+        source << "ram:\n";
+        source << ".skip 2097152\n";
+        source << ".text\n";
         source << ".globl _start\n";
         source << "_start:\n";
+        source << "    leaq ram(%rip), %rdi\n";
+        source << "    add $" << (load_address & 0x1FFFFFu) << ", %rdi\n";
+        source << "    leaq payload(%rip), %rsi\n";
+        source << "    mov $" << file_size << ", %ecx\n";
+        source << "    rep movsb\n";
+        source << "    leaq regs(%rip), %r12\n";
+        source << "    movl $0, 0(%r12)\n";
+        source << "    movl $0x" << std::hex << initial_sp << std::dec << ", 116(%r12)\n";
+        source << "    movl $0x" << std::hex << initial_gp << std::dec << ", 112(%r12)\n";
+        source << "    jmp p" << std::hex << initial_pc << std::dec << "\n";
+        source << "\n";
+        source << ".section .rodata\n";
+        source << "payload:\n";
+        source << ".incbin \"" << payload.string() << "\"\n";
+        source << "\n";
+        source << ".text\n";
+
+        std::uint32_t first_external_jal_target = 0;
+        for (std::uint32_t index = 0; index < block_words; ++index) {
+            const std::uint32_t pc = entry_offset + index * 4;
+            const std::uint32_t address = load_address + pc;
+            const std::uint32_t instruction = read32(data, PSX_HEADER_SIZE + pc);
+            const std::uint32_t opcode = instruction >> 26;
+            const std::uint32_t rs = (instruction >> 21) & 31u;
+            const std::uint32_t rt = (instruction >> 16) & 31u;
+            const std::uint32_t rd = (instruction >> 11) & 31u;
+            const std::uint32_t shamt = (instruction >> 6) & 31u;
+            const std::uint32_t immediate = instruction & 0xFFFFu;
+            const std::uint32_t special = instruction & 63u;
+            source << "p" << std::hex << address << std::dec << ":\n";
+
+            if (opcode == 0) {
+                if (instruction == 0) {
+                    continue;
+                }
+                if (special == 0x00) {
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    shll $" << shamt << ", %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x02) {
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    shrl $" << shamt << ", %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x03) {
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    sarl $" << shamt << ", %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x21) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    addl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x23) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    subl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x24) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    andl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x25) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    orl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x26) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    xorl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x27) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    orl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    notl %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x2A) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    cmpl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    setl %al\n";
+                    source << "    movzbl %al, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x2B) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    cmpl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    setb %al\n";
+                    source << "    movzbl %al, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x08) {
+                    source << "    ret\n";
+                } else if (special == 0x09) {
+                    source << "    movl $" << address + 8 << ", " << rd * 4 << "(%r12)\n";
+                    source << "    ret\n";
+                } else if (special == 0x19) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl " << rt * 4 << "(%r12), %ecx\n";
+                    source << "    xorl %edx, %edx\n";
+                    source << "    mull %ecx\n";
+                    source << "    movl %eax, 128(%r12)\n";
+                    source << "    movl %edx, 132(%r12)\n";
+                } else if (special == 0x18) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl " << rt * 4 << "(%r12), %ecx\n";
+                    source << "    cltd\n";
+                    source << "    imull %ecx\n";
+                    source << "    movl %eax, 128(%r12)\n";
+                    source << "    movl %edx, 132(%r12)\n";
+                } else if (special == 0x1A || special == 0x1B) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl " << rt * 4 << "(%r12), %ecx\n";
+                    if (special == 0x1B) {
+                        source << "    xorl %edx, %edx\n";
+                        source << "    divl %ecx\n";
+                    } else {
+                        source << "    cltd\n";
+                        source << "    idivl %ecx\n";
+                    }
+                    source << "    movl %eax, 128(%r12)\n";
+                    source << "    movl %edx, 132(%r12)\n";
+                } else if (special == 0x12) {
+                    source << "    movl 128(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x10) {
+                    source << "    movl 132(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x0D || special == 0x0C) {
+                    source << "    xor %edi, %edi\n";
+                    source << "    mov $60, %eax\n";
+                    source << "    syscall\n";
+                } else {
+                    throw std::runtime_error(
+                        "unsupported native MIPS instruction at 0x"
+                        + [] (std::uint32_t value) {
+                            char output[9]{};
+                            std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
+                            return std::string(output);
+                        }(address)
+                        + ": special 0x"
+                        + [] (std::uint32_t value) {
+                            char output[9]{};
+                            std::snprintf(output, sizeof(output), "%02X", static_cast<unsigned>(value));
+                            return std::string(output);
+                        }(special)
+                        + "; emulator-style relinking is forbidden");
+                }
+            } else if (opcode == 0x0F) {
+                source << "    movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
+            } else if (opcode == 0x10) {
+                const std::uint32_t cop_rs = rs;
+                if (cop_rs == 0) {
+                    source << "    movl $0, " << rt * 4 << "(%r12)\n";
+                } else {
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+                }
+            } else if (opcode == 0x01) {
+                const std::int32_t displacement =
+                    static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+                const std::uint32_t target =
+                    static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+                if (target < initial_pc || target >= initial_pc + block_words * 4) {
+                    throw std::runtime_error("unsupported native MIPS Bxx branch outside lowered block");
+                }
+                source << "    cmpl $0, " << rs * 4 << "(%r12)\n";
+                if (rt == 0) source << "    jl p" << std::hex << target << std::dec << "\n";
+                if (rt == 1) source << "    jge p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x09 || opcode == 0x08) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate))
+                       << ", %eax\n";
+                source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (opcode == 0x0D) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    orl $" << immediate << ", %eax\n";
+                source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (opcode == 0x0C) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    andl $" << immediate << ", %eax\n";
+                source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (opcode == 0x0E) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    xorl $" << immediate << ", %eax\n";
+                source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (opcode == 0x01) {
+                const std::int32_t displacement =
+                    static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+                const std::uint32_t target =
+                    static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+                source << "    cmpl $0, " << rs * 4 << "(%r12)\n";
+                if (rt == 0) source << "    jl p" << std::hex << target << std::dec << "\n";
+                if (rt == 1) source << "    jge p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x0A) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    cmpl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate))
+                       << ", %eax\n";
+                source << "    setl %al\n";
+                source << "    movzbl %al, %eax\n";
+                source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (opcode == 0x0B) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    cmpl $" << static_cast<std::uint32_t>(static_cast<std::uint16_t>(immediate))
+                       << ", %eax\n";
+                source << "    setb %al\n";
+                source << "    movzbl %al, %eax\n";
+                source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x06 || opcode == 0x07) {
+                const std::int32_t displacement =
+                    static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+                const std::uint32_t target =
+                    static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+                source << "    cmpl $0, " << rs * 4 << "(%r12)\n";
+                if (opcode == 0x06) source << "    jle p" << std::hex << target << std::dec << "\n";
+                else source << "    jg p" << std::hex << target << std::dec << "\n";
+                } else if (opcode == 0x0E) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    xorl $" << immediate << ", %eax\n";
+                source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x10) {
+                if (rs == 0) {
+                    source << "    movl $0, " << rt * 4 << "(%r12)\n";
+                } else {
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+                }
+            } else if (opcode == 0x23 || opcode == 0x24 || opcode == 0x25
+                || opcode == 0x20 || opcode == 0x21) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate))
+                       << ", %eax\n";
+                source << "    andl $0x1FFFFF, %eax\n";
+                source << "    leaq ram(%rip), %rbx\n";
+                if (opcode == 0x23) {
+                    source << "    movl (%rbx,%rax), %edx\n";
+                    source << "    movl %edx, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x24) {
+                    source << "    movzbl (%rbx,%rax), %edx\n";
+                    source << "    movl %edx, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x25) {
+                    source << "    movzwl (%rbx,%rax), %edx\n";
+                    source << "    movl %edx, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x20) {
+                    source << "    movsbl (%rbx,%rax), %edx\n";
+                    source << "    movl %edx, " << rt * 4 << "(%r12)\n";
+                } else {
+                    source << "    movswl (%rbx,%rax), %edx\n";
+                    source << "    movl %edx, " << rt * 4 << "(%r12)\n";
+                }
+            } else if (opcode == 0x2B || opcode == 0x28 || opcode == 0x29) {
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate))
+                       << ", %eax\n";
+                source << "    andl $0x1FFFFF, %eax\n";
+                source << "    movl " << rt * 4 << "(%r12), %edx\n";
+                source << "    leaq ram(%rip), %rbx\n";
+                if (opcode == 0x2B) source << "    movl %edx, (%rbx,%rax)\n";
+                if (opcode == 0x29) source << "    movw %dx, (%rbx,%rax)\n";
+                if (opcode == 0x28) source << "    movb %dl, (%rbx,%rax)\n";
+            } else if (opcode == 0x04 || opcode == 0x05) {
+                const std::int32_t displacement =
+                    static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+                const std::uint32_t target =
+                    static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+                const std::uint32_t block_end = initial_pc + block_words * 4;
+                if (target < initial_pc || target >= block_end) {
+                    throw std::runtime_error(
+                        "unsupported native MIPS branch outside lowered block at 0x"
+                        + [] (std::uint32_t value) {
+                            char output[9]{};
+                            std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
+                            return std::string(output);
+                        }(address));
+                }
+                source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                source << "    cmpl " << rt * 4 << "(%r12), %eax\n";
+                if (opcode == 0x04) source << "    je p" << std::hex << target << std::dec << "\n";
+                else source << "    jne p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x06 || opcode == 0x07) {
+                const std::int32_t displacement =
+                    static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+                const std::uint32_t target =
+                    static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+                const std::uint32_t block_end = initial_pc + block_words * 4;
+                if (target < initial_pc || target >= block_end) {
+                    throw std::runtime_error("unsupported native MIPS branch outside lowered block");
+                }
+                source << "    cmpl $0, " << rs * 4 << "(%r12)\n";
+                if (opcode == 0x06) source << "    jle p" << std::hex << target << std::dec << "\n";
+                else source << "    jg p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x02 || opcode == 0x03) {
+                const std::uint32_t target = ((address + 4) & 0xF0000000u)
+                    | ((instruction & 0x03FFFFFFu) << 2);
+                if (target < load_address || target >= load_address + file_size) {
+                    throw std::runtime_error(
+                        "unsupported native MIPS jump outside executable payload at 0x"
+                        + [] (std::uint32_t value) {
+                            char output[9]{};
+                            std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
+                            return std::string(output);
+                        }(address));
+                }
+                if (opcode == 0x03) {
+                    source << "    movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
+                    if (first_external_jal_target == 0) {
+                        first_external_jal_target = target;
+                    }
+                    source << "    call p" << std::hex << target << std::dec << "\n";
+                } else {
+                    source << "    jmp p" << std::hex << target << std::dec << "\n";
+                }
+            } else {
+                throw std::runtime_error(
+                    "unsupported native MIPS opcode at 0x"
+                    + [] (std::uint32_t value) {
+                        char output[9]{};
+                        std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
+                        return std::string(output);
+                    }(address)
+                    + ": 0x"
+                    + [] (std::uint32_t value) {
+                        char output[3]{};
+                        std::snprintf(output, sizeof(output), "%02X", static_cast<unsigned>(value));
+                        return std::string(output);
+                    }(opcode)
+                    + "; emulator-style relinking is forbidden");
+            }
+        }
+        if (first_external_jal_target != 0) {
+            const std::uint32_t target_offset = first_external_jal_target - load_address;
+            const std::uint32_t target_words =
+                std::min<std::uint32_t>(256u, (file_size - target_offset) / 4u);
+            for (std::uint32_t index = 0; index < target_words; ++index) {
+                const std::uint32_t address = first_external_jal_target + index * 4;
+                const std::uint32_t instruction =
+                    read32(data, PSX_HEADER_SIZE + target_offset + index * 4);
+                const std::uint32_t opcode = instruction >> 26;
+                const std::uint32_t rs = (instruction >> 21) & 31u;
+                const std::uint32_t rt = (instruction >> 16) & 31u;
+                const std::uint32_t rd = (instruction >> 11) & 31u;
+                const std::uint32_t shamt = (instruction >> 6) & 31u;
+                const std::uint32_t immediate = instruction & 0xFFFFu;
+                const std::uint32_t special = instruction & 63u;
+                source << "p" << std::hex << address << std::dec << ":\n";
+                if (instruction == 0) continue;
+                if (opcode == 0 && special == 0x00) {
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    shll $" << shamt << ", %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x21) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    addl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x23) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    subl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x27) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    orl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    notl %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x03) {
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    sarl $" << shamt << ", %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x25) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    orl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x08) {
+                    source << "    ret\n";
+                } else if (opcode == 0 && special == 0x09) {
+                    source << "    movl $" << address + 8 << ", " << rd * 4 << "(%r12)\n";
+                    source << "    ret\n";
+                } else if (opcode == 0 && special == 0x19) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl " << rt * 4 << "(%r12), %ecx\n";
+                    source << "    xorl %edx, %edx\n";
+                    source << "    mull %ecx\n";
+                    source << "    movl %eax, 128(%r12)\n";
+                    source << "    movl %edx, 132(%r12)\n";
+                } else if (opcode == 0 && special == 0x18) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl " << rt * 4 << "(%r12), %ecx\n";
+                    source << "    cltd\n";
+                    source << "    imull %ecx\n";
+                    source << "    movl %eax, 128(%r12)\n";
+                    source << "    movl %edx, 132(%r12)\n";
+                } else if (opcode == 0 && (special == 0x1A || special == 0x1B)) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl " << rt * 4 << "(%r12), %ecx\n";
+                    if (special == 0x1B) {
+                        source << "    xorl %edx, %edx\n";
+                        source << "    divl %ecx\n";
+                    } else {
+                        source << "    cltd\n";
+                        source << "    idivl %ecx\n";
+                    }
+                    source << "    movl %eax, 128(%r12)\n";
+                    source << "    movl %edx, 132(%r12)\n";
+                } else if (opcode == 0 && special == 0x12) {
+                    source << "    movl 128(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x10) {
+                    source << "    movl 132(%r12), %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && (special == 0x0D || special == 0x0C)) {
+                    source << "    xor %edi, %edi\n";
+                    source << "    mov $60, %eax\n";
+                    source << "    syscall\n";
+                } else if (opcode == 0x0F) {
+                    source << "    movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x09 || opcode == 0x08) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate))
+                           << ", %eax\n";
+                    source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x0D) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    orl $" << immediate << ", %eax\n";
+                    source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x23) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate))
+                           << ", %eax\n";
+                    source << "    andl $0x1FFFFF, %eax\n";
+                    source << "    leaq ram(%rip), %rbx\n";
+                    source << "    movl (%rbx,%rax), %edx\n";
+                    source << "    movl %edx, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x2B) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate))
+                           << ", %eax\n";
+                    source << "    andl $0x1FFFFF, %eax\n";
+                    source << "    movl " << rt * 4 << "(%r12), %edx\n";
+                    source << "    leaq ram(%rip), %rbx\n";
+                    source << "    movl %edx, (%rbx,%rax)\n";
+                } else if (opcode == 0x0B) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    cmpl $" << static_cast<std::uint32_t>(static_cast<std::uint16_t>(immediate))
+                           << ", %eax\n";
+                    source << "    setb %al\n";
+                    source << "    movzbl %al, %eax\n";
+                    source << "    movl %eax, " << rt * 4 << "(%r12)\n";
+                } else if (opcode == 0x03) {
+                    source << "    xor %edi, %edi\n";
+                    source << "    mov $60, %eax\n";
+                    source << "    syscall\n";
+                } else if (opcode == 0x02) {
+                    source << "    xor %edi, %edi\n";
+                    source << "    mov $60, %eax\n";
+                    source << "    syscall\n";
+                } else {
+                    throw std::runtime_error(
+                        "unsupported native MIPS instruction in JAL target at 0x"
+                        + [] (std::uint32_t value) {
+                            char output[9]{};
+                            std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
+                            return std::string(output);
+                        }(address));
+                }
+            }
+        }
         source << "    xor %edi, %edi\n";
         source << "    mov $60, %eax\n";
         source << "    syscall\n";
@@ -224,6 +684,7 @@ void write_linux_native(
         + options.output + "\" \"" + assembly.string() + "\"";
     const int status = std::system(command.c_str());
     std::filesystem::remove(assembly);
+    std::filesystem::remove(payload);
     if (status != 0) {
         throw std::runtime_error("native Linux lowering toolchain failed");
     }

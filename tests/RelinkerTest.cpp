@@ -44,6 +44,9 @@ int main(int argc, char** argv)
             || elf_magic[2] != 'L' || elf_magic[3] != 'F') {
             throw std::runtime_error("invalid native ELF output");
         }
+        if (std::system(output_path) != 0) {
+            throw std::runtime_error("native ELF artifact did not exit successfully");
+        }
 
         anyps1::RelinkOptions windows_options;
         windows_options.input = game_root;
