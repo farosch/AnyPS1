@@ -58,7 +58,7 @@
 - [ ] Implement COP3 instructions directly or emit exact unsupported stubs.
 - [ ] Implement all coprocessor load/store families with checked bounds and
   native memory mappings.
-- [ ] Complete load-delay behavior for every MIPS load form and verify the
+- [x] Complete load-delay behavior for every MIPS load form and verify the
   delay-slot fixtures against real instruction sequences.
 - [ ] Verify exact MIPS signed/unsigned overflow, division edge cases,
   endianness, unaligned access, and HI/LO semantics with focused fixtures.

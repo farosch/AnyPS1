@@ -96,6 +96,10 @@ add_test(NAME relinker_native_cop1
     COMMAND anyps1_relinker_test
         ${FIXTURE_OUTPUT_DIR}/mips/native-cop1.ps-exe)
 
+add_test(NAME relinker_load_family_delay
+    COMMAND anyps1_relinker_test
+        ${FIXTURE_OUTPUT_DIR}/mips/load-family-delay.ps-exe)
+
 
 add_executable(anyps1_payload_region_test PayloadRegionTest.cpp)
 target_include_directories(anyps1_payload_region_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
