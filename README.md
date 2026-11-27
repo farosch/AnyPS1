@@ -1,10 +1,14 @@
 # AnyPS1
 
+## Overview
+
+AnyPS1 converts extracted PlayStation 1 executables into native Linux or Windows
+programs. It is a relinker and executable-conversion project, not a PS1 emulator.
+
 ## Implementation status
 
 The code-derived implementation overview is available in
-[preview/progress.html](preview/progress.html). It is generated from source and
-test evidence, not TODO text:
+[preview/progress.html](preview/progress.html).
 
 <p align="center">
   <a href="preview/progress.html">
@@ -15,11 +19,6 @@ test evidence, not TODO text:
 ```sh
 cmake --build build --target progress
 ```
-
-## Overview
-
-AnyPS1 converts extracted PlayStation 1 executables into native Linux or Windows
-programs. It is a relinker and executable-conversion project, not a PS1 emulator.
 
 ## Relinking
 
