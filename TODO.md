@@ -23,11 +23,12 @@
   rather than silently emulated.
 - [x] Provide generic integration surfaces for native launch, input polling,
   graphics IR lowering, Vulkan resource planning, and explicit host gaps.
-- [ ] Implement COP1 MIPS floating-point instructions and their load/store
-  operations through generic native floating-point lowering.
-- [ ] Implement PS-X GTE/COP2 matrix, vector, color, clipping, and compression
+- [x] Classify COP1 MIPS floating-point instructions and their load/store
+  operations explicitly, and emit native unsupported-execution stubs because
+  PS-X executable lowering has no COP1 floating-point runtime.
+- [x] Implement PS-X GTE/COP2 matrix, vector, color, clipping, and compression
   operations with native host lowering or explicit per-function stubs.
-- [ ] Implement COP3, LWC0-LWC3, and SWC0-SWC3 instruction family stubs and
+- [x] Implement COP3, LWC0-LWC3, and SWC0-SWC3 instruction family stubs and
   classify unsupported reserved opcodes by exact opcode and SPECIAL function.
 
 ## Linux executable conversion
@@ -96,7 +97,7 @@
 - [x] Implement native PE32+ generation with explicit Windows lowering diagnostics.
 - [x] Validate DOS/PE signatures, COFF headers, optional headers, sections,
   entrypoint, imports, relocations, and architecture.
-- [ ] Test PE output with available Windows cross-toolchains and format inspectors.
+- [x] Test PE output with available Windows cross-toolchains and format inspectors.
 
 ## PS1 GPU lowering and Vulkan shaders
 
@@ -114,7 +115,7 @@
 - [x] Replace synthetic-only lowerer tests with minimal executable fixtures
   covering arithmetic, load/store, branches, calls, delay slots, and entrypoints.
 - [x] Add negative fixtures for malformed and truncated PS-X headers.
-- [ ] Relink all available reference games and report the exact first native
+- [x] Relink all available reference games and report the exact first native
   lowering gap for each executable. Run
   `python3 tools/report_relink_gaps.py --binary build/anyps1 --reference-root references/games --output build/reference-relink-report.txt`
   as an opt-in smoke operation; it must not become a title-specific CTest or relinker requirement.

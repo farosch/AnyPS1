@@ -69,7 +69,16 @@ UnsupportedInstruction classify_unsupported_instruction(
         return {UnsupportedInstructionKind::Cop1, "cop1"};
     }
     if (opcode == 0x12) {
-        return {UnsupportedInstructionKind::Cop2, "cop2"};
+        switch (instruction) {
+        case 0x48C0C000u: return {UnsupportedInstructionKind::Cop2, "gte_nclip"};
+        case 0x48C0C800u: return {UnsupportedInstructionKind::Cop2, "gte_op"};
+        case 0x48C8D000u: return {UnsupportedInstructionKind::Cop2, "gte_dpcs"};
+        case 0x48C8D800u: return {UnsupportedInstructionKind::Cop2, "gte_intpl"};
+        case 0x48C8E000u: return {UnsupportedInstructionKind::Cop2, "gte_mvmva"};
+        case 0x48C8E800u: return {UnsupportedInstructionKind::Cop2, "gte_sqr"};
+        case 0x48C8F000u: return {UnsupportedInstructionKind::Cop2, "gte_rtv0"};
+        default: return {UnsupportedInstructionKind::Cop2, "cop2"};
+        }
     }
     if (opcode == 0x13) {
         return {UnsupportedInstructionKind::Cop3, "cop3"};

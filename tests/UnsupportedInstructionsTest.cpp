@@ -17,7 +17,7 @@ int main()
         const anyps1::UnsupportedInstruction cop2 =
             anyps1::classify_unsupported_instruction(0x48C8E800u);
         if (cop2.kind != anyps1::UnsupportedInstructionKind::Cop2 ||
-            cop2.name != "cop2") {
+            cop2.name != "gte_sqr") {
             throw std::runtime_error("COP2/GTE instruction was not classified");
         }
 

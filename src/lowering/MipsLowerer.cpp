@@ -395,6 +395,10 @@ void write_linux_native_cfg(
             }
         } else if (opcode == 0x12) {
             emit_unsupported_stub(instruction);
+        } else if (opcode == 0x11) {
+            emit_unsupported_stub(instruction);
+        } else if (opcode == 0x13) {
+            emit_unsupported_stub(instruction);
         } else if (opcode == 0x0F) {
             source << "movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x08) {
@@ -611,6 +615,9 @@ void write_linux_native_cfg(
                 source << "swr_done_" << std::hex << address << std::dec << ": \n";
             }
             source << "movl %eax, (%rbx,%rdi)\n";
+        } else if ((opcode >= 0x30 && opcode <= 0x33) ||
+                   (opcode >= 0x38 && opcode <= 0x3B)) {
+            emit_unsupported_stub(instruction);
         } else {
             emit_unsupported_stub(instruction);
         }

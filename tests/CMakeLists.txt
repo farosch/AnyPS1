@@ -73,3 +73,8 @@ target_link_libraries(anyps1_unsupported_instruction_test
 add_test(NAME unsupported_instruction_registry
     COMMAND anyps1_unsupported_instruction_test)
 
+add_test(NAME pe_format_inspector
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/valid.ps-exe)
+
