@@ -19,9 +19,11 @@
 
 #include <cerrno>
 #include <cstring>
+#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 namespace anyps1 {
 
@@ -30,6 +32,12 @@ namespace {
 int execute_linker(const std::filesystem::path& assembly,
                    const std::filesystem::path& output)
 {
+#ifdef _WIN32
+    (void)assembly;
+    (void)output;
+    throw std::runtime_error(
+        "native Linux lowering toolchain is not available on Windows");
+#else
     const pid_t child = fork();
     if (child < 0) {
         throw std::runtime_error(
@@ -56,6 +64,7 @@ int execute_linker(const std::filesystem::path& assembly,
     }
     if (!WIFEXITED(status)) return -1;
     return WEXITSTATUS(status);
+#endif
 }
 
 void validate_linux_elf64(const std::filesystem::path& path)

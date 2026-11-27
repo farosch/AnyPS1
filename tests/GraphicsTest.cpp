@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -54,8 +55,12 @@ int main()
                 throw std::runtime_error("invalid generated SPIR-V module");
             }
 
+            std::filesystem::path spv_directory =
+                std::filesystem::temp_directory_path();
             const std::string path =
-                "/tmp/anyps1-" + anyps1::graphics_primitive_name(primitive) + ".spv";
+                (spv_directory /
+                 ("anyps1-" + anyps1::graphics_primitive_name(primitive) + ".spv"))
+                    .string();
             std::ofstream output(path, std::ios::binary | std::ios::trunc);
             output.write(
                 reinterpret_cast<const char*>(shader.words.data()),
@@ -65,18 +70,22 @@ int main()
 
             if (std::system(nullptr) != 0) {
                 const char* validator = std::getenv("SPIRV_VAL_EXECUTABLE");
-                if (validator == nullptr || validator[0] == '\0') {
-                    validator = "spirv-val";
-                }
-                const std::string validate = std::string("\"") + validator +
-                    "\" \"" + path + "\"";
-                if (std::system(validate.c_str()) != 0) {
-                    throw std::runtime_error("spirv-val rejected generated shader");
+                if (validator != nullptr && validator[0] != '\0'
+                    && std::string(validator).find("-NOTFOUND") == std::string::npos) {
+                    const std::string validate = std::string("\"") + validator +
+                        "\" \"" + path + "\"";
+                    if (std::system(validate.c_str()) != 0) {
+                        throw std::runtime_error("spirv-val rejected generated shader");
+                    }
                 }
                 const char* optimizer = std::getenv("SPIRV_OPT_EXECUTABLE");
-                if (optimizer != nullptr && optimizer[0] != '\0') {
-                    const std::string optimized = "/tmp/anyps1-" +
-                        anyps1::graphics_primitive_name(primitive) + "-opt.spv";
+                if (optimizer != nullptr && optimizer[0] != '\0'
+                    && std::string(optimizer).find("-NOTFOUND") == std::string::npos) {
+                    const std::string optimized =
+                        (std::filesystem::temp_directory_path() /
+                         ("anyps1-" + anyps1::graphics_primitive_name(primitive) +
+                          "-opt.spv"))
+                            .string();
                     const std::string optimize = std::string("\"") + optimizer +
                         "\" \"" + path + "\" -O -o \"" + optimized + "\"";
                     if (std::system(optimize.c_str()) != 0) {

@@ -52,6 +52,23 @@ int main(int argc, char** argv)
         }
 
         if (std::string(fixture_path).find("native-bios-vector.ps-exe") != std::string::npos) {
+#ifdef _WIN32
+            anyps1::RelinkOptions bios_windows_options;
+            bios_windows_options.input = game_root;
+            bios_windows_options.target = anyps1::TargetPlatform::Windows;
+            if (!anyps1::relink(bios_windows_options)) {
+                throw std::runtime_error("partial BIOS-vector fixture Windows relink failed");
+            }
+            std::ifstream bios_pe("/tmp/anyps1-relinker-test/game.exe", std::ios::binary);
+            char bios_magic[2]{};
+            bios_pe.read(bios_magic, 2);
+            if (bios_pe.gcount() != 2 || bios_magic[0] != 'M' || bios_magic[1] != 'Z') {
+                throw std::runtime_error("BIOS-vector fixture produced invalid Windows PE");
+            }
+            bios_pe.close();
+            std::filesystem::remove_all(game_root);
+            return 0;
+#else
             anyps1::RelinkOptions bios_options;
             bios_options.input = game_root;
             bios_options.target = anyps1::TargetPlatform::Linux;
@@ -60,6 +77,7 @@ int main(int argc, char** argv)
             }
             std::filesystem::remove_all(game_root);
             return 0;
+#endif
         }
 
         {
@@ -79,12 +97,28 @@ int main(int argc, char** argv)
                 malformed = 2048ULL + declared > bytes.size();
             }
             if (malformed) {
+                candidate.close();
                 anyps1::RelinkOptions malformed_options;
                 malformed_options.input = game_root;
                 malformed_options.target = anyps1::TargetPlatform::Linux;
                 try {
                     anyps1::relink(malformed_options);
                     throw std::runtime_error("malformed fixture unexpectedly relinked");
+                } catch (const std::exception& error) {
+                    if (std::string(error.what()).find("unsupported") == std::string::npos
+                        && std::string(error.what()).find("truncated") == std::string::npos
+                        && std::string(error.what()).find("invalid") == std::string::npos
+                        && std::string(error.what()).find("shorter") == std::string::npos
+                        && std::string(error.what()).find("declared size") == std::string::npos) {
+                        throw;
+                    }
+                }
+                anyps1::RelinkOptions malformed_windows_options;
+                malformed_windows_options.input = game_root;
+                malformed_windows_options.target = anyps1::TargetPlatform::Windows;
+                try {
+                    anyps1::relink(malformed_windows_options);
+                    throw std::runtime_error("malformed fixture unexpectedly relinked for Windows");
                 } catch (const std::exception& error) {
                     if (std::string(error.what()).find("unsupported") == std::string::npos
                         && std::string(error.what()).find("truncated") == std::string::npos
@@ -215,6 +249,20 @@ int main(int argc, char** argv)
             throw std::runtime_error("Windows PE output is not PE32+");
         }
         const std::uint32_t optional_offset = pe_offset + 24;
+        const std::uint16_t machine =
+            static_cast<std::uint16_t>(pe_bytes[pe_offset + 4])
+            | (static_cast<std::uint16_t>(pe_bytes[pe_offset + 5]) << 8);
+        if (machine != 0x8664) {
+            throw std::runtime_error("Windows PE output is not AMD64");
+        }
+        const std::uint32_t entry_rva =
+            static_cast<std::uint32_t>(pe_bytes[optional_offset + 16])
+            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 17]) << 8)
+            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 18]) << 16)
+            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 19]) << 24);
+        if (entry_rva != 0x1000) {
+            throw std::runtime_error("Windows PE output has invalid entry RVA");
+        }
         const std::uint32_t number_of_rva =
             static_cast<std::uint32_t>(pe_bytes[optional_offset + 108])
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 109]) << 8)
