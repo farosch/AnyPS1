@@ -6,6 +6,8 @@
 #include <fstream>
 #include <filesystem>
 #include <iterator>
+#include <queue>
+#include <set>
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>

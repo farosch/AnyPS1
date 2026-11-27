@@ -3,7 +3,7 @@ from pathlib import Path
 
 def required_directories(root: Path) -> tuple[Path, ...]:
     return (
-        root / "core" / "relinker",
+        root / "src",
         root / "tools",
         root / "tests",
         root / "3rdparty",
@@ -12,9 +12,10 @@ def required_directories(root: Path) -> tuple[Path, ...]:
 
 def required_files(root: Path) -> tuple[Path, ...]:
     return (
-        root / "core" / "relinker" / "Relinker.h",
-        root / "core" / "relinker" / "Relinker.cpp",
-        root / "core" / "relinker" / "main.cpp",
+        root / "src" / "CMakeLists.txt",
+        root / "src" / "Relinker.h",
+        root / "src" / "Relinker.cpp",
+        root / "src" / "main.cpp",
     )
 
 

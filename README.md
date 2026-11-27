@@ -42,8 +42,7 @@ rendering; it is not an emulator process or a runtime instruction interpreter.
 
 ## Layout
 
-- `core/relinker`: executable decoding and relinking implementation
-- `core/relinker/main.cpp`: main command-line relinker entrypoint
+- `src/`: executable decoding, relinking implementation, and main entrypoint
 - `tools`: command-line and analysis utilities
 - `TODO.md`: known implementation gaps and validation work
 - `tests`: integration and unit tests

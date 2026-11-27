@@ -35,13 +35,13 @@ if(ANYPS1_ENABLE_GLSLANG)
     add_subdirectory(3rdparty/glslang)
 endif()
 
-add_subdirectory(core/relinker)
+add_subdirectory(src)
 
 add_executable(anyps1
-    core/relinker/main.cpp
+    src/main.cpp
 )
 
-target_include_directories(anyps1 PRIVATE core)
+target_include_directories(anyps1 PRIVATE src)
 target_link_libraries(anyps1 PRIVATE anyps1_relinker)
 
 if(BUILD_TESTING)
