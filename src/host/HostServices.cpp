@@ -70,15 +70,15 @@ HostServiceMapping map_host_service(HostServiceKind kind)
     case HostServiceKind::VulkanFramebuffer:
         return {kind, "PS1 framebuffer", "Vulkan instance/surface/swapchain/resources", true};
     case HostServiceKind::CdRom:
-        return {kind, "PS1 CD-ROM registers", "native disc/image API or explicit unsupported exit", false};
+        return {kind, "PS1 CD-ROM registers", "native disc/image API", true};
     case HostServiceKind::Timers:
         return {kind, "PS1 timers", "native monotonic timer or explicit unsupported exit", false};
     case HostServiceKind::Controllers:
         return {kind, "PS1 controller ports", "SDL3 input or explicit unsupported exit", true};
     case HostServiceKind::MemoryCard:
-        return {kind, "PS1 memory-card ports", "native storage mapping or explicit unsupported exit", false};
+        return {kind, "PS1 memory-card ports", "native title-independent block storage", true};
     case HostServiceKind::Spu:
-        return {kind, "PS1 SPU", "SDL3 audio backend or explicit unsupported exit", false};
+        return {kind, "PS1 SPU", "SDL3 audio backend", true};
     case HostServiceKind::Dma:
         return {kind, "PS1 DMA channels", "native host memory copy or explicit unsupported exit", false};
     case HostServiceKind::Interrupt:
@@ -438,6 +438,8 @@ void SdlHostRuntime::shutdown()
 struct NativeHostLoopRuntime::Impl {
     SdlHostRuntime host;
     SdlInputRuntime input;
+    MemoryCardRuntime memory_card;
+    DiscImageRuntime disc;
     bool initialized = false;
 };
 
@@ -519,6 +521,67 @@ bool NativeHostLoopRuntime::queue_audio(
 bool NativeHostLoopRuntime::should_close() const
 {
     return impl_->initialized && impl_->host.should_close();
+}
+
+bool NativeHostLoopRuntime::open_memory_card(
+    int slot,
+    const std::string& file_path,
+    std::string& error)
+{
+    return impl_->memory_card.open_slot(slot, file_path, error);
+}
+
+bool NativeHostLoopRuntime::read_memory_card(
+    int slot,
+    std::uint32_t block,
+    std::uint8_t* data,
+    std::size_t size,
+    std::string& error)
+{
+    return impl_->memory_card.read_block(slot, block, data, size, error);
+}
+
+bool NativeHostLoopRuntime::write_memory_card(
+    int slot,
+    std::uint32_t block,
+    const std::uint8_t* data,
+    std::size_t size,
+    std::string& error)
+{
+    return impl_->memory_card.write_block(slot, block, data, size, error);
+}
+
+void NativeHostLoopRuntime::close_memory_card(int slot)
+{
+    impl_->memory_card.close_slot(slot);
+}
+
+bool NativeHostLoopRuntime::open_disc(
+    const std::string& bin_path,
+    bool mode2,
+    std::string& error)
+{
+    return impl_->disc.open_disc(bin_path, mode2, error);
+}
+
+bool NativeHostLoopRuntime::read_disc(
+    std::uint32_t lba,
+    std::uint8_t* data,
+    std::size_t size,
+    std::string& error)
+{
+    return impl_->disc.read_sector(lba, data, size, error);
+}
+
+void NativeHostLoopRuntime::close_disc()
+{
+    impl_->disc.close_disc();
+}
+
+std::string NativeHostLoopRuntime::structured_exit_log(
+    HostExitCode code) const
+{
+    return host_exit_log(code);
 }
 
 void NativeHostLoopRuntime::shutdown()
@@ -680,6 +743,19 @@ void DiscImageRuntime::close_disc()
 {
     bin_path_.clear();
     mode2_ = false;
+}
+
+HostLoopPlan plan_native_host_loop()
+{
+    return {
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+    };
 }
 
 bool is_supported_bios_vector(std::uint32_t vector)

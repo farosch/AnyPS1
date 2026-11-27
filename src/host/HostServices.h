@@ -125,6 +125,18 @@ private:
 
 bool is_supported_bios_vector(std::uint32_t vector);
 
+struct HostLoopPlan {
+    bool input_polling = true;
+    bool window_events = true;
+    bool audio = true;
+    bool framebuffer = true;
+    bool vulkan = true;
+    bool memory_card = true;
+    bool disc = true;
+};
+
+HostLoopPlan plan_native_host_loop();
+
 class SdlHostRuntime {
 public:
     SdlHostRuntime();
@@ -178,6 +190,34 @@ public:
         std::size_t sample_count,
         std::string& error);
     bool should_close() const;
+    bool open_memory_card(
+        int slot,
+        const std::string& file_path,
+        std::string& error);
+    bool read_memory_card(
+        int slot,
+        std::uint32_t block,
+        std::uint8_t* data,
+        std::size_t size,
+        std::string& error);
+    bool write_memory_card(
+        int slot,
+        std::uint32_t block,
+        const std::uint8_t* data,
+        std::size_t size,
+        std::string& error);
+    void close_memory_card(int slot);
+    bool open_disc(
+        const std::string& bin_path,
+        bool mode2,
+        std::string& error);
+    bool read_disc(
+        std::uint32_t lba,
+        std::uint8_t* data,
+        std::size_t size,
+        std::string& error);
+    void close_disc();
+    std::string structured_exit_log(HostExitCode code) const;
     void shutdown();
 
 private:

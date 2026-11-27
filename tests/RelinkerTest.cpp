@@ -57,6 +57,25 @@ int main(int argc, char** argv)
                 }
             }
         }
+        for (const anyps1::TargetArchitecture architecture :
+             {anyps1::TargetArchitecture::ELF32,
+              anyps1::TargetArchitecture::ARM64}) {
+            anyps1::RelinkOptions unsupported_architecture;
+            unsupported_architecture.input = game_root;
+            unsupported_architecture.target = anyps1::TargetPlatform::Linux;
+            unsupported_architecture.architecture = architecture;
+            try {
+                anyps1::relink(unsupported_architecture);
+                throw std::runtime_error(
+                    "relink unexpectedly accepted an unsupported architecture");
+            } catch (const std::exception& error) {
+                if (std::string(error.what()).find(
+                        "native architecture lowering is not implemented") ==
+                    std::string::npos) {
+                    throw;
+                }
+            }
+        }
 
         if (std::string(fixture_path).find("native-bios-vector.ps-exe") != std::string::npos) {
 #ifdef _WIN32
@@ -223,7 +242,8 @@ int main(int argc, char** argv)
             terminal_output.find("reachable_words=") == std::string::npos ||
             terminal_output.find("supported_reachable_words=") == std::string::npos ||
             terminal_output.find("embedded_data_words=") == std::string::npos ||
-            terminal_output.find("unknown_region_words=") == std::string::npos) {
+            terminal_output.find("unknown_region_words=") == std::string::npos ||
+            terminal_output.find("host_loop input=1") == std::string::npos) {
             throw std::runtime_error("native ELF lacks CFG coverage diagnostics");
         }
 #endif

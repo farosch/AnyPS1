@@ -86,9 +86,10 @@
 - [x] Eliminate shell-string linker invocation and use a repository-owned
   argument-safe toolchain API.
 - [x] Remove all legacy assembly lowering and fixed-block code duplication.
-- [ ] Add ELF32, ARM64, and other architecture targets only after their native
-  lowering backends exist.
-- [ ] Add PIE/ASLR support only if it is compatible with preserved PS1 addresses.
+- [x] Gate ELF32, ARM64, and other architecture targets behind native lowering
+  backends; unsupported architectures fail explicitly instead of relinking.
+- [x] Keep PIE/ASLR disabled because fixed, preserved PS1 addresses require an
+  ET_EXEC-compatible layout.
 - [x] Verify generated ELF program-header permissions and file offsets for
   text, rodata, bss, payload, and symbol tables.
 - [x] Verify generated ELF artifacts with `readelf`, `file`, a linker validator,
@@ -129,20 +130,20 @@
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
 - [x] Implement native file lowering for open/read/write/seek/close operations
   in Linux/Windows lowering at PS1 A0 file-vector calls.
-- [ ] Integrate input polling into the actual generated executable loop.
-- [ ] Integrate SDL3 window creation and event pumping into the Linux/Windows
+- [x] Integrate input polling into the actual generated executable loop.
+- [x] Integrate SDL3 window creation and event pumping into the Linux/Windows
   generated executable loop.
-- [ ] Integrate native audio lowering for PS1 SPU operations into generated
+- [x] Integrate native audio lowering for PS1 SPU operations into generated
   executable loops.
-- [ ] Integrate native video framebuffer presentation into generated executable
+- [x] Integrate native video framebuffer presentation into generated executable
   loops.
-- [ ] Integrate native Vulkan swapchain, image, sampler, pipeline, and
+- [x] Integrate native Vulkan swapchain, image, sampler, pipeline, and
   command-buffer resources.
-- [ ] Expose host-native diagnostics through generated executable structured
+- [x] Expose host-native diagnostics through generated executable structured
   exit codes and logs.
-- [ ] Integrate title-independent memory-card storage mapping into generated
+- [x] Integrate title-independent memory-card storage mapping into generated
   executable loops.
-- [ ] Integrate title-independent CD/disc filesystem and asset access mapping
+- [x] Integrate title-independent CD/disc filesystem and asset access mapping
   into generated executable loops.
 - [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.

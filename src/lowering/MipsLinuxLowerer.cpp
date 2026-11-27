@@ -447,6 +447,15 @@ void MipsLinuxLowerer::lower(
             : "first_unsupported_gap=" + hex32(first_unsupported_address) +
               " instruction=" + hex32(first_unsupported_word) +
               " name=" + first_unsupported_name + "\n";
+    const HostLoopPlan host_loop = plan_native_host_loop();
+    const std::string host_loop_diag =
+        "host_loop input=" + std::to_string(host_loop.input_polling) +
+        " window=" + std::to_string(host_loop.window_events) +
+        " audio=" + std::to_string(host_loop.audio) +
+        " framebuffer=" + std::to_string(host_loop.framebuffer) +
+        " vulkan=" + std::to_string(host_loop.vulkan) +
+        " memory_card=" + std::to_string(host_loop.memory_card) +
+        " disc=" + std::to_string(host_loop.disc) + "\n";
     const std::string completed = "native lowering complete\n";
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
@@ -474,6 +483,7 @@ void MipsLinuxLowerer::lower(
     source << "diag_scratchpad_range:.asciz \"" << escape_assembly_string(scratchpad_range) << "\"\n";
     source << "diag_unsupported:.asciz \"" << escape_assembly_string(unsupported) << "\"\n";
     source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
+    source << "diag_host_loop:.asciz \"" << escape_assembly_string(host_loop_diag) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
     source << ".text\n.globl _start\n_start:\n";
     source << "leaq diag_banner(%rip), %rsi\nmov $" << banner.size() << ", %rdx\ncall print_diag\n";
@@ -496,6 +506,7 @@ void MipsLinuxLowerer::lower(
     source << "leaq diag_scratchpad_range(%rip), %rsi\nmov $" << scratchpad_range.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_unsupported(%rip), %rsi\nmov $" << unsupported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_host_loop(%rip), %rsi\nmov $" << host_loop_diag.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";
     source << "add $" << (load_address & 0x1FFFFFu) << ", %rdi\n";
     source << "leaq payload(%rip), %rsi\n";
@@ -516,6 +527,9 @@ void MipsLinuxLowerer::lower(
     source << "unsupported_instruction_exit:\n";
     source << "leaq diag_first_gap(%rip), %rsi\n";
     source << "mov $" << first_gap.size() << ", %rdx\n";
+    source << "call print_diag\n";
+    source << "leaq diag_host_loop(%rip), %rsi\n";
+    source << "mov $" << host_loop_diag.size() << ", %rdx\n";
     source << "call print_diag\n";
     source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
     for (const std::string& family : unsupported_family_names) {

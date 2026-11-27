@@ -78,6 +78,17 @@ int main()
         if (loop.poll(input, host_error)) {
             throw std::runtime_error("uninitialized native host loop unexpectedly polled");
         }
+        const anyps1::HostLoopPlan host_loop =
+            anyps1::plan_native_host_loop();
+        if (!host_loop.input_polling ||
+            !host_loop.window_events ||
+            !host_loop.audio ||
+            !host_loop.framebuffer ||
+            !host_loop.vulkan ||
+            !host_loop.memory_card ||
+            !host_loop.disc) {
+            throw std::runtime_error("native host loop plan is incomplete");
+        }
 
         const anyps1::HostServiceMapping console =
             anyps1::map_host_service(anyps1::HostServiceKind::Console);

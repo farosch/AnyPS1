@@ -348,6 +348,15 @@ void MipsWindowsLowerer::lower(
                     : "first_unsupported_gap=" +
                       hex32(first_unsupported_address) +
                       " name=" + first_unsupported_name + "\n");
+    const HostLoopPlan host_loop = plan_native_host_loop();
+    emit_string(source, "diag_host_loop",
+                "host_loop input=" + std::to_string(host_loop.input_polling) +
+                " window=" + std::to_string(host_loop.window_events) +
+                " audio=" + std::to_string(host_loop.audio) +
+                " framebuffer=" + std::to_string(host_loop.framebuffer) +
+                " vulkan=" + std::to_string(host_loop.vulkan) +
+                " memory_card=" + std::to_string(host_loop.memory_card) +
+                " disc=" + std::to_string(host_loop.disc) + "\n");
     emit_string(source, "diag_completed",
                 "native lowering complete\n");
 
@@ -392,7 +401,7 @@ void MipsWindowsLowerer::lower(
     const char* diagnostics[] = {
         "diag_banner", "diag_target", "diag_load", "diag_entry",
         "diag_gp", "diag_sp", "diag_payload", "diag_unsupported",
-        "diag_first_gap"
+        "diag_first_gap", "diag_host_loop"
     };
     for (const char* label : diagnostics) {
         source << "mov rcx,r12\n";
