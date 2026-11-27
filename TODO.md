@@ -1,124 +1,263 @@
 # TODO
 
-## Next relinker blockers
+## Current relinker blockers
 
-- [x] Remove the fixed 512-leader CFG limit and replace it with bounded CFG
-  expansion that can preserve every emitted branch, call, and fallthrough target.
-- [x] Prevent undefined assembly labels or duplicate JALR labels at CFG bounds;
-  every out-of-range or unresolved transfer must emit an explicit
-  unsupported-execution exit.
-- [x] Count unsupported instructions only in statically reachable executable
-  code, and distinguish those words from embedded data, tables, padding, or
-  non-code payload regions.
-- [x] Report native lowering coverage as a percentage and as exact leader/block,
-  call-edge, and unresolved-indirect-transfer counts.
-- [x] Replace the current real-executable smoke mechanism with an opt-in
-  format-generic fixture/report test that does not depend on game names,
-  directories, or assets.
-- [x] Continue real executable relinking until the first reachable unsupported
-  MIPS instruction or host operation is resolved, then add a minimal fixture
-  that reproduces it without copyrighted assets.
-- [x] Define native host mappings for file, input, console, audio, video, and
-  Vulkan framebuffer operations, with unsupported services reported explicitly
-  rather than silently emulated.
-- [x] Provide generic integration surfaces for native launch, input polling,
-  graphics IR lowering, Vulkan resource planning, and explicit host gaps.
-- [x] Classify COP1 MIPS floating-point instructions and their load/store
-  operations explicitly, and emit native unsupported-execution stubs because
-  PS-X executable lowering has no COP1 floating-point runtime.
-- [x] Implement PS-X GTE/COP2 matrix, vector, color, clipping, and compression
-  operations with native host lowering or explicit per-function stubs.
-- [x] Implement COP3, LWC0-LWC3, and SWC0-SWC3 instruction family stubs and
-  classify unsupported reserved opcodes by exact opcode and SPECIAL function.
+- [ ] Replace partial Linux lowering with complete native lowering for every
+  statically reachable PS-X instruction and host operation.
+- [ ] Remove the legacy fixed-block `write_linux_native` path and make
+  `write_linux_native_cfg` the only Linux lowering implementation.
+- [ ] Improve CFG discovery beyond static leaders. Resolve JALR targets when
+  they are statically provable, preserve indirect-call edges, and emit explicit
+  unsupported exits for unresolved indirect control flow.
+- [ ] Distinguish executable code from embedded data, tables, padding,
+  `.rodata`, and payload regions when counting unsupported instructions.
+- [ ] Report exact supported/reachable word counts, unsupported word counts,
+  leader counts, call-edge counts, unresolved-indirect counts, and the first
+  unsupported address without including data words as instructions.
+- [ ] Add per-instruction native lowering fixtures for every MIPS I opcode,
+  COP0 operation, COP1 operation, COP2/GTE operation, COP3 operation,
+  coprocessor load/store, and reserved opcode.
+- [ ] Remove the remaining generic reserved-opcode and coprocessor stubs that
+  can be lowered directly, and keep only irreducibly unsupported operations
+  as explicit conversion failures.
+- [ ] Replace substring-based unsupported-instruction heuristics with a shared
+  opcode/classification implementation used by lowering, disassembly,
+  diagnostics, and inventory tools.
+
+## MIPS and COP lowering
+
+### Implemented
+
+- [x] Add direct native lowering for NOP and the arithmetic/control subset.
+- [x] Lower fixed and variable shifts.
+- [x] Lower MIPS I arithmetic, logical, compare, immediate, branch, and jump
+  instructions.
+- [x] Lower byte, halfword, word, and unaligned load/store instructions.
+- [x] Lower MULT/MULTU/DIV/DIVU and HI/LO operations.
+- [x] Lower MTHI/MTLO and MFHI/MFLO.
+- [x] Lower SYSCALL and BREAK to native process exit behavior.
+- [x] Add PC-relative branch and static J/JAL lowering.
+- [x] Add JR/JALR emission and JALR target deduplication.
+- [x] Add branch-delay-slot emission and load-delay behavior.
+- [x] Implement signed ADD/ADDI/SUB overflow exits.
+- [x] Implement divide-by-zero exits.
+- [x] Preserve load address, entrypoint, GP, SP, RAM, and scratchpad state.
+- [x] Lower checked PS1 COP0 reads/writes where they correspond to host state.
+- [x] Add explicit COP0/COP1/COP2/COP3 and coprocessor load/store stubs.
+- [x] Name known GTE/COP2 operations and add exact GTE test coverage.
+- [x] Classify exact reserved opcodes and SPECIAL functions.
+- [x] Inventory unsupported instruction words and families across executable
+  payloads.
+
+### Remaining
+
+- [ ] Implement native COP1 floating-point instructions and LWC1/SWC1 behavior.
+- [ ] Implement native COP2/GTE matrix, vector, color, clipping, division,
+  compression, and interpolation operations.
+- [ ] Implement COP3 instructions directly or emit exact unsupported stubs.
+- [ ] Implement all coprocessor load/store families with checked bounds and
+  native memory mappings.
+- [ ] Complete load-delay behavior for every MIPS load form and verify the
+  delay-slot fixtures against real instruction sequences.
+- [ ] Verify exact MIPS signed/unsigned overflow, division edge cases,
+  endianness, unaligned access, and HI/LO semantics with focused fixtures.
+- [ ] Add support for sparse control-flow regions and discontinuous executable
+  sections in CFG discovery.
 
 ## Linux executable conversion
 
-- [x] Complete native Linux ELF64 executable generation with valid entrypoint,
-  program headers, section headers, permissions, and static host linking.
-- [x] Link each lowered executable with host-native code and host-native data;
-  reject dynamic dependencies and unsupported executable layout state.
-- [x] Add real Linux launch fixtures and verify them with `file`, `readelf`,
-  execution, and exit status.
-- [x] Add native executable terminal diagnostics with target, addresses, GP/SP,
-  payload size, lowering size, and completion status.
+### Implemented
 
-## MIPS instruction lowering
+- [x] Add an explicit `--target linux|windows` parameter.
+- [x] Generate ELF64 x86-64 executables with a native `_start` entrypoint.
+- [x] Emit valid ELF entry, program-header, section-header, text, rodata,
+  and BSS metadata.
+- [x] Link with `gcc -nostdlib -static -no-pie`.
+- [x] Add no-exec-stack, RELRO, now, notext, and build-ID linker options.
+- [x] Validate ELF signature, ELF64 class, little-endian encoding, x86-64
+  machine type, ET_EXEC type, entrypoint, program headers, and section headers.
+- [x] Add `file`, `readelf`, execution, and exit-status fixture coverage.
+- [x] Add comprehensive terminal diagnostics for target, addresses, GP/SP,
+  payload size, lowering size, coverage, call edges, unresolved transfers,
+  unsupported counts, and completion status.
+- [x] Produce valid partial ELF artifacts for unsupported instructions.
+- [x] Exit at unsupported instructions with a dedicated native status and
+  first-gap diagnostic.
+- [x] Keep native executable permissions on generated Linux artifacts.
 
-- [x] Add a direct lowering path for NOP and a tested arithmetic/control subset.
-- [x] Lower variable SLLV/SRLV/SRAV shifts and MTHI/MTLO in native entry and
-  JAL target blocks.
-- [x] Lower every MIPS I instruction used by PS-X executables:
-  ADD/ADDU/SUB/SUBU, AND/OR/XOR/NOR, SLT/SLTU, shifts, variable shifts,
-  ADDI/ADDIU/ANDI/ORI/XORI/LUI, SLTI/SLTIU, load/store byte/half/word,
-  branches, J/JAL/JR/JALR, MULT/MULTU/DIV/DIVU, MFHI/MFLO/MTHI/MTLO,
-  SYSCALL/BREAK, and unaligned load/store operations.
-- [x] Add branch-delay-slot emission and PC-relative branch target lowering.
-- [x] Add load-delay-slot behavior for LB/LH/LW/LBU/LHU loads.
-- [x] Implement arithmetic overflow and divide-by-zero exits in lowered ADD,
-  ADDI, SUB, DIV, and DIVU paths.
-- [x] Add native control-flow graph discovery for entry blocks, static branch
-  targets, jump targets, delay slots, and fallthrough leaders.
-- [x] Complete CFG lowering for indirect jumps/JALR and multiple functions.
-- [x] Lower MIPS COP0 reads/writes where they correspond to host-platform state.
-- [x] Replace unsupported COP0/COP2 behavior with explicit conversion errors.
-- [x] Lower MIPS GTE/COP2 instructions directly or classify them as
-  unsupported executable conversion features.
-- [x] Preserve the PS-X load address, stack pointer, global pointer, and entry
-  point in native lowered code.
-- [x] Emit a valid native ELF for partial lowerings and report the first
-  unsupported instruction/address in terminal diagnostics.
+### Remaining
+
+- [ ] Remove all legacy assembly lowering and fixed-block code duplication.
+- [ ] Eliminate shell-string linker invocation and use a repository-owned
+  argument-safe toolchain API.
+- [ ] Add ELF32, ARM64, and other architecture targets only after their native
+  lowering backends exist.
+- [ ] Add PIE/ASLR support only if it is compatible with preserved PS1 addresses.
+- [ ] Verify generated ELF program-header permissions and file offsets for
+  text, rodata, bss, payload, and symbol tables.
+- [ ] Verify generated ELF artifacts with `readelf`, `file`, a linker validator,
+  and direct launch in every supported Linux build environment.
+- [ ] Emit host-native sections only; reject or exclude PS1 payload bytes from
+  executable state that are not referenced by lowered native code.
 
 ## Memory and address lowering
 
-- [x] Map PS1 RAM, scratchpad, and executable sections into native memory.
-- [x] Lower 32-bit PS1 addresses to native host addresses with checked bounds.
-- [x] Preserve endianness and 8/16/32-bit load/store behavior.
-- [x] Translate PS1 MMIO references into explicit unsupported conversion errors
-  unless they have a documented native implementation.
-- [x] Remove all title-specific, BIOS-dependent, and virtualized-memory behavior
-  from lowering.
+### Implemented
 
-## System calls and host integration
+- [x] Map 2 MiB PS1 RAM and 1 KiB scratchpad into native memory.
+- [x] Normalize 32-bit PS1 addresses to host RAM/scratchpad offsets.
+- [x] Preserve 8/16/32-bit load/store behavior and signed/unsigned extensions.
+- [x] Emit checked bounds for RAM and scratchpad accesses.
+- [x] Route out-of-range and MMIO accesses to explicit fault/unsupported exits.
+- [x] Preserve executable payload bytes for native payload copying.
+- [x] Remove title-specific, BIOS-dependent, and virtualized-memory behavior.
 
-- [x] Replace PS1 BIOS-vector assumptions with explicit unsupported conversion
-  results or native host services.
-- [x] Document native equivalents for file, input, audio, video, and console APIs.
-- [x] Add direct native I/O/exit handling.
-- [x] Do not require BIOS images or external PS-X state.
-- [x] Implement SDL-mapped PS1 controller input, including analog sticks and
-  triggers.
-- [x] Implement keyboard and mouse host input mappings.
-- [x] Add an `anyps1-input.ini` format for configuring controller, keyboard,
-  and mouse mappings.
+### Remaining
+
+- [ ] Implement page/range validation for executable sections and RAM boundaries.
+- [ ] Add executable-section protection and separate code/data/rodata mappings.
+- [ ] Add a generic MMIO map with documented native implementations.
+- [ ] Lower PS1 DMA to native host memory copies or explicit unsupported exits.
+- [ ] Lower CD-ROM, disc, cache, timers, controllers, memory cards, SPU, GPU,
+  interrupt, and peripheral state without title-specific behavior.
+- [ ] Implement 32-bit address wraparound consistently across every load,
+  store, branch, jump, and call calculation.
+- [ ] Add exhaustive unaligned load/store and endianness fixtures.
+- [ ] Reject BIOS-dependent executable transitions explicitly.
+
+## Host integration
+
+### Implemented
+
+- [x] Replace BIOS-vector assumptions with native host services or explicit
+  unsupported results.
+- [x] Add native Linux console write and process exit handling.
+- [x] Implement generic file, input, audio, video, and Vulkan host mappings.
+- [x] Add SDL3 gamepad, keyboard, and mouse runtime support.
+- [x] Add analog sticks, triggers, shoulders, D-pad, and face buttons.
+- [x] Add `anyps1-input.ini` parsing and default bindings.
+- [x] Add host mapping and input integration fixtures.
+- [x] Add unsupported MMIO and BIOS-vector fixtures.
+
+### Remaining
+
+- [ ] Implement native file lowering for open/read/write/seek/close operations.
+- [ ] Integrate input polling into the actual generated executable loop.
+- [ ] Implement SDL3 window creation and event pumping in the Linux/Windows
+  host backend.
+- [ ] Implement native audio lowering for PS1 SPU operations.
+- [ ] Implement native video framebuffer presentation.
+- [ ] Implement native Vulkan swapchain, image, sampler, pipeline, and
+  command-buffer resources.
+- [ ] Expose host-native diagnostics through structured exit codes and logs.
+- [ ] Implement title-independent memory-card storage mapping.
+- [ ] Implement title-independent CD/disc filesystem and asset access mapping.
+- [ ] Add explicit unsupported exits for every unimplemented BIOS vector and
+  MMIO device family.
 
 ## Windows executable conversion
 
-- [x] Implement native PE32+ generation with explicit Windows lowering diagnostics.
-- [x] Validate DOS/PE signatures, COFF headers, optional headers, sections,
-  entrypoint, imports, relocations, and architecture.
-- [x] Test PE output with available Windows cross-toolchains and format inspectors.
+### Implemented
+
+- [x] Generate PE32+ layout for AMD64 with DOS and PE signatures.
+- [x] Add COFF headers, optional headers, text/rdata sections, entrypoint,
+  imports, relocations, architecture fields, and host diagnostics.
+- [x] Add PE signature, machine, section, optional-header, and import-directory
+  fixture validation.
+- [x] Add `objdump`/`llvm-readobj` format-inspector support.
+- [x] Use explicit Windows lowering diagnostics rather than silent success.
+
+### Remaining
+
+- [ ] Implement native Windows MIPS lowering equivalent to Linux lowering.
+- [ ] Generate imports and relocations for real Windows host-native code.
+- [ ] Add PE32 support if an x86 compatibility target is required.
+- [ ] Test generated PE32+ output with available Windows cross-toolchains.
+- [ ] Add Windows execution fixtures and exit-status/diagnostic validation.
+- [ ] Integrate Windows SDL3 input and Vulkan host services.
+- [ ] Validate generated PE images with platform format inspectors and signed
+  executable tooling as applicable.
 
 ## PS1 GPU lowering and Vulkan shaders
 
-- [x] Define a generic host graphics IR for PS1 GP0/GP1 commands and VRAM operations.
-- [x] Lower GP0 and GP1 state changes into Vulkan resources and command-buffer operations.
-- [x] Emit SPIR-V shaders for PS1 polygon, textured-polygon, sprite, rectangle,
-  blending, and framebuffer operations.
-- [x] Add SPIR-V validation and optimization through `SPIRV-Tools` in conversion tests.
-- [x] Use `glslang` or a direct SPIR-V emitter for host shader generation.
-- [x] Add a Vulkan backend for Linux and Windows without adding NVIDIA/CUDA-only dependencies.
+### Implemented
+
+- [x] Define a generic GP0/GP1 and VRAM graphics IR.
+- [x] Lower GP0/GP1 state changes into Vulkan resource plans.
+- [x] Emit direct SPIR-V shader modules for polygon, textured-polygon, sprite,
+  rectangle, and framebuffer primitive categories.
+- [x] Add generic SPIR-V validation and optimization test support.
+- [x] Add Vulkan/Linux and Vulkan/Windows platform enums without CUDA/NVIDIA
+  dependencies.
 - [x] Preserve unsupported GPU commands as explicit conversion failures.
 
-## Validation
+### Remaining
 
-- [x] Replace synthetic-only lowerer tests with minimal executable fixtures
-  covering arithmetic, load/store, branches, calls, delay slots, and entrypoints.
-- [x] Add negative fixtures for malformed and truncated PS-X headers.
-- [x] Relink all available reference games and report the exact first native
-  lowering gap for each executable. Run
-  `python3 tools/report_relink_gaps.py --binary build/anyps1 --reference-root references/games --output build/reference-relink-report.txt`
-  as an opt-in smoke operation; it must not become a title-specific CTest or relinker requirement.
-- [x] Add end-to-end tests that run a lowered executable and verify native exit
-  status and observable host output.
-- [x] Add all conversion results to TODO/dev docs without recording interpretation
-  behavior as a relinker requirement.
+- [ ] Model GP0/GP1 command payloads completely, including VRAM transfers,
+  draw areas, texture windows, display areas, display modes, DMA direction,
+  and display enable state.
+- [ ] Emit primitive-specific SPIR-V shaders rather than a shared minimal module.
+- [ ] Implement PS1 blending modes, semi-transparency, dithering, 16/24-bit
+  color, CLUT/texture lookup, texture-page modes, and framebuffer reads.
+- [ ] Implement polygon, textured-polygon, sprite, rectangle, line, and
+  framebuffer operations with native Vulkan pipelines.
+- [ ] Implement VRAM-to-host-image and host-image-to-VRAM transfers.
+- [ ] Create and validate Vulkan resources in the Linux/Windows runtime.
+- [ ] Integrate shader validation and optimization into release builds.
+- [ ] Add SPIR-V golden fixtures and malformed GPU command fixtures.
+- [ ] Preserve unsupported GPU commands as conversion failures, including no
+  silent drop or emulator fallback.
+
+## Unsupported instruction tracking
+
+### Implemented
+
+- [x] Add a C++ unsupported-instruction classifier for SPECIAL, COP0/COP1/COP2/
+  COP3, coprocessor load/store, and reserved opcodes.
+- [x] Add exact GTE/COP2 function names for known operations.
+- [x] Emit category-specific native unsupported stubs.
+- [x] Add first-gap, unsupported-count, coverage, call-edge, and unresolved
+  transfer terminal diagnostics.
+- [x] Add a JSON inventory tool for exact instruction words, addresses, and
+  family counts.
+- [x] Add fixture tests for COP1/COP2/COP3 and reserved-opcode classification.
+
+### Remaining
+
+- [ ] Replace separate Python and C++ opcode-name tables with one generated or
+  shared canonical opcode registry.
+- [ ] Add exact MIPS function names and operand decoding for every reserved
+  SPECIAL function.
+- [ ] Add exact disassembly for every inventory entry.
+- [ ] Add source-fix stubs for instruction-family implementation functions.
+- [ ] Track newly resolved instruction families and remove their unsupported
+  stubs automatically.
+- [ ] Ensure inventory counts exclude embedded data and unreachable code.
+
+## Validation and quality
+
+### Implemented
+
+- [x] Add checked-in JSON executable fixtures for arithmetic, loads/stores,
+  branches, calls, delay slots, entrypoints, memory, host integration, and
+  unsupported paths.
+- [x] Add malformed and truncated PS-X header fixtures.
+- [x] Add end-to-end Linux ELF launch fixtures and terminal-output checks.
+- [x] Add PE32+, SPIR-V, SDL input, host integration, and unsupported registry
+  tests.
+- [x] Add an opt-in generic reference-executable inventory/report tool.
+- [x] Add CMake, CTest, layout, fixture, build, and format validation targets.
+
+### Remaining
+
+- [ ] Relink available reference executables and record first reachable
+  unsupported gaps in build artifacts, never in title-specific test code.
+- [ ] Add minimal copyright-safe fixtures for every new real-executable blocker.
+- [ ] Run sanitizer builds and fuzz malformed PS-X headers/payloads.
+- [ ] Add deterministic assembler/linker failure tests.
+- [ ] Add ELF and PE reproducibility tests.
+- [ ] Add cross-platform Linux/Windows build matrices.
+- [ ] Add static analysis, compiler-warning cleanup, and memory/error audit.
+- [ ] Add benchmark and timeout tests for CFG discovery and assembly generation.
+- [ ] Add CMake release artifacts and installation/packaging rules.
+- [ ] Keep TODO current after every converter, lowering, host, and format change.
