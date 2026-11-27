@@ -35,6 +35,8 @@
   unsupported executable conversion features.
 - [x] Preserve the PS-X load address, stack pointer, global pointer, and entry
   point in native lowered code.
+- [x] Emit a valid native ELF for partial lowerings and report the first
+  unsupported instruction/address in terminal diagnostics.
 
 ## Memory and address lowering
 

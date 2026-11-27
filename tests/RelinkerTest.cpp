@@ -11,6 +11,7 @@
 #include <string>
 #include <iterator>
 #include <vector>
+#include <sys/wait.h>
 
 int main(int argc, char** argv)
 {
@@ -52,14 +53,8 @@ int main(int argc, char** argv)
             anyps1::RelinkOptions bios_options;
             bios_options.input = game_root;
             bios_options.target = anyps1::TargetPlatform::Linux;
-            try {
-                anyps1::relink(bios_options);
-                throw std::runtime_error("PS1 BIOS-vector fixture unexpectedly relinked");
-            } catch (const std::exception& error) {
-                if (std::string(error.what()).find("BIOS-vector") == std::string::npos
-                    && std::string(error.what()).find("indirect JR") == std::string::npos) {
-                    throw;
-                }
+            if (!anyps1::relink(bios_options)) {
+                throw std::runtime_error("partial BIOS-vector fixture relink failed");
             }
             std::filesystem::remove_all(game_root);
             return 0;
@@ -125,7 +120,11 @@ int main(int argc, char** argv)
             terminal_output += capture.data();
         }
         const int capture_status = pclose(executable);
-        if (capture_status != 0) {
+        const int exit_status =
+            WIFEXITED(capture_status) ? WEXITSTATUS(capture_status) : -1;
+        const bool partial_fixture =
+            std::string(fixture_path).find("native-unsupported.ps-exe") != std::string::npos;
+        if (exit_status != 0 && !(partial_fixture && exit_status == 16)) {
             throw std::runtime_error("native ELF artifact did not exit successfully");
         }
         if (terminal_output.find("AnyPS1 native executable diagnostics") == std::string::npos
@@ -133,8 +132,14 @@ int main(int argc, char** argv)
             || terminal_output.find("entry_point=0x") == std::string::npos
             || (std::string(fixture_path).find("native-cfg-cop0.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("comprehensive.ps-exe") == std::string::npos
+                && std::string(fixture_path).find("native-unsupported.ps-exe") == std::string::npos
                 && terminal_output.find("native lowering complete") == std::string::npos)) {
             throw std::runtime_error("native ELF artifact lacks comprehensive diagnostics");
+        }
+        if (partial_fixture &&
+            (terminal_output.find("unsupported_instructions=") == std::string::npos ||
+             terminal_output.find("first_unsupported_gap=0x") == std::string::npos)) {
+            throw std::runtime_error("partial native ELF lacks unsupported lowering diagnostics");
         }
 
         anyps1::RelinkOptions windows_options;

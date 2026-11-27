@@ -57,7 +57,11 @@ Windows MIPS lowering and PE generation are implemented.
 ## Current status
 
 - Native Linux ELF lowering is implemented for a tested MIPS subset.
-- Unsupported instructions and executable layouts fail explicitly.
+- Partial lowerings produce a valid native ELF and report the unsupported
+  instruction/address in terminal diagnostics. Execution exits explicitly
+  when it reaches an unsupported operation instead of silently substituting
+  emulator behavior.
+- Malformed and unsupported executable layouts fail explicitly at relink time.
 - PS1 BIOS and emulator fallback behavior are not part of relinking.
 - Windows output is planned, not currently supported.
 - Generic GP0/GP1 graphics IR and SPIR-V conversion structures are implemented;

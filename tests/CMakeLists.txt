@@ -33,6 +33,7 @@ add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_
 add_test(NAME relinker_native_cfg_cop0 COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-cfg-cop0.ps-exe)
 add_test(NAME relinker_native_unaligned COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-unaligned.ps-exe)
 add_test(NAME relinker_native_comprehensive COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/comprehensive.ps-exe)
+add_test(NAME relinker_native_partial COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-unsupported.ps-exe)
 add_test(NAME relinker_invalid_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/invalid.ps-exe)
 add_test(NAME relinker_truncated_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/truncated.ps-exe)
 

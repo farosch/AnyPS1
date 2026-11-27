@@ -42,6 +42,9 @@ void write_linux_native_cfg(
     std::set<std::uint32_t> leaders;
     std::set<std::uint32_t> delay_slots;
     std::queue<std::uint32_t> work;
+    std::uint32_t unsupported_count = 0;
+    std::uint32_t first_unsupported_address = 0;
+    std::uint32_t first_unsupported_word = 0;
     leaders.insert(initial_pc);
     work.push(initial_pc);
     while (!work.empty()) {
@@ -78,12 +81,12 @@ void write_linux_native_cfg(
             if ((target & 0xFF000000u) == 0xA0000000u
                 || (target & 0xFF000000u) == 0xB0000000u
                 || (target & 0xFF000000u) == 0xC0000000u) {
-                throw std::runtime_error(
-                    "unsupported PS1 BIOS-vector transition at " + hex32(address)
-                    + " to " + hex32(target));
+                leaders.insert(address + 8);
+                work.push(address + 8);
+            } else {
+                leaders.insert(target);
+                work.push(target);
             }
-            leaders.insert(target);
-            work.push(target);
             if (opcode == 0x03) {
                 leaders.insert(address + 8);
                 work.push(address + 8);
@@ -98,6 +101,53 @@ void write_linux_native_cfg(
                 delay_slots.insert(delay_address);
                 leaders.insert(delay_address);
                 work.push(delay_address);
+            }
+        }
+
+    }
+
+    for (std::uint32_t offset = 0; offset + 4 <= file_size; offset += 4) {
+        const std::uint32_t address = load_address + offset;
+        const std::uint32_t instruction = read_psx32(data, PSX_HEADER_SIZE + offset);
+        const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t rs = (instruction >> 21) & 31u;
+        const std::uint32_t special = instruction & 63u;
+        bool supported = false;
+        if (instruction == 0) {
+            supported = true;
+        } else if (opcode == 0) {
+            supported =
+                special == 0x00 || special == 0x02 || special == 0x03 ||
+                special == 0x04 || special == 0x06 || special == 0x07 ||
+                special == 0x08 || special == 0x09 ||
+                special == 0x10 || special == 0x11 || special == 0x12 ||
+                special == 0x13 || special == 0x18 || special == 0x19 ||
+                special == 0x1A || special == 0x1B ||
+                special == 0x20 || special == 0x21 || special == 0x22 ||
+                special == 0x23 || special == 0x24 || special == 0x25 ||
+                special == 0x26 || special == 0x27 || special == 0x2A ||
+                special == 0x2B || special == 0x0C || special == 0x0D;
+        } else if (opcode == 0x10) {
+            supported =
+                rs == 0x00 || rs == 0x02 || rs == 0x04 ||
+                rs == 0x06 || (rs == 0x10 && special == 0x10);
+        } else {
+            supported =
+                opcode == 0x01 || opcode == 0x02 || opcode == 0x03 ||
+                opcode == 0x04 || opcode == 0x05 || opcode == 0x06 ||
+                opcode == 0x07 || opcode == 0x08 || opcode == 0x09 ||
+                opcode == 0x0A || opcode == 0x0B || opcode == 0x0C ||
+                opcode == 0x0D || opcode == 0x0E || opcode == 0x0F ||
+                opcode == 0x20 || opcode == 0x21 || opcode == 0x22 ||
+                opcode == 0x23 || opcode == 0x24 || opcode == 0x25 ||
+                opcode == 0x26 || opcode == 0x28 || opcode == 0x29 ||
+                opcode == 0x2A || opcode == 0x2B || opcode == 0x2E;
+        }
+        if (!supported) {
+            ++unsupported_count;
+            if (first_unsupported_address == 0) {
+                first_unsupported_address = address;
+                first_unsupported_word = instruction;
             }
         }
     }
@@ -120,6 +170,13 @@ void write_linux_native_cfg(
     const std::string sp = "initial_sp=" + hex32(initial_sp) + "\n";
     const std::string payload_size = "payload_size=" + std::to_string(file_size) + "\n";
     const std::string lowered = "lowered_words=" + std::to_string(leaders.size()) + "\n";
+    const std::string unsupported =
+        "unsupported_instructions=" + std::to_string(unsupported_count) + "\n";
+    const std::string first_gap =
+        first_unsupported_address == 0
+            ? "first_unsupported_gap=none\n"
+            : "first_unsupported_gap=" + hex32(first_unsupported_address) +
+              " instruction=" + hex32(first_unsupported_word) + "\n";
     const std::string completed = "native lowering complete\n";
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
@@ -133,6 +190,8 @@ void write_linux_native_cfg(
     source << "diag_sp:.asciz \"" << escape_assembly_string(sp) << "\"\n";
     source << "diag_payload:.asciz \"" << escape_assembly_string(payload_size) << "\"\n";
     source << "diag_lowered:.asciz \"" << escape_assembly_string(lowered) << "\"\n";
+    source << "diag_unsupported:.asciz \"" << escape_assembly_string(unsupported) << "\"\n";
+    source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
     source << ".text\n.globl _start\n_start:\n";
     source << "leaq diag_banner(%rip), %rsi\nmov $" << banner.size() << ", %rdx\ncall print_diag\n";
@@ -143,6 +202,8 @@ void write_linux_native_cfg(
     source << "leaq diag_sp(%rip), %rsi\nmov $" << sp.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_payload(%rip), %rsi\nmov $" << payload_size.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_lowered(%rip), %rsi\nmov $" << lowered.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_unsupported(%rip), %rsi\nmov $" << unsupported.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";
     source << "add $" << (load_address & 0x1FFFFFu) << ", %rdi\n";
     source << "leaq payload(%rip), %rsi\n";
@@ -160,6 +221,11 @@ void write_linux_native_cfg(
     source << "memory_fault_exit:\nmov $13, %edi\nmov $60, %eax\nsyscall\n";
     source << "mmio_exit:\nmov $14, %edi\nmov $60, %eax\nsyscall\n";
     source << "unsupported_jump_exit:\nmov $15, %edi\nmov $60, %eax\nsyscall\n";
+    source << "unsupported_instruction_exit:\n";
+    source << "leaq diag_first_gap(%rip), %rsi\n";
+    source << "mov $" << first_gap.size() << ", %rdx\n";
+    source << "call print_diag\n";
+    source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
     source << ".text\n";
     source << "print_diag:\n";
     source << "mov $1, %edi\n";
@@ -233,7 +299,7 @@ void write_linux_native_cfg(
             } else if (special == 0x0D) {
                 source << "mov $9, %edi\nmov $60, %eax\nsyscall\n";
             } else {
-                throw std::runtime_error("unsupported native MIPS instruction at " + hex32(address));
+                source << "jmp unsupported_instruction_exit\n";
             }
         } else if (opcode == 0x10) {
             const std::uint32_t cop0_register = rd;
@@ -252,12 +318,10 @@ void write_linux_native_cfg(
                        << "andl $~3, %eax\n"
                        << "movl %eax, cop0+48(%rip)\n";
             } else {
-                throw std::runtime_error(
-                    "unsupported native COP0 operation at " + hex32(address));
+                source << "jmp unsupported_instruction_exit\n";
             }
         } else if (opcode == 0x12) {
-            throw std::runtime_error(
-                "unsupported native COP2/GTE instruction at " + hex32(address));
+            source << "jmp unsupported_instruction_exit\n";
         } else if (opcode == 0x0F) {
             source << "movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x08) {
@@ -475,7 +539,7 @@ void write_linux_native_cfg(
             }
             source << "movl %eax, (%rbx,%rdi)\n";
         } else {
-            throw std::runtime_error("unsupported native MIPS opcode at " + hex32(address));
+            source << "jmp unsupported_instruction_exit\n";
         }
     };
 
@@ -520,6 +584,9 @@ void write_linux_native_cfg(
                 static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
             const std::uint32_t target =
                 static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+            if (target < load_address || target >= load_address + file_size) {
+                source << "jmp unsupported_jump_exit\n";
+            } else
             if (opcode == 0x04) {
                 source << "movl " << rs * 4 << "(%r12), %eax\n";
                 source << "cmpl " << rt * 4 << "(%r12), %eax\n";
@@ -545,8 +612,7 @@ void write_linux_native_cfg(
                     source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
                     source << "jge p" << std::hex << target << std::dec << "\n";
                 } else {
-                    throw std::runtime_error(
-                        "unsupported native MIPS REGIMM branch at " + hex32(address));
+                    source << "jmp unsupported_instruction_exit\n";
                 }
             }
         } else if (jump) {
@@ -554,9 +620,17 @@ void write_linux_native_cfg(
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
             if (opcode == 0x03) {
                 source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
-                source << "call p" << std::hex << target << std::dec << "\n";
+                if (target >= load_address && target < load_address + file_size) {
+                    source << "call p" << std::hex << target << std::dec << "\n";
+                } else {
+                    source << "jmp unsupported_jump_exit\n";
+                }
             } else {
-                source << "jmp p" << std::hex << target << std::dec << "\n";
+                if (target >= load_address && target < load_address + file_size) {
+                    source << "jmp p" << std::hex << target << std::dec << "\n";
+                } else {
+                    source << "jmp unsupported_jump_exit\n";
+                }
             }
         } else if (jr) {
             if (rs == 31) {
