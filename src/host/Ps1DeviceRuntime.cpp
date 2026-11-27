@@ -2,6 +2,10 @@
 
 #include <cstdint>
 
+#ifdef _MSC_VER
+extern "C" void _RTC_CheckStackVars(void*, void*) {}
+#endif
+
 namespace {
 
 anyps1::Ps1DeviceRuntime device_runtime;

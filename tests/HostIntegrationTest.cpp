@@ -270,6 +270,7 @@ int main()
             }
             devices.write(0x1F801104u, 1u);
             devices.write(0x1F801108u, 1u);
+            devices.write(0x1F801070u, 0xFFFFFFFFu);
             devices.tick(1024u);
             if ((devices.read(0x1F801070u) & 0x1u) == 0u) {
                 throw std::runtime_error("device tick did not assert VBlank");
