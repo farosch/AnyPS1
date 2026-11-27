@@ -63,7 +63,7 @@
   stubs for LWC0-LWC3/SWC0-SWC3 coprocessor families.
 - [x] Complete load-delay behavior for every MIPS load form and verify the
   delay-slot fixtures against real instruction sequences.
-- [ ] Verify exact MIPS signed/unsigned overflow, division edge cases,
+- [x] Verify exact MIPS signed/unsigned overflow, division edge cases,
   endianness, unaligned access, and HI/LO semantics with focused fixtures.
 - [x] Add support for sparse control-flow regions and discontinuous executable
   sections in CFG discovery.

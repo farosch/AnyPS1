@@ -104,6 +104,10 @@ add_test(NAME relinker_sparse_cfg
     COMMAND anyps1_relinker_test
         ${FIXTURE_OUTPUT_DIR}/mips/native-sparse-cfg.ps-exe)
 
+add_test(NAME relinker_mips_edge_cases
+    COMMAND anyps1_relinker_test
+        ${FIXTURE_OUTPUT_DIR}/mips/mips-edge-cases.ps-exe)
+
 
 add_executable(anyps1_payload_region_test PayloadRegionTest.cpp)
 target_include_directories(anyps1_payload_region_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
