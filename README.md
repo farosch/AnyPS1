@@ -1,34 +1,137 @@
 # AnyPS1
 
-AnyPS1 is a project for relinking PlayStation 1 game executables into native Linux or Windows programs.
+AnyPS1 converts extracted PlayStation 1 game files into native Linux or Windows
+programs. It is a relinker and PS1 executable conversion project, not a PS1
+emulator.
 
-This repository converts PS-X EXE images and extracted PlayStation 1 discs into
-native Linux or Windows artifacts.
+The required relinker input is an extracted game folder prepared in the layout
+described below. A raw CUE/BIN disc is not the relinker input. The extraction
+script in this repository is a helper that turns CUE/BIN discs into that
+expected extracted-folder layout.
 
-## Architecture
+## Workflow
 
-AnyPS1 is organized around executable conversion, direct MIPS lowering,
-command-line tools, and target-platform output.
+```text
+CUE/BIN discs
+    |
+    v
+tools/extract_psx_game.py
+    |
+    v
+extracted game folder
+    |
+    v
+anyps1
+    |
+    v
+native game ELF or PE executable
+```
 
-The implementation decodes PS-X EXE structures, analyzes references and entry
-points, and produces native Linux or Windows artifacts through direct MIPS
-instruction lowering. It does not execute or interpret PS-X behavior.
+1. Extract one or more CUE/BIN discs with `tools/extract_psx_game.py`.
+2. Point `anyps1` at the resulting extracted disc folder or game folder.
+3. The relinker reads `SYSTEM.CNF`, finds the boot PS-X executable, lowers
+   supported MIPS code, and writes the native artifact beside the extracted
+   game files.
+
+## Extraction helper
+
+Extract a single-disc game:
+
+```sh
+python3 tools/extract_psx_game.py "/path/to/Game.cue"
+```
+
+Extract every disc of a multi-disc game:
+
+```sh
+python3 tools/extract_psx_game.py \
+  "/path/to/Game (Disc 1).cue" \
+  "/path/to/Game (Disc 2).cue" \
+  "/path/to/Game (Disc 3).cue"
+```
+
+The default output is an `extracted/` directory next to the first CUE file.
+Use `--output` to choose another location:
+
+```sh
+python3 tools/extract_psx_game.py \
+  "/path/to/Game (Disc 1).cue" \
+  "/path/to/Game (Disc 2).cue" \
+  --output "/path/to/output"
+```
+
+The extraction helper removes and recreates each output disc directory on
+subsequent runs.
+
+The resulting layout is direct and contains the extracted disc filesystem:
+
+```text
+extracted/
+  disc1/
+    SYSTEM.CNF
+    SCUS_941.63
+    BATTLE/
+    MENU/
+    ...other extracted files
+  disc2/
+    SYSTEM.CNF
+    SCUS_941.64
+    ...other extracted files
+```
+
+When the game has one disc, `anyps1` can read `extracted/disc1/`. For a
+multi-disc game, point `anyps1` at the relevant disc folder or at the overall
+`extracted/` folder.
+
+## Relinking
+
+Build the project, then pass the extracted folder:
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+./build/anyps1 "/path/to/extracted/disc1"
+```
+
+The default target is Linux:
+
+```sh
+./build/anyps1 --target linux "/path/to/extracted/disc1"
+```
+
+Windows conversion is a planned target:
+
+```sh
+./build/anyps1 --target windows "/path/to/extracted/disc1"
+```
+
+The relinker:
+
+- accepts an extracted disc folder or an extracted game folder;
+- reads `SYSTEM.CNF` to identify the boot executable;
+- falls back to locating a PS-X EXE header in the extracted files;
+- writes `game.elf` for Linux or `game.exe` for Windows in the directory supplied
+  as input;
+- reports unsupported executable layouts or instructions explicitly.
+
+Do not pass `Game.cue`, `Game.bin`, or an arbitrary PS-X executable to the
+normal directory workflow. The helper and relinker accept different inputs.
 
 ## GPU lowering and Vulkan
 
-The PS1 GPU command stream is lowered into native host graphics operations.
-The lowering pipeline targets Vulkan rather than CUDA: Vulkan is available on
-Linux and Windows and exposes a portable SPIR-V shader interface. CUDA would be
-NVIDIA-only and would not provide a cross-platform PS1 host backend.
+PS1 GP0/GP1 commands and framebuffer operations are planned for lowering into a
+generic host graphics intermediate representation. Vulkan is the intended
+cross-platform rendering target because it supports portable SPIR-V shaders.
+CUDA is not used because it is NVIDIA-specific.
 
-The repository includes these graphics and shader submodules:
+The repository includes:
 
-- `3rdparty/Vulkan-Headers`: Vulkan API definitions and types.
-- `3rdparty/SPIRV-Headers`: SPIR-V definitions and grammar headers.
-- `3rdparty/SPIRV-Tools`: SPIR-V validation and optimization.
-- `3rdparty/glslang`: GLSL and SPIR-V shader tooling.
+- `3rdparty/Vulkan-Headers`
+- `3rdparty/SPIRV-Headers`
+- `3rdparty/SPIRV-Tools`
+- `3rdparty/glslang`
 
-SPIR-V support is built only when explicitly enabled:
+Enable SPIR-V tooling explicitly:
 
 ```sh
 cmake -S . -B build -G Ninja \
@@ -36,25 +139,19 @@ cmake -S . -B build -G Ninja \
   -DANYPS1_ENABLE_GLSLANG=ON
 ```
 
-The initial implementation will lower PS1 GP0/GP1 commands and framebuffer
-operations into a generic host graphics IR. That IR will emit SPIR-V for Vulkan
-rendering; it is not an emulator process or a runtime instruction interpreter.
+GPU lowering is not complete. Unsupported GPU commands must fail explicitly
+and must not silently disappear or fall back to an emulator-style runtime.
 
 ## Layout
 
-- `src/`: executable decoding, relinking implementation, and main entrypoint
-- `tools`: command-line and analysis utilities
-- `TODO.md`: known implementation gaps and validation work
-- `tests`: integration and unit tests
-- `3rdparty`: third-party dependencies managed as submodules
+- `src/`: relinker and executable-lowering implementation
+- `tools/`: extraction and PS1 analysis helpers
+- `tests/`: fixture-based C++ and Python tests
+- `assets/`: repository assets such as the relinker icon
+- `3rdparty/`: third-party dependencies managed as submodules
+- `TODO.md`: implementation gaps and validation work
 
-## Build
-
-Requirements:
-
-- CMake 3.20 or newer
-- A C++17 compiler
-- Ninja or another CMake-supported build tool
+## Testing
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -62,48 +159,6 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-## Extract a PS1 game
-
-```sh
-python3 tools/extract_psx_game.py "/path/to/Game.cue"
-```
-
-## Relink an extracted PS1 game
-
-```sh
-anyps1 "/path/to/extracted/game"
-anyps1 --target linux "/path/to/extracted/game"
-anyps1 --target windows "/path/to/extracted/game"
-```
-
-The relinker accepts an extracted game directory or disc directory. It locates
-the boot executable from `SYSTEM.CNF` (or, as a fallback, a PS-X executable
-header), lowers supported MIPS instructions directly into native Linux code,
-and rejects unsupported instructions explicitly. It does not execute or interpret
-PS-X behavior.
-
-Relinked native executables print terminal diagnostics on startup: target
-platform, load address, entry point, GP/SP values, payload size, lowered word
-count, and lowering completion status.
-
-The resulting layout is:
-
-```text
-extracted/
-  disc1/
-    SYSTEM.CNF
-    SCUS_941.63
-    ... other extracted files
-  disc2/
-    SYSTEM.CNF
-    SCUS_941.64
-    ... other extracted files
-```
-
-Relinking a directory writes `game.elf` or `game.exe` into the directory itself:
-
-```sh
-anyps1 "/path/to/extracted"
-anyps1 --target windows "/path/to/extracted/disc1"
-```
-
+Tests materialize generated binary inputs from JSON descriptions under
+`tests/fixtures/json/`. Generated `.ps-exe` and `.bin` files remain build
+artifacts and are not source-controlled fixtures.
