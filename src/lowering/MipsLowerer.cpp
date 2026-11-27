@@ -573,6 +573,37 @@ void write_linux_native_cfg(
                 } else if (special == 4) {
                     source << "sqrtss fregs+" << fs * 4 << "(%rip), %xmm0\n";
                     source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 5) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "andl $0x7FFFFFFF, %eax\n";
+                    source << "movd %xmm0, %eax\n";
+                    source << "andl $0x7FFFFFFF, %eax\n";
+                    source << "movd %eax, %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 6) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 7) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "movd %xmm0, %eax\n";
+                    source << "xorl $0x80000000, %eax\n";
+                    source << "movd %eax, %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 12) {
+                    source << "roundss $0, fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "cvttss2si %xmm0, %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 13) {
+                    source << "cvttss2si fregs+" << fs * 4 << "(%rip), %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 14) {
+                    source << "roundss $2, fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "cvttss2si %xmm0, %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 15) {
+                    source << "roundss $1, fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "cvttss2si %xmm0, %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
                 } else if (special == 0x20) {
                     source << "cvttss2si fregs+" << fs * 4 << "(%rip), %eax\n";
                     source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
@@ -580,7 +611,41 @@ void write_linux_native_cfg(
                     source << "movl fregs+" << fs * 4 << "(%rip), %eax\n";
                     source << "cvtsi2ss %eax, %xmm0\n";
                     source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 0x30) {
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
+                } else if (special == 0x31) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "comiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "setp %dl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
                 } else if (special == 0x32) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "comiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "setz %dl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
+                } else if (special == 0x33) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "comiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "setz %dl\n";
+                    source << "setp %cl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "movzbl %cl, %ecx\n";
+                    source << "orl %ecx, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
+                } else if (special == 0x34) {
                     source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
                     source << "comiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
                     source << "movl fpcsr(%rip), %eax\n";
