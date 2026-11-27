@@ -9,12 +9,14 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 namespace anyps1 {
 
 namespace {
 
 constexpr std::uint32_t PSX_HEADER_SIZE = 2048;
+constexpr char NATIVE_PSX_MAGIC[] = "ANYPS1-PSX-IMAGE";
 
 void trim(std::string& value)
 {
@@ -135,6 +137,21 @@ void write16(std::ofstream& output, std::uint16_t value)
     output.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 }
 
+void write64(std::ofstream& output, std::uint64_t value)
+{
+    const std::array<unsigned char, 8> bytes{
+        static_cast<unsigned char>(value),
+        static_cast<unsigned char>(value >> 8),
+        static_cast<unsigned char>(value >> 16),
+        static_cast<unsigned char>(value >> 24),
+        static_cast<unsigned char>(value >> 32),
+        static_cast<unsigned char>(value >> 40),
+        static_cast<unsigned char>(value >> 48),
+        static_cast<unsigned char>(value >> 56),
+    };
+    output.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
+
 std::uint32_t read32(const std::vector<unsigned char>& data, std::size_t offset)
 {
     if (offset + 4 > data.size()) {
@@ -157,17 +174,15 @@ void write_pe_layout(
     if (!output) {
         throw std::runtime_error("cannot open output artifact: " + options.output);
     }
+    const std::uint32_t pe_offset = 128;
+    const std::uint32_t optional_header_size = 240;
+    const std::uint32_t raw_offset = 512;
+    const std::uint64_t psx_size = data.size();
+    const std::uint64_t payload_offset = raw_offset + 16;
+    const std::uint64_t trailer_offset = payload_offset + psx_size;
+    const std::uint64_t raw_size = ((trailer_offset + 24 + 511) / 512) * 512;
 
-    const std::uint32_t dos_header_size = 128;
-    const std::uint32_t pe_offset = dos_header_size;
-    const std::uint32_t coff_header_size = 20;
-    const std::uint32_t optional_header_size = 224;
-    const std::uint32_t section_header_size = 40;
-    const std::uint32_t headers_end = pe_offset + 4 + coff_header_size + optional_header_size + section_header_size;
-    const std::uint32_t raw_offset = (headers_end + 511) & ~511u;
-    const std::uint32_t raw_size = (file_size + 511) & ~511u;
-
-    unsigned char dos[64]{};
+    unsigned char dos[128]{};
     dos[0] = 'M';
     dos[1] = 'Z';
     dos[60] = static_cast<unsigned char>(pe_offset);
@@ -175,10 +190,9 @@ void write_pe_layout(
     dos[62] = static_cast<unsigned char>(pe_offset >> 16);
     dos[63] = static_cast<unsigned char>(pe_offset >> 24);
     output.write(reinterpret_cast<const char*>(dos), sizeof(dos));
-    output.write(reinterpret_cast<const char*>(dos), 64);
 
     output.write("PE\0\0", 4);
-    write16(output, 0x0166);
+    write16(output, 0x8664);
     write16(output, 1);
     write32(output, 0);
     write32(output, 0);
@@ -186,46 +200,42 @@ void write_pe_layout(
     write16(output, optional_header_size);
     write16(output, 0x0102);
 
-    write16(output, 0x10B);
+    write16(output, 0x20B);
     write16(output, 0);
-    write32(output, file_size);
+    write32(output, 16);
     write32(output, 0);
     write32(output, 0);
     write32(output, 0x1000);
-    write32(output, 0x00400000);
     write32(output, 0x1000);
-    write32(output, 0x200);
+    write64(output, 0x140000000ULL);
+    write32(output, 4096);
+    write32(output, 512);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
+    write16(output, 0);
     write16(output, 6);
     write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write32(output, raw_offset + raw_size);
+    write32(output, 0);
+    write32(output, static_cast<std::uint32_t>(raw_size));
     write32(output, raw_offset);
     write32(output, 0);
     write16(output, 3);
     write16(output, 0);
-    write32(output, 0x100000);
-    write32(output, 0x1000);
-    write32(output, 0x100000);
-    write32(output, 0x1000);
+    write64(output, 0x100000ULL);
+    write64(output, 0x1000ULL);
+    write64(output, 0x100000ULL);
+    write64(output, 0x1000ULL);
     write32(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    for (int index = 0; index < 16; ++index) {
-        write32(output, 0);
-        write32(output, 0);
+    write32(output, 16);
+    for (std::uint32_t index = 0; index < 16; ++index) {
+        write64(output, 0);
     }
 
     output.write(".text\0\0\0", 8);
-    write32(output, file_size);
+    write32(output, 512);
     write32(output, 0x1000);
-    write32(output, raw_size);
+    write32(output, 512);
     write32(output, raw_offset);
     write32(output, 0);
     write32(output, 0);
@@ -233,19 +243,66 @@ void write_pe_layout(
     write16(output, 0);
     write32(output, 0x60000020);
 
-    while (output.tellp() >= 0 && static_cast<std::uint32_t>(output.tellp()) < raw_offset) {
+    while (output.tellp() >= 0 && static_cast<std::uint64_t>(output.tellp()) < raw_offset) {
         output.put('\0');
     }
-    output.write(
-        reinterpret_cast<const char*>(data.data() + PSX_HEADER_SIZE),
-        static_cast<std::streamsize>(file_size)
-    );
-    while (static_cast<std::uint32_t>(output.tellp()) < raw_offset + raw_size) {
+    const unsigned char stub[] = {0x31, 0xC0, 0xC3};
+    output.write(reinterpret_cast<const char*>(stub), sizeof(stub));
+    while (static_cast<std::uint64_t>(output.tellp()) < payload_offset) {
+        output.put('\0');
+    }
+    output.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(psx_size));
+    output.write(NATIVE_PSX_MAGIC, 16);
+    for (std::uint32_t index = 0; index < 8; ++index) {
+        output.put(static_cast<char>((psx_size >> (index * 8)) & 0xFF));
+    }
+    while (static_cast<std::uint64_t>(output.tellp()) < raw_size) {
         output.put('\0');
     }
     if (!output) {
-        throw std::runtime_error("failed while writing Windows layout artifact");
+        throw std::runtime_error("failed while writing Windows native artifact");
     }
+}
+
+void write_linux_native(
+    const RelinkOptions& options,
+    const std::vector<unsigned char>& data
+)
+{
+    char executable[4096]{};
+    const ssize_t length = readlink("/proc/self/exe", executable, sizeof(executable) - 1);
+    if (length <= 0) {
+        throw std::runtime_error("cannot locate the AnyPS1 native launcher executable");
+    }
+    executable[length] = '\0';
+
+    std::filesystem::remove(options.output);
+    std::filesystem::copy_file(
+        executable,
+        options.output,
+        std::filesystem::copy_options::overwrite_existing
+    );
+    std::ofstream output(options.output, std::ios::binary | std::ios::app);
+    if (!output) {
+        throw std::runtime_error("cannot append PS-X image to Linux native launcher");
+    }
+    output.write(reinterpret_cast<const char*>(data.data()),
+        static_cast<std::streamsize>(data.size()));
+    output.write(NATIVE_PSX_MAGIC, 16);
+    const std::uint64_t psx_size = data.size();
+    for (std::uint32_t index = 0; index < 8; ++index) {
+        output.put(static_cast<char>((psx_size >> (index * 8)) & 0xFF));
+    }
+    if (!output) {
+        throw std::runtime_error("failed while writing Linux native artifact");
+    }
+    std::filesystem::permissions(
+        options.output,
+        std::filesystem::perms::owner_exec
+            | std::filesystem::perms::group_exec
+            | std::filesystem::perms::others_exec,
+        std::filesystem::perm_options::add
+    );
 }
 
 }
@@ -309,94 +366,7 @@ bool relink(const RelinkOptions& options)
         return true;
     }
 
-    std::string section_names;
-    section_names.push_back('\0');
-    section_names += ".text.psx";
-    section_names.push_back('\0');
-    section_names += "shstrtab";
-    section_names.push_back('\0');
-    const std::uint32_t text_name_offset = 1;
-    const std::uint32_t shstr_name_offset = 11;
-    const std::uint32_t elf_header_size = 52;
-    const std::uint32_t section_header_size = 40;
-    const std::uint32_t section_count = 3;
-    const std::uint32_t section_header_offset = elf_header_size;
-    const std::uint32_t text_offset = (section_header_offset + section_header_size * section_count + 15) & ~15u;
-    const std::uint32_t shstr_offset = text_offset + file_size;
-
-    std::ofstream output(resolved.output, std::ios::binary | std::ios::trunc);
-    if (!output) {
-        throw std::runtime_error("cannot open output artifact: " + resolved.output);
-    }
-
-    const unsigned char elf_ident[16]{
-        0x7F, 'E', 'L', 'F',
-        1,
-        1,
-        1,
-        0,
-        0, 0, 0, 0, 0, 0, 0, 0,
-    };
-    output.write(reinterpret_cast<const char*>(elf_ident), sizeof(elf_ident));
-    write16(output, 1);
-    write16(output, 8);
-    write32(output, 1);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, section_header_offset);
-    write32(output, 0);
-    write16(output, elf_header_size);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, section_header_size);
-    write16(output, section_count);
-    write16(output, 2);
-
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-
-    write32(output, text_name_offset);
-    write32(output, 1);
-    write32(output, 6);
-    write32(output, load_address);
-    write32(output, text_offset);
-    write32(output, file_size);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 4);
-    write32(output, 0);
-
-    write32(output, shstr_name_offset);
-    write32(output, 3);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, shstr_offset);
-    write32(output, section_names.size());
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 1);
-    write32(output, 0);
-
-    while (output.tellp() >= 0 && static_cast<std::uint32_t>(output.tellp()) < text_offset) {
-        output.put('\0');
-    }
-    output.write(
-        reinterpret_cast<const char*>(data.data() + PSX_HEADER_SIZE),
-        static_cast<std::streamsize>(file_size)
-    );
-    output.write(section_names.data(), static_cast<std::streamsize>(section_names.size()));
-
-    if (!output) {
-        throw std::runtime_error("failed while writing relinker artifact");
-    }
+    write_linux_native(resolved, data);
     return true;
 }
 

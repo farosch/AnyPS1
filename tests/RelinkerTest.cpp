@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -50,7 +51,7 @@ int main(int argc, char** argv)
             throw std::runtime_error("Windows relink failed");
         }
         std::ifstream windows_artifact(windows_output_path, std::ios::binary);
-        std::array<unsigned char, 132> windows_header{};
+        std::array<unsigned char, 224> windows_header{};
         windows_artifact.read(reinterpret_cast<char*>(windows_header.data()), windows_header.size());
         if (windows_header[0] != 'M' || windows_header[1] != 'Z') {
             throw std::runtime_error("invalid PE DOS magic");
@@ -65,6 +66,13 @@ int main(int argc, char** argv)
         if (windows_header[128] != 'P' || windows_header[129] != 'E') {
             throw std::runtime_error("invalid PE signature");
         }
+        if (windows_header[132] != static_cast<unsigned char>(0x64)
+            || windows_header[133] != static_cast<unsigned char>(0x86)) {
+            throw std::runtime_error("invalid PE x86-64 machine");
+        }
+        if (windows_header[220] != 3 || windows_header[221] != 0) {
+            throw std::runtime_error("invalid PE CUI subsystem");
+        }
 
         std::ifstream artifact(output_path, std::ios::binary);
         std::array<unsigned char, 52> header{};
@@ -72,11 +80,19 @@ int main(int argc, char** argv)
         if (header[0] != 0x7F || header[1] != 'E' || header[2] != 'L' || header[3] != 'F') {
             throw std::runtime_error("invalid ELF magic");
         }
-        artifact.seekg(152);
-        std::array<unsigned char, 4> shstr_size{};
-        artifact.read(reinterpret_cast<char*>(shstr_size.data()), shstr_size.size());
-        if (shstr_size[0] == 0 && shstr_size[1] == 0 && shstr_size[2] == 0 && shstr_size[3] == 0) {
-            throw std::runtime_error("ELF section-name table is empty");
+        artifact.seekg(0, std::ios::end);
+        const std::uint64_t artifact_size =
+            static_cast<std::uint64_t>(artifact.tellg());
+        constexpr std::uint64_t trailer_size = 24;
+        if (artifact_size < trailer_size) {
+            throw std::runtime_error("Linux native launcher trailer is missing");
+        }
+        artifact.seekg(static_cast<std::streamoff>(artifact_size - trailer_size));
+        std::array<unsigned char, trailer_size> trailer{};
+        artifact.read(reinterpret_cast<char*>(trailer.data()), trailer.size());
+        const char magic[] = "ANYPS1-PSX-IMAGE";
+        if (std::memcmp(trailer.data(), magic, 16) != 0) {
+            throw std::runtime_error("invalid Linux native launcher trailer");
         }
 
         std::remove(output_path);

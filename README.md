@@ -10,7 +10,7 @@ native Linux or Windows artifacts.
 AnyPS1 is organized around executable conversion, PS1 runtime emulation, host
 integration, command-line tools, and target-platform output.
 
-The implementation decodes PS-X EXE structures, analyzes references and entry points, and produces a target-native executable or layout artifact.
+The implementation decodes PS-X EXE structures, analyzes references and entry points, and produces a native Linux or Windows launcher artifact embedding the PS-X image.
 
 ## Layout
 
@@ -53,8 +53,10 @@ anyps1 --target windows "/path/to/extracted/game"
 
 The relinker accepts an extracted game directory or disc directory. It locates
 the boot executable from `SYSTEM.CNF` (or, as a fallback, a PS-X executable
-header), then writes `game.elf` or `game.exe` directly inside the directory
-pointed to by the command.
+header), then writes a native Linux ELF launcher or PE32+ launcher named
+`game.elf` or `game.exe` inside the selected directory. The launcher embeds the
+PS-X executable and invokes AnyPS1's interpreter; direct MIPS instruction
+lowering remains under active development.
 
 ## Run an extracted PS-X executable in the first runtime
 
