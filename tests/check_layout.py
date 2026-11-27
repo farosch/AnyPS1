@@ -4,6 +4,10 @@ from pathlib import Path
 def required_directories(root: Path) -> tuple[Path, ...]:
     return (
         root / "src",
+        root / "src" / "relinker",
+        root / "src" / "format",
+        root / "src" / "lowering",
+        root / "src" / "executable",
         root / "tools",
         root / "tests",
         root / "3rdparty",
@@ -13,9 +17,9 @@ def required_directories(root: Path) -> tuple[Path, ...]:
 def required_files(root: Path) -> tuple[Path, ...]:
     return (
         root / "src" / "CMakeLists.txt",
-        root / "src" / "Relinker.h",
-        root / "src" / "Relinker.cpp",
         root / "src" / "main.cpp",
+        root / "src" / "relinker" / "Relinker.h",
+        root / "src" / "relinker" / "Relinker.cpp",
     )
 
 
