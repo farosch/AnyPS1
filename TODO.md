@@ -167,6 +167,7 @@
 - [x] Add PE signature, machine, section, optional-header, and import-directory
   fixture validation.
 - [x] Add `objdump`/`llvm-readobj` format-inspector support.
+- [x] Add a shared semantic parity fixture that executes on Linux and Windows.
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
 - [ ] Implement native Windows MIPS lowering equivalent to Linux lowering.
 - [x] Generate imports and relocations for real Windows host-native code.

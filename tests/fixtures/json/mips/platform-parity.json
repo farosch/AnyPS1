@@ -1,0 +1,35 @@
+{
+  "kind": "psx_exe",
+  "expected_exit": 0,
+  "parity_features": [
+    "ram-store",
+    "load-delay",
+    "zero-register",
+    "branch-delay-slot",
+    "syscall-exit"
+  ],
+  "header": {
+    "initial_pc": 2147549184,
+    "initial_gp": 0,
+    "load_address": 2147549184,
+    "file_size": 56,
+    "initial_sp_base": 0,
+    "initial_sp_offset": 0
+  },
+  "instructions": [
+    1007157248,
+    889716768,
+    604569605,
+    2903048192,
+    2366242816,
+    20979745,
+    335544322,
+    0,
+    603979777,
+    335544322,
+    0,
+    12,
+    13,
+    0
+  ]
+}

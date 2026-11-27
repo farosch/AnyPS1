@@ -36,6 +36,9 @@ add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_
 add_test(NAME relinker_zero_register COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/zero-register.ps-exe)
 add_test(NAME relinker_taken_delay_slot COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/delay-slot-taken.ps-exe)
 add_test(NAME relinker_memory_boundary COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/memory-boundary.ps-exe)
+add_test(NAME relinker_platform_parity
+    COMMAND anyps1_relinker_test
+        ${FIXTURE_OUTPUT_DIR}/mips/platform-parity.ps-exe)
 add_test(NAME relinker_native_cfg_cop0 COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-cfg-cop0.ps-exe)
 add_test(NAME relinker_native_unaligned COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-unaligned.ps-exe)
 add_test(NAME relinker_native_comprehensive COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/comprehensive.ps-exe)
@@ -113,6 +116,10 @@ add_test(NAME pe_memory_boundary
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/memory-boundary.ps-exe)
+add_test(NAME pe_platform_parity
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/platform-parity.ps-exe)
 
 add_test(NAME relinker_static_jalr
     COMMAND anyps1_relinker_test
