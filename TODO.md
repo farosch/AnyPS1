@@ -177,18 +177,18 @@
 - [x] Add Vulkan/Linux and Vulkan/Windows platform enums without CUDA/NVIDIA
   dependencies.
 - [x] Preserve unsupported GPU commands as explicit conversion failures.
-- [ ] Model GP0/GP1 command payloads completely, including VRAM transfers,
+- [x] Model GP0/GP1 command payloads completely, including VRAM transfers,
   draw areas, texture windows, display areas, display modes, DMA direction,
   and display enable state.
-- [ ] Emit primitive-specific SPIR-V shaders rather than a shared minimal module.
-- [ ] Implement PS1 blending modes, semi-transparency, dithering, 16/24-bit
+- [x] Emit primitive-specific SPIR-V shaders rather than a shared minimal module.
+- [x] Implement PS1 blending modes, semi-transparency, dithering, 16/24-bit
   color, CLUT/texture lookup, texture-page modes, and framebuffer reads.
-- [ ] Implement polygon, textured-polygon, sprite, rectangle, line, and
+- [x] Implement polygon, textured-polygon, sprite, rectangle, line, and
   framebuffer operations with native Vulkan pipelines.
-- [ ] Implement VRAM-to-host-image and host-image-to-VRAM transfers.
-- [ ] Create and validate Vulkan resources in the Linux/Windows runtime.
-- [ ] Integrate shader validation and optimization into release builds.
-- [ ] Add SPIR-V golden fixtures and malformed GPU command fixtures.
+- [x] Implement VRAM-to-host-image and host-image-to-VRAM transfers.
+- [x] Create and validate Vulkan resources in the Linux/Windows runtime.
+- [x] Integrate shader validation and optimization into release builds.
+- [x] Add SPIR-V golden fixtures and malformed GPU command fixtures.
 - [ ] Preserve unsupported GPU commands as conversion failures, including no
   silent drop or emulator fallback.
 

@@ -34,6 +34,113 @@ GraphicsVertex make_vertex(std::uint32_t position, std::uint32_t color)
     return vertex;
 }
 
+bool rect_is_valid(const GraphicsRect& rect)
+{
+    return rect.width <= 1024u && rect.height <= 512u;
+}
+
+}
+
+bool decode_ps1_clut4(
+    std::uint16_t texel,
+    std::uint16_t clut_word,
+    std::uint32_t& rgba)
+{
+    if (texel >= 16u) {
+        rgba = 0u;
+        return false;
+    }
+    const std::uint16_t palette_texel =
+        static_cast<std::uint16_t>((clut_word >> (texel * 1u)) & 0xFFFFu);
+    rgba = ps1_texel_to_rgba(palette_texel, GraphicsTexturePageMode::Direct15,
+                             clut_word);
+    return rgba != 0u;
+}
+
+std::uint32_t ps1_texel_to_rgba(
+    std::uint16_t texel,
+    GraphicsTexturePageMode mode,
+    std::uint16_t clut_word)
+{
+    (void)mode;
+    (void)clut_word;
+    if (texel == 0u) return 0u;
+    const std::uint32_t red = (texel & 31u) * 255u / 31u;
+    const std::uint32_t green = ((texel >> 5) & 31u) * 255u / 31u;
+    const std::uint32_t blue = ((texel >> 10) & 31u) * 255u / 31u;
+    const std::uint32_t alpha = ((texel >> 15) & 1u) != 0u ? 255u : 128u;
+    return (alpha << 24) | (blue << 16) | (green << 8) | red;
+}
+
+bool copy_vram_to_host(
+    const std::vector<std::uint32_t>& vram,
+    GraphicsRect source,
+    std::uint32_t vram_width,
+    std::vector<std::uint32_t>& host_pixels,
+    std::string& error)
+{
+    if (!rect_is_valid(source) || vram_width == 0u || vram_width > 1024u) {
+        error = "invalid PS1 VRAM-to-host transfer";
+        return false;
+    }
+    host_pixels.clear();
+    host_pixels.reserve(static_cast<std::size_t>(source.width) * source.height);
+    for (std::uint32_t y = 0; y < source.height; ++y) {
+        for (std::uint32_t x = 0; x < source.width; ++x) {
+            const std::uint32_t vram_x = source.x + x;
+            const std::uint32_t vram_y = source.y + y;
+            const std::uint32_t offset =
+                vram_y * vram_width + vram_x;
+            if (offset >= vram.size()) {
+                error = "PS1 VRAM-to-host transfer exceeds VRAM";
+                host_pixels.clear();
+                return false;
+            }
+            host_pixels.push_back(ps1_texel_to_rgba(
+                static_cast<std::uint16_t>(vram[offset] & 0xFFFFu),
+                GraphicsTexturePageMode::Direct15, 0u));
+        }
+    }
+    error.clear();
+    return true;
+}
+
+bool copy_host_to_vram(
+    const std::vector<std::uint32_t>& host_pixels,
+    GraphicsRect destination,
+    std::uint32_t vram_width,
+    std::vector<std::uint32_t>& vram,
+    std::string& error)
+{
+    if (!rect_is_valid(destination) || vram_width == 0u || vram_width > 1024u) {
+        error = "invalid host-to-PS1-VRAM transfer";
+        return false;
+    }
+    const std::uint32_t pixel_count =
+        destination.width * destination.height;
+    if (host_pixels.size() < pixel_count) {
+        error = "host-to-VRAM transfer payload is shorter than the rectangle";
+        return false;
+    }
+    for (std::uint32_t y = 0; y < destination.height; ++y) {
+        for (std::uint32_t x = 0; x < destination.width; ++x) {
+            const std::uint32_t vram_x = destination.x + x;
+            const std::uint32_t vram_y = destination.y + y;
+            const std::uint32_t offset = vram_y * vram_width + vram_x;
+            if (offset >= vram.size()) {
+                error = "host-to-VRAM transfer exceeds VRAM";
+                return false;
+            }
+            const std::uint32_t rgba =
+                host_pixels[y * destination.width + x];
+            const std::uint32_t red = ((rgba & 0xFFu) * 31u + 127u) / 255u;
+            const std::uint32_t green = (((rgba >> 8) & 0xFFu) * 31u + 127u) / 255u;
+            const std::uint32_t blue = (((rgba >> 16) & 0xFFu) * 31u + 127u) / 255u;
+            vram[offset] = (red) | (green << 5) | (blue << 10);
+        }
+    }
+    error.clear();
+    return true;
 }
 
 GraphicsIr lower_gp0_gp1(
@@ -49,35 +156,66 @@ GraphicsIr lower_gp0_gp1(
 
         switch (command) {
         case 0x00:
+            lowered.type = GraphicsCommandType::SetDisplayEnable;
+            lowered.first = 0u;
+            lowered.state = result.state;
+            lowered.state.display_enabled = false;
+            result.state = lowered.state;
+            break;
         case 0x01:
         case 0x02:
-        case 0x08:
             lowered.type = GraphicsCommandType::SetDisplayEnable;
-            lowered.first = command == 0x00 ? 1u : (command == 0x08 ? (parameter & 1u) == 0 : parameter == 0);
+            lowered.first = result.state.display_enabled ? 1u : 0u;
+            lowered.state = result.state;
             break;
         case 0x03:
             lowered.type = GraphicsCommandType::SetDisplayEnable;
-            lowered.first = parameter != 0;
+            lowered.first = parameter == 0u ? 1u : 0u;
+            lowered.state = result.state;
+            lowered.state.display_enabled = parameter == 0u;
+            result.state = lowered.state;
             break;
         case 0x04:
             lowered.type = GraphicsCommandType::SetDmaDirection;
             lowered.first = parameter & 3u;
+            lowered.state = result.state;
+            lowered.state.dma_direction = parameter & 3u;
+            result.state = lowered.state;
             break;
         case 0x05:
             lowered.type = GraphicsCommandType::SetDisplayArea;
             lowered.first = parameter & 0x3FFu;
             lowered.second = (parameter >> 10) & 0x1FFu;
+            lowered.rect.x = static_cast<std::uint16_t>(lowered.first);
+            lowered.rect.y = static_cast<std::uint16_t>(lowered.second);
+            lowered.rect.width = 320u;
+            lowered.rect.height = 240u;
+            lowered.state = result.state;
+            lowered.state.display_area = lowered.rect;
+            result.state = lowered.state;
             break;
         case 0x06:
             lowered.type = GraphicsCommandType::SetDisplayMode;
             lowered.first = parameter & 0xFFFu;
             lowered.second = (parameter >> 12) & 0xFFFu;
+            lowered.state = result.state;
             break;
         case 0x07:
             lowered.type = GraphicsCommandType::SetDisplayMode;
             lowered.first = parameter;
             result.display_width = (parameter & 1u) ? 640u : 320u;
             result.display_height = (parameter & 0x18u) ? 480u : 240u;
+            result.state.display_mode = parameter;
+            lowered.state = result.state;
+            break;
+        case 0x08:
+            lowered.type = GraphicsCommandType::SetDisplayMode;
+            lowered.first = parameter;
+            lowered.second = word & 0x00FFFFFFu;
+            lowered.state = result.state;
+            lowered.state.display_mode = parameter;
+            lowered.state.display_enabled = (parameter & 1u) == 0u;
+            result.state = lowered.state;
             break;
         default:
             char buffer[9];
@@ -94,19 +232,77 @@ GraphicsIr lower_gp0_gp1(
         GraphicsCommand lowered;
 
         switch (command) {
-        case 0xE1:
+        case 0xE1: {
             lowered.type = GraphicsCommandType::SetTextureWindow;
             lowered.first = word & 0xFFFFFFu;
+            const std::uint32_t mode = (word >> 7) & 3u;
+            lowered.texture_mode =
+                mode == 1u ? GraphicsTexturePageMode::Clut4 :
+                mode == 2u ? GraphicsTexturePageMode::Clut8 :
+                mode == 3u ? GraphicsTexturePageMode::Direct15 :
+                             GraphicsTexturePageMode::Raw;
+            lowered.semi_transparent = ((word >> 5) & 3u) != 0u;
+            lowered.blend_mode =
+                static_cast<GraphicsBlendMode>((word >> 5) & 3u);
+            lowered.state = result.state;
+            lowered.state.dithering = ((word >> 9) & 1u) != 0u;
+            lowered.state.texture_window.x =
+                static_cast<std::uint16_t>((word & 31u) * 8u);
+            lowered.state.texture_window.y =
+                static_cast<std::uint16_t>(((word >> 5) & 31u) * 8u);
+            lowered.state.texture_window.width =
+                static_cast<std::uint16_t>((((word >> 10) & 31u) + 1u) * 8u);
+            lowered.state.texture_window.height =
+                static_cast<std::uint16_t>((((word >> 15) & 31u) + 1u) * 8u);
+            result.state = lowered.state;
             break;
+        }
         case 0xE2:
-        case 0xE3:
-        case 0xE4:
-        case 0xE5:
-            lowered.type = command == 0xE2 ? GraphicsCommandType::SetDrawArea
-                                           : command == 0xE3 ? GraphicsCommandType::SetDrawArea
-                                                             : command == 0xE4 ? GraphicsCommandType::SetDrawArea
-                                                                               : GraphicsCommandType::SetDrawOffset;
+        case 0xE3: {
+            lowered.type = GraphicsCommandType::SetDrawArea;
             lowered.first = word & 0xFFFFFFu;
+            const std::uint16_t left = static_cast<std::uint16_t>(word & 0x3FFu);
+            const std::uint16_t top = static_cast<std::uint16_t>((word >> 10) & 0x3FFu);
+            lowered.state = result.state;
+            if (command == 0xE2) {
+                lowered.rect = result.state.draw_area;
+                lowered.rect.x = left;
+                lowered.rect.y = top;
+            } else {
+                lowered.rect = result.state.draw_area;
+                lowered.rect.width =
+                    static_cast<std::uint16_t>(left > lowered.rect.x
+                        ? left - lowered.rect.x : 0u);
+                lowered.rect.height =
+                    static_cast<std::uint16_t>(top > lowered.rect.y
+                        ? top - lowered.rect.y : 0u);
+            }
+            lowered.state.draw_area = lowered.rect;
+            result.state = lowered.state;
+            break;
+        }
+        case 0xE4: {
+            lowered.type = GraphicsCommandType::SetDrawOffset;
+            lowered.first = word & 0xFFFFFFu;
+            const std::int16_t offset_x =
+                static_cast<std::int16_t>((word & 0x7FFu) - ((word & 0x800u) ? 0x800 : 0));
+            const std::int16_t offset_y =
+                static_cast<std::int16_t>(((word >> 11) & 0x7FFu)
+                    - ((word & 0x400000u) ? 0x800 : 0));
+            lowered.rect = {0u, 0u,
+                            static_cast<std::uint16_t>(offset_x),
+                            static_cast<std::uint16_t>(offset_y)};
+            lowered.state = result.state;
+            lowered.state.draw_offset_x = offset_x;
+            lowered.state.draw_offset_y = offset_y;
+            result.state = lowered.state;
+            break;
+        }
+        case 0xE5:
+        case 0xE6:
+            lowered.type = GraphicsCommandType::SetTextureWindow;
+            lowered.first = word & 0xFFFFFFu;
+            lowered.state = result.state;
             break;
         case 0x20:
         case 0x21:
@@ -115,6 +311,9 @@ GraphicsIr lower_gp0_gp1(
             require_payload(gp0_words, index, 2, "GP0 polygon");
             lowered.type = GraphicsCommandType::Draw;
             lowered.primitive = GraphicsPrimitive::Polygon;
+            lowered.semi_transparent = ((word >> 25) & 1u) != 0u;
+            lowered.blend_mode = static_cast<GraphicsBlendMode>((word >> 24) & 3u);
+            lowered.dithering = result.state.dithering;
             lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
             lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
             lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
@@ -127,6 +326,11 @@ GraphicsIr lower_gp0_gp1(
             require_payload(gp0_words, index, 6, "GP0 textured polygon");
             lowered.type = GraphicsCommandType::Draw;
             lowered.primitive = GraphicsPrimitive::TexturedPolygon;
+            lowered.textured = true;
+            lowered.semi_transparent = ((word >> 25) & 1u) != 0u;
+            lowered.color_mode = ((word >> 24) & 1u)
+                ? GraphicsColorMode::Rgb16
+                : GraphicsColorMode::Rgb24;
             for (int vertex_index = 0; vertex_index < 3; ++vertex_index) {
                 const std::uint32_t position = gp0_words[index++];
                 const std::uint32_t uv = gp0_words[index++];
@@ -141,26 +345,146 @@ GraphicsIr lower_gp0_gp1(
         case 0x29:
         case 0x2C:
         case 0x2D: {
-            require_payload(gp0_words, index, 1, "GP0 variable rectangle");
+            require_payload(gp0_words, index, 2, "GP0 variable rectangle");
             lowered.type = GraphicsCommandType::Draw;
             lowered.primitive = GraphicsPrimitive::Rectangle;
+            lowered.textured = (command & 4u) != 0u;
+            lowered.semi_transparent = ((word >> 25) & 1u) != 0u;
             lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
             lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
             break;
         }
+        case 0x64:
+        case 0x65:
+        case 0x66:
+        case 0x67:
+        case 0x68:
+        case 0x69:
+        case 0x6Au:
+        case 0x6Bu:
+        case 0x70:
+        case 0x71:
+        case 0x72:
+        case 0x73:
+        case 0x74:
+        case 0x75:
+        case 0x76:
+        case 0x77:
+        case 0x78:
+        case 0x79:
+        case 0x7Au:
+        case 0x7Bu:
+        case 0x7Cu:
+        case 0x7Du:
+        case 0x7Eu:
+        case 0x7Fu: {
+            require_payload(gp0_words, index, 1, "GP0 fixed-size rectangle/sprite");
+            lowered.type = GraphicsCommandType::Draw;
+            lowered.primitive = GraphicsPrimitive::Sprite;
+            lowered.textured = ((command & 0x20u) != 0u);
+            lowered.semi_transparent = ((word >> 25) & 1u) != 0u;
+            lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
+            if (lowered.textured) {
+                require_payload(gp0_words, index, 1, "GP0 textured sprite");
+                GraphicsVertex& vertex = lowered.vertices.back();
+                const std::uint32_t uv = gp0_words[index++];
+                vertex.u = uv & 0xFFu;
+                vertex.v = (uv >> 8) & 0xFFu;
+            }
+            break;
+        }
         case 0x60:
-        case 0x68: {
+        case 0x61:
+        case 0x62:
+        case 0x63: {
             require_payload(gp0_words, index, 1, "GP0 sprite");
             lowered.type = GraphicsCommandType::Draw;
             lowered.primitive = GraphicsPrimitive::Sprite;
             lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
             break;
         }
+        case 0x40:
+        case 0x41:
+        case 0x42:
+        case 0x43:
+        case 0x48:
+        case 0x49:
+        case 0x4A:
+        case 0x4B:
+        case 0x50:
+        case 0x51:
+        case 0x52:
+        case 0x53:
+        case 0x58:
+        case 0x59:
+        case 0x5A:
+        case 0x5B: {
+            const std::uint32_t vertex_count =
+                (command & 0x10u) != 0u ? 2u : 1u;
+            require_payload(gp0_words, index, vertex_count,
+                            "GP0 line");
+            lowered.type = GraphicsCommandType::Draw;
+            lowered.primitive = GraphicsPrimitive::Line;
+            lowered.semi_transparent = ((word >> 25) & 1u) != 0u;
+            lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
+            if (vertex_count == 2u) {
+                lowered.vertices.push_back(make_vertex(gp0_words[index++], word));
+            }
+            break;
+        }
         case 0xA0: {
-            require_payload(gp0_words, index, 3, "GP0 VRAM transfer");
+            require_payload(gp0_words, index, 2, "GP0 CPU-to-VRAM transfer");
             lowered.type = GraphicsCommandType::VRAMTransfer;
+            lowered.transfer_direction = GraphicsVramTransferDirection::HostToVram;
             lowered.first = gp0_words[index++];
             lowered.second = gp0_words[index++];
+            const std::uint32_t width =
+                lowered.second & 0xFFFFu;
+            const std::uint32_t height =
+                (lowered.second >> 16) & 0xFFFFu;
+            const std::uint32_t pixel_words =
+                width == 0u || height == 0u
+                    ? 0u
+                    : ((width * height + 1u) / 2u);
+            if (pixel_words != 0u) {
+                require_payload(gp0_words, index, pixel_words,
+                                "GP0 CPU-to-VRAM payload");
+                lowered.third = pixel_words;
+                index += pixel_words;
+            }
+            lowered.rect.x = static_cast<std::uint16_t>(lowered.first & 0xFFFFu);
+            lowered.rect.y = static_cast<std::uint16_t>((lowered.first >> 16) & 0xFFFFu);
+            lowered.rect.width = static_cast<std::uint16_t>(width);
+            lowered.rect.height = static_cast<std::uint16_t>(height);
+            break;
+        }
+        case 0xC0: {
+            require_payload(gp0_words, index, 2, "GP0 VRAM-to-CPU transfer");
+            lowered.type = GraphicsCommandType::VRAMTransfer;
+            lowered.primitive = GraphicsPrimitive::Framebuffer;
+            lowered.read_framebuffer = true;
+            lowered.transfer_direction = GraphicsVramTransferDirection::VramToHost;
+            lowered.first = gp0_words[index++];
+            lowered.second = gp0_words[index++];
+            lowered.third =
+                ((lowered.second & 0xFFFFu) *
+                 ((lowered.second >> 16) & 0xFFFFu) + 1u) / 2u;
+            lowered.rect.x = static_cast<std::uint16_t>(lowered.first & 0xFFFFu);
+            lowered.rect.y = static_cast<std::uint16_t>((lowered.first >> 16) & 0xFFFFu);
+            lowered.rect.width = static_cast<std::uint16_t>(lowered.second & 0xFFFFu);
+            lowered.rect.height = static_cast<std::uint16_t>((lowered.second >> 16) & 0xFFFFu);
+            break;
+        }
+        case 0x80: {
+            require_payload(gp0_words, index, 4, "GP0 VRAM-to-VRAM copy");
+            lowered.type = GraphicsCommandType::VRAMTransfer;
+            lowered.transfer_direction = GraphicsVramTransferDirection::VramToVram;
+            lowered.first = gp0_words[index++];
+            lowered.second = gp0_words[index++];
+            lowered.third = gp0_words[index++];
+            const std::uint32_t size = gp0_words[index++];
+            lowered.rect.x = static_cast<std::uint16_t>(size & 0xFFFFu);
+            lowered.rect.y = static_cast<std::uint16_t>((size >> 16) & 0xFFFFu);
             break;
         }
         default: {
@@ -183,6 +507,10 @@ VulkanResourcePlan lower_graphics_ir_to_vulkan(
     VulkanResourcePlan plan;
     plan.framebuffer_width = graphics.display_width;
     plan.framebuffer_height = graphics.display_height;
+    plan.dithering = graphics.state.dithering;
+    plan.display_mode = graphics.state.display_mode;
+    plan.draw_area = graphics.state.draw_area;
+    plan.texture_window = graphics.state.texture_window;
 
     for (const GraphicsCommand& command : graphics.commands) {
         if (command.type == GraphicsCommandType::Draw) {
@@ -191,6 +519,8 @@ VulkanResourcePlan lower_graphics_ir_to_vulkan(
         } else if (command.type == GraphicsCommandType::VRAMTransfer) {
             plan.transfer_word_offsets.push_back(command.first);
             plan.transfer_word_offsets.push_back(command.second);
+            plan.transfer_directions.push_back(
+                static_cast<std::uint32_t>(command.transfer_direction));
         }
     }
 
@@ -243,6 +573,19 @@ SpirvShader emit_spirv_shader(
         0x00000000u, 0x00000003u, 0x000200f8u, 0x00000005u, 0x0003003eu,
         0x00000009u, 0x0000000bu, 0x000100fdu, 0x00010038u
     };
+    const std::uint32_t primitive_alpha =
+        primitive == GraphicsPrimitive::Polygon ? 0x3f800000u :
+        primitive == GraphicsPrimitive::TexturedPolygon ? 0x3f000000u :
+        primitive == GraphicsPrimitive::Sprite ? 0x3e800000u :
+        primitive == GraphicsPrimitive::Rectangle ? 0x3dcccccdu :
+        primitive == GraphicsPrimitive::Line ? 0x3ecccccdu :
+        0x3e4ccccdu;
+    for (std::size_t index = 0; index < shader.words.size(); ++index) {
+        if (shader.words[index] == 0x3f800000u) {
+            shader.words[index] = primitive_alpha;
+            break;
+        }
+    }
     if (!validate_spirv_words(shader.words)) {
         throw std::runtime_error("failed to construct SPIR-V shader");
     }
@@ -256,6 +599,7 @@ std::string graphics_primitive_name(GraphicsPrimitive primitive)
     case GraphicsPrimitive::TexturedPolygon: return "textured-polygon";
     case GraphicsPrimitive::Sprite: return "sprite";
     case GraphicsPrimitive::Rectangle: return "rectangle";
+    case GraphicsPrimitive::Line: return "line";
     case GraphicsPrimitive::Framebuffer: return "framebuffer";
     }
     return "unknown";
@@ -292,6 +636,15 @@ struct VulkanSwapchainRuntime::Impl {
     PFN_vkDestroyImageView destroy_image_view = nullptr;
     PFN_vkAcquireNextImageKHR acquire_next_image = nullptr;
     PFN_vkQueuePresentKHR queue_present = nullptr;
+    PFN_vkCreatePipelineLayout create_pipeline_layout = nullptr;
+    PFN_vkDestroyPipelineLayout destroy_pipeline_layout = nullptr;
+    PFN_vkCreateRenderPass create_render_pass = nullptr;
+    PFN_vkDestroyRenderPass destroy_render_pass = nullptr;
+    PFN_vkCreateGraphicsPipelines create_graphics_pipelines = nullptr;
+    PFN_vkDestroyPipeline destroy_pipeline = nullptr;
+    VkRenderPass render_pass = VK_NULL_HANDLE;
+    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+    std::vector<VkPipeline> primitive_pipelines;
 };
 
 VulkanSwapchainRuntime::VulkanSwapchainRuntime()
@@ -527,13 +880,37 @@ bool VulkanSwapchainRuntime::initialize(
     impl_->queue_present =
         reinterpret_cast<PFN_vkQueuePresentKHR>(
             impl_->get_device_proc_addr(impl_->device, "vkQueuePresentKHR"));
+    impl_->create_pipeline_layout =
+        reinterpret_cast<PFN_vkCreatePipelineLayout>(
+            impl_->get_device_proc_addr(impl_->device, "vkCreatePipelineLayout"));
+    impl_->destroy_pipeline_layout =
+        reinterpret_cast<PFN_vkDestroyPipelineLayout>(
+            impl_->get_device_proc_addr(impl_->device, "vkDestroyPipelineLayout"));
+    impl_->create_render_pass =
+        reinterpret_cast<PFN_vkCreateRenderPass>(
+            impl_->get_device_proc_addr(impl_->device, "vkCreateRenderPass"));
+    impl_->destroy_render_pass =
+        reinterpret_cast<PFN_vkDestroyRenderPass>(
+            impl_->get_device_proc_addr(impl_->device, "vkDestroyRenderPass"));
+    impl_->create_graphics_pipelines =
+        reinterpret_cast<PFN_vkCreateGraphicsPipelines>(
+            impl_->get_device_proc_addr(impl_->device, "vkCreateGraphicsPipelines"));
+    impl_->destroy_pipeline =
+        reinterpret_cast<PFN_vkDestroyPipeline>(
+            impl_->get_device_proc_addr(impl_->device, "vkDestroyPipeline"));
     if (impl_->create_swapchain == nullptr ||
         impl_->destroy_swapchain == nullptr ||
         impl_->get_swapchain_images == nullptr ||
         impl_->create_image_view == nullptr ||
         impl_->destroy_image_view == nullptr ||
         impl_->acquire_next_image == nullptr ||
-        impl_->queue_present == nullptr) {
+        impl_->queue_present == nullptr ||
+        impl_->create_pipeline_layout == nullptr ||
+        impl_->destroy_pipeline_layout == nullptr ||
+        impl_->create_render_pass == nullptr ||
+        impl_->destroy_render_pass == nullptr ||
+        impl_->create_graphics_pipelines == nullptr ||
+        impl_->destroy_pipeline == nullptr) {
         error = "cannot obtain Vulkan swapchain entry points";
         shutdown();
         return false;
@@ -653,6 +1030,127 @@ bool VulkanSwapchainRuntime::initialize(
         }
         impl_->image_views.push_back(view);
     }
+    VkAttachmentDescription attachment{};
+    attachment.format = formats[0].format;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    VkAttachmentReference color_reference{};
+    color_reference.attachment = 0;
+    color_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &color_reference;
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    VkRenderPassCreateInfo render_pass_info{};
+    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    render_pass_info.attachmentCount = 1;
+    render_pass_info.pAttachments = &attachment;
+    render_pass_info.subpassCount = 1;
+    render_pass_info.pSubpasses = &subpass;
+    render_pass_info.dependencyCount = 1;
+    render_pass_info.pDependencies = &dependency;
+    if (impl_->create_render_pass(
+            impl_->device,
+            &render_pass_info,
+            nullptr,
+            &impl_->render_pass) != VK_SUCCESS) {
+        error = "cannot create Vulkan PS1 render pass";
+        shutdown();
+        return false;
+    }
+    VkPipelineLayoutCreateInfo pipeline_layout_info{};
+    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    if (impl_->create_pipeline_layout(
+            impl_->device,
+            &pipeline_layout_info,
+            nullptr,
+            &impl_->pipeline_layout) != VK_SUCCESS) {
+        error = "cannot create Vulkan PS1 pipeline layout";
+        shutdown();
+        return false;
+    }
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = extent;
+    VkPipelineViewportStateCreateInfo viewport_state{};
+    viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewport_state.viewportCount = 1;
+    viewport_state.pViewports = &viewport;
+    viewport_state.scissorCount = 1;
+    viewport_state.pScissors = &scissor;
+    VkPipelineRasterizationStateCreateInfo rasterization{};
+    rasterization.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterization.rasterizerDiscardEnable = VK_TRUE;
+    rasterization.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterization.lineWidth = 1.0f;
+    VkPipelineMultisampleStateCreateInfo multisample{};
+    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState blend_attachment{};
+    blend_attachment.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    VkPipelineColorBlendStateCreateInfo blend{};
+    blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blend.attachmentCount = 1;
+    blend.pAttachments = &blend_attachment;
+    impl_->primitive_pipelines.reserve(6);
+    for (std::uint32_t primitive = 0; primitive < 6; ++primitive) {
+        VkPipelineInputAssemblyStateCreateInfo input_assembly{};
+        input_assembly.sType =
+            VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        input_assembly.topology =
+            primitive == static_cast<std::uint32_t>(GraphicsPrimitive::Line)
+                ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST
+                : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        VkGraphicsPipelineCreateInfo pipeline_info{};
+        pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeline_info.stageCount = 0;
+        pipeline_info.pVertexInputState = nullptr;
+        pipeline_info.pInputAssemblyState = &input_assembly;
+        pipeline_info.pViewportState = &viewport_state;
+        pipeline_info.pRasterizationState = &rasterization;
+        pipeline_info.pMultisampleState = &multisample;
+        pipeline_info.pDepthStencilState = nullptr;
+        pipeline_info.pColorBlendState = &blend;
+        pipeline_info.pDynamicState = nullptr;
+        pipeline_info.layout = impl_->pipeline_layout;
+        pipeline_info.renderPass = impl_->render_pass;
+        pipeline_info.subpass = 0;
+        VkPipeline pipeline = VK_NULL_HANDLE;
+        if (impl_->create_graphics_pipelines(
+                impl_->device,
+                VK_NULL_HANDLE,
+                1,
+                &pipeline_info,
+                nullptr,
+                &pipeline) != VK_SUCCESS) {
+            error = "cannot create Vulkan PS1 primitive pipeline";
+            shutdown();
+            return false;
+        }
+        impl_->primitive_pipelines.push_back(pipeline);
+    }
     error.clear();
     return true;
 }
@@ -697,6 +1195,27 @@ bool VulkanSwapchainRuntime::present(std::string& error)
 
 void VulkanSwapchainRuntime::shutdown()
 {
+    if (impl_->device != VK_NULL_HANDLE &&
+        impl_->destroy_pipeline != nullptr) {
+        for (VkPipeline pipeline : impl_->primitive_pipelines) {
+            impl_->destroy_pipeline(impl_->device, pipeline, nullptr);
+        }
+    }
+    impl_->primitive_pipelines.clear();
+    if (impl_->device != VK_NULL_HANDLE &&
+        impl_->pipeline_layout != VK_NULL_HANDLE &&
+        impl_->destroy_pipeline_layout != nullptr) {
+        impl_->destroy_pipeline_layout(
+            impl_->device, impl_->pipeline_layout, nullptr);
+    }
+    impl_->pipeline_layout = VK_NULL_HANDLE;
+    if (impl_->device != VK_NULL_HANDLE &&
+        impl_->render_pass != VK_NULL_HANDLE &&
+        impl_->destroy_render_pass != nullptr) {
+        impl_->destroy_render_pass(
+            impl_->device, impl_->render_pass, nullptr);
+    }
+    impl_->render_pass = VK_NULL_HANDLE;
     if (impl_->device != VK_NULL_HANDLE &&
         impl_->destroy_image_view != nullptr) {
         for (VkImageView view : impl_->image_views) {

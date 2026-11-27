@@ -51,14 +51,17 @@ int main()
             anyps1::GraphicsPrimitive::TexturedPolygon,
             anyps1::GraphicsPrimitive::Sprite,
             anyps1::GraphicsPrimitive::Rectangle,
+            anyps1::GraphicsPrimitive::Line,
             anyps1::GraphicsPrimitive::Framebuffer
         };
+        std::vector<anyps1::SpirvShader> primitive_shaders;
         for (const anyps1::GraphicsPrimitive primitive : primitives) {
             const anyps1::SpirvShader shader =
                 anyps1::emit_spirv_shader(primitive, true, true);
             if (!anyps1::validate_spirv_words(shader.words)) {
                 throw std::runtime_error("invalid generated SPIR-V module");
             }
+            primitive_shaders.push_back(shader);
 
             std::filesystem::path spv_directory =
                 std::filesystem::temp_directory_path();
@@ -100,6 +103,72 @@ int main()
                 }
             }
             std::remove(path.c_str());
+        }
+        if (primitive_shaders.size() != 6u) {
+            throw std::runtime_error("missing primitive-specific SPIR-V modules");
+        }
+        for (std::size_t index = 1u; index < primitive_shaders.size(); ++index) {
+            if (primitive_shaders[index].words ==
+                primitive_shaders[index - 1u].words) {
+                throw std::runtime_error("primitive SPIR-V modules are identical");
+            }
+        }
+
+        const anyps1::GraphicsIr state_graphics = anyps1::lower_gp0_gp1(
+            {
+                0xE2000000u,
+                0xE3002000u,
+                0xE4000100u,
+                0xA0000000u,
+                0x00000010u,
+                0x00020002u,
+                0xFFFFFFFFu,
+                0x12345678u,
+                0xC0000000u,
+                0x00000010u,
+                0x00020002u
+            },
+            {
+                0x03000000u,
+                0x04000002u,
+                0x05010040u,
+                0x07000008u
+            });
+        if (!state_graphics.state.display_enabled ||
+            state_graphics.state.dma_direction != 2u ||
+            state_graphics.commands.empty()) {
+            throw std::runtime_error("GPU state payload lowering failed");
+        }
+        bool host_to_vram = false;
+        bool vram_to_host = false;
+        for (const anyps1::GraphicsCommand& command : state_graphics.commands) {
+            host_to_vram |=
+                command.transfer_direction ==
+                anyps1::GraphicsVramTransferDirection::HostToVram;
+            vram_to_host |=
+                command.transfer_direction ==
+                anyps1::GraphicsVramTransferDirection::VramToHost;
+        }
+        if (!host_to_vram || !vram_to_host) {
+            throw std::runtime_error("GPU VRAM transfer directions were not modeled");
+        }
+
+        std::vector<std::uint32_t> vram(1024u * 512u, 0u);
+        const anyps1::GraphicsRect destination{16u, 16u, 2u, 2u};
+        const std::vector<std::uint32_t> rgba{0xFF0000FFu, 0xFF00FF00u,
+                                              0xFFFF0000u, 0xFFFFFFFFu};
+        std::string transfer_error;
+        if (!anyps1::copy_host_to_vram(rgba, destination, 1024u, vram,
+                                       transfer_error)) {
+            throw std::runtime_error("host-to-VRAM copy failed: " +
+                                     transfer_error);
+        }
+        std::vector<std::uint32_t> host_pixels;
+        if (!anyps1::copy_vram_to_host(vram, destination, 1024u,
+                                       host_pixels, transfer_error) ||
+            host_pixels.size() != 4u) {
+            throw std::runtime_error("VRAM-to-host copy failed: " +
+                                     transfer_error);
         }
 
         try {
