@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 int main(int argc, char** argv)
 {
@@ -43,8 +44,24 @@ int main(int argc, char** argv)
             || elf_magic[2] != 'L' || elf_magic[3] != 'F') {
             throw std::runtime_error("invalid native ELF output");
         }
-        if (std::system(output_path) != 0) {
+        FILE* executable = popen(output_path, "r");
+        if (executable == nullptr) {
+            throw std::runtime_error("cannot start native ELF artifact");
+        }
+        std::string terminal_output;
+        std::array<char, 256> capture{};
+        while (std::fgets(capture.data(), static_cast<int>(capture.size()), executable) != nullptr) {
+            terminal_output += capture.data();
+        }
+        const int capture_status = pclose(executable);
+        if (capture_status != 0) {
             throw std::runtime_error("native ELF artifact did not exit successfully");
+        }
+        if (terminal_output.find("AnyPS1 native executable diagnostics") == std::string::npos
+            || terminal_output.find("target=linux") == std::string::npos
+            || terminal_output.find("entry_point=0x") == std::string::npos
+            || terminal_output.find("native lowering complete") == std::string::npos) {
+            throw std::runtime_error("native ELF artifact lacks comprehensive diagnostics");
         }
 
         anyps1::RelinkOptions windows_options;

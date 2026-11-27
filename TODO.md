@@ -3,12 +3,14 @@
 ## Linux executable conversion
 
 - [ ] Complete native Linux ELF32/ELF64 executable generation with valid
-  entrypoint, program headers, section headers, permissions, and dynamic
- /runtime linkage as required.
+  entrypoint, program headers, section headers, permissions, and required
+  host linking.
 - [ ] Link each lowered executable with only host-native code and host-native
-  data; never embed or invoke a PS1 interpreter.
+  data.
 - [ ] Add real Linux launch fixtures and verify them with `file`, `readelf`,
   execution, and exit status.
+- [ ] Expand native executable terminal diagnostics with register, memory,
+  lowering, instruction, and exit-status details.
 
 ## MIPS instruction lowering
 
@@ -44,8 +46,8 @@
 - [ ] Replace PS1 BIOS-vector assumptions with native host services or explicit
   unsupported conversion results.
 - [ ] Document native equivalents for file, input, audio, video, and console APIs.
-- [ ] Add direct native I/O/exit handling without embedding executable PS1 services.
-- [ ] Do not require BIOS images, PS-X runtime state, or PS1 MMIO interpretation.
+- [ ] Add direct native I/O/exit handling.
+- [ ] Do not require BIOS images or external PS-X state.
 
 ## Windows executable conversion
 

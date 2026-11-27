@@ -163,6 +163,25 @@ std::uint32_t read32(const std::vector<unsigned char>& data, std::size_t offset)
         | (static_cast<std::uint32_t>(data[offset + 3]) << 24);
 }
 
+std::string hex32(std::uint32_t value)
+{
+    char output[11]{};
+    std::snprintf(output, sizeof(output), "0x%08X", static_cast<unsigned>(value));
+    return output;
+}
+
+std::string escape_assembly_string(const std::string& value)
+{
+    std::string escaped;
+    for (char character : value) {
+        if (character == '\n') escaped += "\\n";
+        else if (character == '\\') escaped += "\\\\";
+        else if (character == '"') escaped += "\\\"";
+        else escaped += character;
+    }
+    return escaped;
+}
+
 void write_pe_layout(
     const RelinkOptions& options,
     const std::vector<unsigned char>& data,
@@ -204,6 +223,15 @@ void write_linux_native(
     }
     {
         std::ofstream source(assembly, std::ios::trunc);
+        const std::string banner = "AnyPS1 native executable diagnostics\n";
+        const std::string target = "target=linux\n";
+        const std::string load = "load_address=" + hex32(load_address) + "\n";
+        const std::string entry = "entry_point=" + hex32(initial_pc) + "\n";
+        const std::string gp = "initial_gp=" + hex32(initial_gp) + "\n";
+        const std::string sp = "initial_sp=" + hex32(initial_sp) + "\n";
+        const std::string payload_size = "payload_size=" + std::to_string(file_size) + "\n";
+        const std::string lowered = "lowered_words=" + std::to_string(block_words) + "\n";
+        const std::string completed = "native lowering complete\n";
         source << ".text\n";
         source << ".section .bss\n";
         source << ".p2align 4\n";
@@ -212,8 +240,48 @@ void write_linux_native(
         source << "ram:\n";
         source << ".skip 2097152\n";
         source << ".text\n";
+        source << ".section .rodata\n";
+        source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
+        source << "diag_target:.asciz \"" << escape_assembly_string(target) << "\"\n";
+        source << "diag_load:.asciz \"" << escape_assembly_string(load) << "\"\n";
+        source << "diag_entry:.asciz \"" << escape_assembly_string(entry) << "\"\n";
+        source << "diag_gp:.asciz \"" << escape_assembly_string(gp) << "\"\n";
+        source << "diag_sp:.asciz \"" << escape_assembly_string(sp) << "\"\n";
+        source << "diag_payload:.asciz \"" << escape_assembly_string(payload_size) << "\"\n";
+        source << "diag_lowered:.asciz \"" << escape_assembly_string(lowered) << "\"\n";
+        source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
+        source << ".text\n";
+        source << "print_diag:\n";
+        source << "    mov $1, %edi\n";
+        source << "    mov $1, %eax\n";
+        source << "    syscall\n";
+        source << "    ret\n";
         source << ".globl _start\n";
         source << "_start:\n";
+        source << "    leaq diag_banner(%rip), %rsi\n";
+        source << "    mov $" << banner.size() << ", %rdx\n";
+        source << "    call print_diag\n";
+        source << "    leaq diag_target(%rip), %rsi\n";
+        source << "    mov $" << target.size() << ", %rdx\n";
+        source << "    call print_diag\n";
+        source << "    leaq diag_load(%rip), %rsi\n";
+        source << "    mov $" << load.size() << ", %rdx\n";
+        source << "    call print_diag\n";
+        source << "    leaq diag_entry(%rip), %rsi\n";
+        source << "    mov $" << entry.size() << ", %rdx\n";
+        source << "    call print_diag\n";
+        source << "    leaq diag_gp(%rip), %rsi\n";
+        source << "    mov $" << gp.size() << ", %rdx\n";
+        source << "    call print_diag\n";
+        source << "    leaq diag_sp(%rip), %rsi\n";
+        source << "    mov $" << sp.size() << ", %rdx\n";
+        source << "    call print_diag\n";
+        source << "    leaq diag_payload(%rip), %rsi\n";
+        source << "    mov $" << payload_size.size() << ", %rdx\n";
+        source << "    call print_diag\n";
+        source << "    leaq diag_lowered(%rip), %rsi\n";
+        source << "    mov $" << lowered.size() << ", %rdx\n";
+        source << "    call print_diag\n";
         source << "    leaq ram(%rip), %rdi\n";
         source << "    add $" << (load_address & 0x1FFFFFu) << ", %rdi\n";
         source << "    leaq payload(%rip), %rsi\n";
@@ -672,6 +740,9 @@ void write_linux_native(
                 }
             }
         }
+        source << "    leaq diag_completed(%rip), %rsi\n";
+        source << "    mov $" << completed.size() << ", %rdx\n";
+        source << "    call print_diag\n";
         source << "    xor %edi, %edi\n";
         source << "    mov $60, %eax\n";
         source << "    syscall\n";

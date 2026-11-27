@@ -57,6 +57,10 @@ header), lowers supported MIPS instructions directly into native Linux code,
 and rejects unsupported instructions explicitly. It does not execute or interpret
 PS-X behavior.
 
+Relinked native executables print terminal diagnostics on startup: target
+platform, load address, entry point, GP/SP values, payload size, lowered word
+count, and lowering completion status.
+
 The resulting layout is:
 
 ```text
