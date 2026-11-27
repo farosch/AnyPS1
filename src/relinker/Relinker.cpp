@@ -54,7 +54,7 @@ bool relink(RelinkOptions& options)
     if (initial_pc != 0 && (initial_pc < load_address || initial_pc >= load_address + file_size)) throw std::runtime_error("PS-X EXE entry point is outside the executable image");
 
     if (*resolved.target == TargetPlatform::Windows) {
-        write_pe_layout(resolved, data, load_address, file_size);
+        write_windows_native_cfg(resolved, data);
         return true;
     }
     try { write_linux_native_cfg(resolved, data); }

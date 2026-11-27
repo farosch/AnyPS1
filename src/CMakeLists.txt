@@ -22,6 +22,7 @@ add_library(anyps1_executable
 
 add_library(anyps1_lowering
     lowering/MipsLowerer.cpp
+    lowering/MipsWindowsLowerer.cpp
     lowering/UnsupportedInstructions.cpp
     lowering/PayloadRegion.cpp
 )

@@ -1004,62 +1004,62 @@ void write_linux_native_cfg(
         if (branch) {
             const std::int32_t displacement =
                 static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
-            const std::uint32_t target =
+            const std::uint32_t branch_target =
                 static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
-            if (target < load_address || target >= load_address + file_size ||
-                leaders.find(target) == leaders.end()) {
+            if (branch_target < load_address || branch_target >= load_address + file_size ||
+                leaders.find(branch_target) == leaders.end()) {
                 source << "jmp unsupported_jump_exit\n";
             } else if (opcode == 0x11 && (rs == 8 || rs == 12)) {
                 source << "movl fpcsr(%rip), %eax\n";
                 source << "testl $1, %eax\n";
                 if (rt == 0 || rt == 2) {
-                    source << "jz p" << std::hex << target << std::dec << "\n";
+                    source << "jz p" << std::hex << branch_target << std::dec << "\n";
                 } else {
-                    source << "jnz p" << std::hex << target << std::dec << "\n";
+                    source << "jnz p" << std::hex << branch_target << std::dec << "\n";
                 }
             } else if (opcode == 0x04) {
                 source << "movl " << rs * 4 << "(%r12), %eax\n";
                 source << "cmpl " << rt * 4 << "(%r12), %eax\n";
-                source << "je p" << std::hex << target << std::dec << "\n";
+                source << "je p" << std::hex << branch_target << std::dec << "\n";
             } else if (opcode == 0x05) {
                 source << "movl " << rs * 4 << "(%r12), %eax\n";
                 source << "cmpl " << rt * 4 << "(%r12), %eax\n";
-                source << "jne p" << std::hex << target << std::dec << "\n";
+                source << "jne p" << std::hex << branch_target << std::dec << "\n";
             } else if (opcode == 0x06) {
-                source << "cmpl $0, " << rs * 4 << "(%r12)\njle p" << std::hex << target << std::dec << "\n";
+                source << "cmpl $0, " << rs * 4 << "(%r12)\njle p" << std::hex << branch_target << std::dec << "\n";
             } else if (opcode == 0x07) {
-                source << "cmpl $0, " << rs * 4 << "(%r12)\njg p" << std::hex << target << std::dec << "\n";
+                source << "cmpl $0, " << rs * 4 << "(%r12)\njg p" << std::hex << branch_target << std::dec << "\n";
             } else {
                 source << "cmpl $0, " << rs * 4 << "(%r12)\n";
                 if (rt == 0) {
-                    source << "jl p" << std::hex << target << std::dec << "\n";
+                    source << "jl p" << std::hex << branch_target << std::dec << "\n";
                 } else if (rt == 1) {
-                    source << "jge p" << std::hex << target << std::dec << "\n";
+                    source << "jge p" << std::hex << branch_target << std::dec << "\n";
                 } else if (rt == 16) {
                     source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
-                    source << "jl p" << std::hex << target << std::dec << "\n";
+                    source << "jl p" << std::hex << branch_target << std::dec << "\n";
                 } else if (rt == 17) {
                     source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
-                    source << "jge p" << std::hex << target << std::dec << "\n";
+                    source << "jge p" << std::hex << branch_target << std::dec << "\n";
                 } else {
                     emit_unsupported_stub(instruction);
                 }
             }
         } else if (jump) {
-            const std::uint32_t target =
+            const std::uint32_t jump_target =
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
             if (opcode == 0x03) {
                 source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
-                if (target >= load_address && target < load_address + file_size &&
-                    leaders.find(target) != leaders.end()) {
-                    source << "call p" << std::hex << target << std::dec << "\n";
+                if (jump_target >= load_address && jump_target < load_address + file_size &&
+                    leaders.find(jump_target) != leaders.end()) {
+                    source << "call p" << std::hex << jump_target << std::dec << "\n";
                 } else {
                     source << "jmp unsupported_jump_exit\n";
                 }
             } else {
-                if (target >= load_address && target < load_address + file_size &&
-                    leaders.find(target) != leaders.end()) {
-                    source << "jmp p" << std::hex << target << std::dec << "\n";
+                if (jump_target >= load_address && jump_target < load_address + file_size &&
+                    leaders.find(jump_target) != leaders.end()) {
+                    source << "jmp p" << std::hex << jump_target << std::dec << "\n";
                 } else {
                     source << "jmp unsupported_jump_exit\n";
                 }
@@ -1069,10 +1069,10 @@ void write_linux_native_cfg(
                 source << "ret\n";
             } else {
                 source << "movl " << rs * 4 << "(%r12), %eax\n";
-                for (std::uint32_t target : leaders) {
-                    if (target >= load_address && target < load_address + file_size) {
-                        source << "cmpl $" << target << ", %eax\n";
-                        source << "je p" << std::hex << target << std::dec << "\n";
+                for (std::uint32_t leader_target : leaders) {
+                    if (leader_target >= load_address && leader_target < load_address + file_size) {
+                        source << "cmpl $" << leader_target << ", %eax\n";
+                        source << "je p" << std::hex << leader_target << std::dec << "\n";
                     }
                 }
                 source << "jmp unsupported_jump_exit\n";

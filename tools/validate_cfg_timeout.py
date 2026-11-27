@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -27,8 +28,10 @@ def main() -> int:
             encoding="utf-8",
         )
         try:
+            target = "windows" if os.name == "nt" else "linux"
+            artifact = "game.exe" if target == "windows" else "game.elf"
             completed = subprocess.run(
-                [str(args.relinker), "--target", "linux", str(folder)],
+                [str(args.relinker), "--target", target, str(folder)],
                 capture_output=True,
                 check=False,
                 timeout=args.timeout,
@@ -41,8 +44,8 @@ def main() -> int:
             raise RuntimeError(
                 completed.stderr.decode("utf-8", errors="replace").strip()
                 or "CFG relinking failed")
-        if not (folder / "game.elf").is_file():
-            raise RuntimeError("CFG relinking did not retain game.elf")
+        if not (folder / artifact).is_file():
+            raise RuntimeError(f"CFG relinking did not retain {artifact}")
     return 0
 
 

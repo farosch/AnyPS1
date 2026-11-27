@@ -100,8 +100,10 @@ int NativeFileRuntime::open(const std::string& path, bool write, bool append,
     int flags = (_O_BINARY | (write ? (_O_WRONLY | _O_CREAT) : _O_RDONLY));
     if (append) flags |= _O_APPEND;
     int mode = _S_IREAD | _S_IWRITE;
-    const int descriptor = _open(path.c_str(), flags, mode);
-    if (descriptor < 0) {
+    int descriptor = -1;
+    const errno_t open_error =
+        _sopen_s(&descriptor, path.c_str(), flags, _SH_DENYNO, mode);
+    if (open_error != 0) {
         error = "native file open failed";
         return -1;
     }

@@ -8,5 +8,6 @@ namespace anyps1 {
 
 struct RelinkOptions;
 void write_linux_native_cfg(const RelinkOptions& options, const std::vector<unsigned char>& data);
+void write_windows_native_cfg(const RelinkOptions& options, const std::vector<unsigned char>& data);
 
 }

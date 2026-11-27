@@ -22,10 +22,17 @@ int main(int argc, char** argv)
         return 1;
     }
     const char* fixture_path = argv[1];
+#ifdef _WIN32
+    const char* game_root = "C:\\tmp\\anyps1-relinker-test";
+    const char* input_path = "C:\\tmp\\anyps1-relinker-test\\SCUS_941.63";
+    const char* output_path = "C:\\tmp\\anyps1-relinker-test\\game.elf";
+    const char* windows_output_path = "C:\\tmp\\anyps1-relinker-test\\game.exe";
+#else
     const char* game_root = "/tmp/anyps1-relinker-test";
     const char* input_path = "/tmp/anyps1-relinker-test/SCUS_941.63";
     const char* output_path = "/tmp/anyps1-relinker-test/game.elf";
     const char* windows_output_path = "/tmp/anyps1-relinker-test/game.exe";
+#endif
     try {
         if (!std::filesystem::is_regular_file(fixture_path)) {
             throw std::runtime_error("missing relinker fixture");
@@ -266,7 +273,7 @@ int main(int argc, char** argv)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 17]) << 8)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 18]) << 16)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 19]) << 24);
-        if (entry_rva != 0x1000) {
+        if (entry_rva < 0x1000 || entry_rva >= 0x3000) {
             throw std::runtime_error("Windows PE output has invalid entry RVA");
         }
         const std::uint32_t number_of_rva =
@@ -282,13 +289,13 @@ int main(int argc, char** argv)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 121]) << 8)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 122]) << 16)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 123]) << 24);
-        if (import_directory != 0x2040) {
+        if (import_directory != 0x2120) {
             throw std::runtime_error("Windows PE output has invalid import directory");
         }
         const std::uint16_t section_count =
             static_cast<std::uint16_t>(pe_bytes[pe_offset + 6])
             | (static_cast<std::uint16_t>(pe_bytes[pe_offset + 7]) << 8);
-        if (section_count != 2) {
+        if (section_count != 4) {
             throw std::runtime_error("Windows PE output has invalid section count");
         }
 

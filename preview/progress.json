@@ -1,6 +1,6 @@
 {
   "summary": {
-    "commit": "c67d6fb",
+    "commit": "5db7b81",
     "total": 78,
     "status_counts": {
       "tested": 16,
@@ -115,6 +115,8 @@
       "relinker_sparse_cfg",
       "relinker_mips_edge_cases",
       "payload_region_classifier",
+      "validation_tools",
+      "cfg_timeout",
       "memory_map_mmio_dma"
     ],
     "implemented_percent": 96.1,
@@ -129,7 +131,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 481,
+          "line": 498,
           "pattern": "special == 0x00"
         }
       ],
@@ -143,7 +145,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 483,
+          "line": 500,
           "pattern": "special == 0x02"
         }
       ],
@@ -157,7 +159,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 485,
+          "line": 502,
           "pattern": "special == 0x03"
         }
       ],
@@ -171,7 +173,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 487,
+          "line": 504,
           "pattern": "special == 0x04"
         }
       ],
@@ -185,7 +187,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 489,
+          "line": 506,
           "pattern": "special == 0x06"
         }
       ],
@@ -199,7 +201,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 491,
+          "line": 508,
           "pattern": "special == 0x07"
         }
       ],
@@ -213,7 +215,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 493,
+          "line": 510,
           "pattern": "special == 0x20"
         }
       ],
@@ -227,7 +229,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 495,
+          "line": 512,
           "pattern": "special == 0x21"
         }
       ],
@@ -241,7 +243,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 497,
+          "line": 514,
           "pattern": "special == 0x22"
         }
       ],
@@ -255,7 +257,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 499,
+          "line": 516,
           "pattern": "special == 0x23"
         }
       ],
@@ -269,7 +271,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 501,
+          "line": 518,
           "pattern": "special == 0x24"
         }
       ],
@@ -283,7 +285,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 503,
+          "line": 520,
           "pattern": "special == 0x25"
         }
       ],
@@ -297,7 +299,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 505,
+          "line": 522,
           "pattern": "special == 0x26"
         }
       ],
@@ -311,7 +313,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 507,
+          "line": 524,
           "pattern": "special == 0x27"
         }
       ],
@@ -325,7 +327,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 509,
+          "line": 526,
           "pattern": "special == 0x2A"
         }
       ],
@@ -339,7 +341,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 511,
+          "line": 528,
           "pattern": "special == 0x2B"
         }
       ],
@@ -353,7 +355,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 513,
+          "line": 530,
           "pattern": "special == 0x18"
         }
       ],
@@ -367,7 +369,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 515,
+          "line": 532,
           "pattern": "special == 0x19"
         }
       ],
@@ -381,7 +383,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 517,
+          "line": 534,
           "pattern": "special == 0x1A"
         }
       ],
@@ -395,7 +397,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 517,
+          "line": 534,
           "pattern": "special == 0x1B"
         }
       ],
@@ -409,7 +411,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 522,
+          "line": 539,
           "pattern": "special == 0x10"
         }
       ],
@@ -423,7 +425,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 526,
+          "line": 543,
           "pattern": "special == 0x12"
         }
       ],
@@ -437,7 +439,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 524,
+          "line": 541,
           "pattern": "special == 0x11"
         }
       ],
@@ -451,7 +453,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 528,
+          "line": 545,
           "pattern": "special == 0x13"
         }
       ],
@@ -465,7 +467,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 698,
+          "line": 715,
           "pattern": "opcode == 0x08"
         }
       ],
@@ -479,7 +481,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 157,
+          "line": 175,
           "pattern": "opcode == 0x09"
         }
       ],
@@ -493,7 +495,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 702,
+          "line": 719,
           "pattern": "opcode == 0x0C"
         }
       ],
@@ -507,7 +509,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 163,
+          "line": 181,
           "pattern": "opcode == 0x0D"
         }
       ],
@@ -521,7 +523,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 706,
+          "line": 723,
           "pattern": "opcode == 0x0E"
         }
       ],
@@ -535,7 +537,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 154,
+          "line": 172,
           "pattern": "opcode == 0x0F"
         }
       ],
@@ -549,7 +551,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 712,
+          "line": 729,
           "pattern": "opcode == 0x20"
         }
       ],
@@ -563,7 +565,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 712,
+          "line": 729,
           "pattern": "opcode == 0x21"
         }
       ],
@@ -577,7 +579,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 712,
+          "line": 729,
           "pattern": "opcode == 0x23"
         }
       ],
@@ -591,7 +593,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 712,
+          "line": 729,
           "pattern": "opcode == 0x24"
         }
       ],
@@ -605,7 +607,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 712,
+          "line": 729,
           "pattern": "opcode == 0x25"
         }
       ],
@@ -619,7 +621,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 735,
+          "line": 752,
           "pattern": "opcode == 0x28"
         }
       ],
@@ -633,7 +635,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 735,
+          "line": 752,
           "pattern": "opcode == 0x29"
         }
       ],
@@ -647,7 +649,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 735,
+          "line": 752,
           "pattern": "opcode == 0x2B"
         }
       ],
@@ -661,7 +663,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 780,
+          "line": 797,
           "pattern": "opcode == 0x22"
         }
       ],
@@ -675,7 +677,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 780,
+          "line": 797,
           "pattern": "opcode == 0x26"
         }
       ],
@@ -689,7 +691,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 228,
+          "line": 245,
           "pattern": "opcode == 0x04"
         }
       ],
@@ -703,7 +705,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 228,
+          "line": 245,
           "pattern": "opcode == 0x05"
         }
       ],
@@ -717,7 +719,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 229,
+          "line": 246,
           "pattern": "opcode == 0x06"
         }
       ],
@@ -731,7 +733,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 229,
+          "line": 246,
           "pattern": "opcode == 0x07"
         }
       ],
@@ -745,7 +747,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 231,
+          "line": 248,
           "pattern": "opcode == 0x02"
         }
       ],
@@ -759,7 +761,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 231,
+          "line": 248,
           "pattern": "opcode == 0x03"
         }
       ],
@@ -773,7 +775,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 232,
+          "line": 249,
           "pattern": "special == 0x08"
         }
       ],
@@ -787,7 +789,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 233,
+          "line": 250,
           "pattern": "special == 0x09"
         }
       ],
@@ -801,7 +803,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 234,
+          "line": 251,
           "pattern": "special == 0x0C"
         }
       ],
@@ -815,7 +817,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 234,
+          "line": 251,
           "pattern": "special == 0x0D"
         }
       ],
@@ -829,7 +831,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 539,
+          "line": 556,
           "pattern": "opcode == 0x10"
         }
       ],
@@ -843,7 +845,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 539,
+          "line": 556,
           "pattern": "opcode == 0x10"
         }
       ],
@@ -865,7 +867,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 558,
+          "line": 575,
           "pattern": "opcode == 0x12"
         }
       ],
@@ -879,7 +881,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 230,
+          "line": 247,
           "pattern": "opcode == 0x11"
         }
       ],
@@ -893,7 +895,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 694,
+          "line": 711,
           "pattern": "opcode == 0x13"
         }
       ],
@@ -924,7 +926,7 @@
         },
         {
           "path": "tests/RelinkerTest.cpp",
-          "line": 66,
+          "line": 73,
           "pattern": "invalid"
         }
       ],
@@ -949,7 +951,7 @@
       "tests": [
         {
           "path": "tests/RelinkerTest.cpp",
-          "line": 36,
+          "line": 43,
           "pattern": "SYSTEM.CNF"
         }
       ],
@@ -1000,14 +1002,14 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 173,
+          "line": 191,
           "pattern": "write_linux_native_cfg"
         }
       ],
       "tests": [
         {
           "path": "tests/RelinkerTest.cpp",
-          "line": 148,
+          "line": 155,
           "pattern": "native ELF"
         }
       ],
@@ -1040,19 +1042,19 @@
       "source": [
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 338,
+          "line": 355,
           "pattern": "native executable diagnostics"
         },
         {
           "path": "src/lowering/MipsLowerer.cpp",
-          "line": 375,
+          "line": 392,
           "pattern": "unsupported_instructions"
         }
       ],
       "tests": [
         {
           "path": "tests/RelinkerTest.cpp",
-          "line": 54,
+          "line": 61,
           "pattern": "native"
         }
       ],

@@ -149,12 +149,14 @@
 - [x] Add `objdump`/`llvm-readobj` format-inspector support.
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
 - [ ] Implement native Windows MIPS lowering equivalent to Linux lowering.
-- [ ] Generate imports and relocations for real Windows host-native code.
-- [ ] Add PE32 support if an x86 compatibility target is required.
-- [ ] Test generated PE32+ output with available Windows cross-toolchains.
-- [ ] Add Windows execution fixtures and exit-status/diagnostic validation.
-- [ ] Integrate Windows SDL3 input and Vulkan host services.
-- [ ] Validate generated PE images with platform format inspectors and signed
+- [x] Generate imports and relocations for real Windows host-native code.
+- [x] Document PE32 support as optional: no PE32-only x86 compatibility target
+  is required because the native backend emits AMD64 PE32+.
+- [x] Test generated PE32+ output with available Windows cross-toolchains.
+- [x] Add Windows execution fixtures and exit-status/diagnostic validation.
+- [ ] Integrate Windows SDL3 input and Vulkan host services into the generated
+  executable loop.
+- [x] Validate generated PE images with platform format inspectors and signed
   executable tooling as applicable.
 
 ## PS1 GPU lowering and Vulkan shaders
