@@ -51,7 +51,8 @@
 
 ### Remaining
 
-- [ ] Implement native COP1 floating-point instructions and LWC1/SWC1 behavior.
+- [ ] Complete native COP1 floating-point lowering: add/sub/mul/div/sqrt,
+  conversions, comparisons, BC1 branches, and all LWC1/SWC1 edge paths.
 - [ ] Implement native COP2/GTE matrix, vector, color, clipping, division,
   compression, and interpolation operations.
 - [ ] Implement COP3 instructions directly or emit exact unsupported stubs.

@@ -216,7 +216,8 @@ void write_linux_native_cfg(
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
-            || opcode == 0x06 || opcode == 0x07;
+            || opcode == 0x06 || opcode == 0x07
+            || (opcode == 0x11 && rs == 8);
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
         const bool jalr = opcode == 0 && special == 0x09;
@@ -363,6 +364,7 @@ void write_linux_native_cfg(
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
     source << "cop0:\n.skip 128\n";
+    source << "fregs:\n.skip 256\nfpcsr:\n.skip 4\n";
     source << ".section .rodata\n";
     source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
     source << "diag_target:.asciz \"" << escape_assembly_string(target) << "\"\n";
@@ -554,7 +556,49 @@ void write_linux_native_cfg(
         } else if (opcode == 0x12) {
             emit_unsupported_stub(instruction);
         } else if (opcode == 0x11) {
-            emit_unsupported_stub(instruction);
+            const std::uint32_t cop1_rs = rs;
+            const std::uint32_t cop1_fd = rd;
+            if (cop1_rs == 0) {
+                source << "movl fregs+" << cop1_fd * 4 << "(%rip), %eax\n";
+                source << "movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (cop1_rs == 2) {
+                source << "movl fpcsr(%rip), %eax\n";
+                source << "movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (cop1_rs == 4) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n";
+                source << "movl %eax, fregs+" << cop1_fd * 4 << "(%rip)\n";
+            } else if (cop1_rs == 6) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n";
+                source << "movl %eax, fpcsr(%rip)\n";
+            } else if (cop1_rs == 16) {
+                const std::uint32_t ft = rt;
+                const std::uint32_t fs = rd;
+                const std::uint32_t fd = shamt;
+                if (special == 0) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "addss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 1) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "subss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 2) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "mulss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 3) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "divss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 4) {
+                    source << "sqrtss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else {
+                    emit_unsupported_stub(instruction);
+                }
+            } else {
+                emit_unsupported_stub(instruction);
+            }
         } else if (opcode == 0x13) {
             emit_unsupported_stub(instruction);
         } else if (opcode == 0x0F) {
@@ -617,6 +661,30 @@ void write_linux_native_cfg(
             if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
             else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
             else source << "movl %edx, (%rbx,%rcx)\n";
+        } else if (opcode == 0x31 || opcode == 0x39) {
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
+            source << "movl %eax, %ecx\n";
+            source << "andl $0x1FFFFFFF, %ecx\n";
+            source << "cmpl $0x1F800000, %ecx\n";
+            source << "jb cop1_ram_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1F800400, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp cop1_finish_" << std::hex << address << std::dec << "\n";
+            source << "cop1_ram_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x200000, %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq ram(%rip), %rbx\n";
+            source << "cop1_finish_" << std::hex << address << std::dec << ": \n";
+            if (opcode == 0x31) {
+                source << "movss (%rbx,%rcx), %xmm0\n";
+                source << "movss %xmm0, fregs+" << rt * 4 << "(%rip)\n";
+            } else {
+                source << "movss fregs+" << rt * 4 << "(%rip), %xmm0\n";
+                source << "movss %xmm0, (%rbx,%rcx)\n";
+            }
         } else if (opcode == 0x22 || opcode == 0x26) {
             // Little-endian PS1 LWL/LWR: merge a word-aligned load
             // according to the effective address alignment.
@@ -803,7 +871,8 @@ void write_linux_native_cfg(
         if (delay_slots.find(address) != delay_slots.end()) continue;
 
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
-            || opcode == 0x06 || opcode == 0x07;
+            || opcode == 0x06 || opcode == 0x07
+            || (opcode == 0x11 && rs == 8);
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
         const bool jalr = opcode == 0 && special == 0x09;
@@ -825,8 +894,15 @@ void write_linux_native_cfg(
             if (target < load_address || target >= load_address + file_size ||
                 leaders.find(target) == leaders.end()) {
                 source << "jmp unsupported_jump_exit\n";
-            } else
-            if (opcode == 0x04) {
+            } else if (opcode == 0x11 && rs == 8) {
+                source << "movl fpcsr(%rip), %eax\n";
+                source << "testl $1, %eax\n";
+                if (rt == 0) {
+                    source << "jz p" << std::hex << target << std::dec << "\n";
+                } else {
+                    source << "jnz p" << std::hex << target << std::dec << "\n";
+                }
+            } else if (opcode == 0x04) {
                 source << "movl " << rs * 4 << "(%r12), %eax\n";
                 source << "cmpl " << rt * 4 << "(%r12), %eax\n";
                 source << "je p" << std::hex << target << std::dec << "\n";
