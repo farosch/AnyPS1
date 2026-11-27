@@ -1,0 +1,120 @@
+name: CI and implementation progress
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: anyps1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-linux:
+    name: Linux build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ninja and FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: |
+          export LD_LIBRARY_PATH="$PWD/build/3rdparty/SDL:${LD_LIBRARY_PATH:-}"
+          ctest --test-dir build --output-on-failure
+
+  test-windows:
+    name: Windows build and tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        shell: cmd
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        shell: cmd
+        run: cmake --build build --parallel
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $env:PATH = "$PWD\build\3rdparty\SDL;$env:PATH"
+          ctest --test-dir build --output-on-failure
+
+  progress:
+    name: Generate implementation progress
+    needs:
+      - test-linux
+      - test-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Generate preview
+        run: python3 tools/progress/generate_progress.py
+
+      - name: Require preview to be committed on pull requests
+        if: github.event_name == 'pull_request'
+        run: git diff --exit-code -- preview
+
+      - name: Commit preview updates
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- preview; then
+            echo "Preview is already up to date"
+            exit 0
+          fi
+          git add preview
+          git commit -m "docs: update implementation progress preview [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

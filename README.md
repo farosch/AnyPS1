@@ -20,6 +20,11 @@ The code-derived implementation overview is available in
 cmake --build build --target progress
 ```
 
+GitHub Actions runs the Linux and Windows CTest suites on pushes and pull requests.
+The CI progress job regenerates `preview/progress.{json,html,svg,png}` and rejects
+stale preview artifacts in pull requests. Push workflows update and commit preview
+artifacts automatically.
+
 ## Relinking
 
 Prepare an extracted disc in this layout:

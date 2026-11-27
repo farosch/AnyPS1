@@ -8,6 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
+
 option(ANYPS1_ENABLE_SPIRV_TOOLS "Build SPIR-V validation and optimization tools" OFF)
 option(ANYPS1_ENABLE_GLSLANG "Build glslang shader tooling" OFF)
 
@@ -57,7 +60,7 @@ if(BUILD_TESTING)
 endif()
 
 add_custom_target(progress
-    COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/progress/generate_progress.py
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/progress/generate_progress.py
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Generating AnyPS1 implementation progress report"
 )
