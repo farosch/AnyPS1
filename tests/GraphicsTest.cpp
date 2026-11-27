@@ -180,6 +180,24 @@ int main()
                 throw;
             }
         }
+        try {
+            anyps1::lower_gp0_gp1({}, {0x09000000u});
+            throw std::runtime_error("unsupported GP1 command unexpectedly accepted");
+        } catch (const std::runtime_error& error) {
+            if (std::string(error.what()).find("unsupported PS1 GP1") ==
+                std::string::npos) {
+                throw;
+            }
+        }
+        try {
+            anyps1::lower_gp0_gp1({0x20FFFFFFu, 0x00000010u}, {});
+            throw std::runtime_error("truncated GP0 polygon unexpectedly accepted");
+        } catch (const std::runtime_error& error) {
+            if (std::string(error.what()).find("truncated PS1 GPU command") ==
+                std::string::npos) {
+                throw;
+            }
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Graphics test failed: " << error.what() << "\n";

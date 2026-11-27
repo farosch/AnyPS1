@@ -43,6 +43,9 @@ enum class GraphicsVramTransferDirection {
 };
 
 enum class GraphicsCommandType {
+    ResetGpu,
+    ResetCommandBuffer,
+    AcknowledgeInterrupt,
     SetDisplayEnable,
     SetDisplayMode,
     SetDisplayArea,

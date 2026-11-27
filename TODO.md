@@ -189,7 +189,7 @@
 - [x] Create and validate Vulkan resources in the Linux/Windows runtime.
 - [x] Integrate shader validation and optimization into release builds.
 - [x] Add SPIR-V golden fixtures and malformed GPU command fixtures.
-- [ ] Preserve unsupported GPU commands as conversion failures, including no
+- [x] Preserve unsupported GPU commands as conversion failures, including no
   silent drop or emulator fallback.
 
 ## Unsupported instruction tracking

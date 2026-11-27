@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include "input/Input.h"
 
 namespace anyps1 {
 
@@ -145,6 +146,38 @@ public:
         const std::int16_t* samples,
         std::size_t sample_count,
         std::string& error);
+    void shutdown();
+
+private:
+    struct Impl;
+    Impl* impl_;
+};
+
+class NativeHostLoopRuntime {
+public:
+    NativeHostLoopRuntime();
+    ~NativeHostLoopRuntime();
+
+    NativeHostLoopRuntime(const NativeHostLoopRuntime&) = delete;
+    NativeHostLoopRuntime& operator=(const NativeHostLoopRuntime&) = delete;
+
+    bool initialize(
+        const std::string& title,
+        std::uint32_t width,
+        std::uint32_t height,
+        const std::string& input_config_path,
+        std::string& error);
+    bool poll(Ps1InputState& input, std::string& error);
+    bool present_framebuffer(
+        const std::uint32_t* pixels,
+        std::uint32_t width,
+        std::uint32_t height,
+        std::string& error);
+    bool queue_audio(
+        const std::int16_t* samples,
+        std::size_t sample_count,
+        std::string& error);
+    bool should_close() const;
     void shutdown();
 
 private:

@@ -435,6 +435,100 @@ void SdlHostRuntime::shutdown()
     }
 }
 
+struct NativeHostLoopRuntime::Impl {
+    SdlHostRuntime host;
+    SdlInputRuntime input;
+    bool initialized = false;
+};
+
+NativeHostLoopRuntime::NativeHostLoopRuntime()
+    : impl_(new Impl{})
+{
+}
+
+NativeHostLoopRuntime::~NativeHostLoopRuntime()
+{
+    shutdown();
+    delete impl_;
+}
+
+bool NativeHostLoopRuntime::initialize(
+    const std::string& title,
+    std::uint32_t width,
+    std::uint32_t height,
+    const std::string& input_config_path,
+    std::string& error)
+{
+    if (impl_->initialized) {
+        error.clear();
+        return true;
+    }
+    if (!impl_->host.initialize(title, width, height, error)) {
+        return false;
+    }
+    const InputConfig input_config =
+        load_input_config_or_default(input_config_path, error);
+    if (!impl_->input.initialize(input_config, error)) {
+        impl_->host.shutdown();
+        return false;
+    }
+    impl_->initialized = true;
+    error.clear();
+    return true;
+}
+
+bool NativeHostLoopRuntime::poll(Ps1InputState& input, std::string& error)
+{
+    if (!impl_->initialized) {
+        error = "native host loop runtime is not initialized";
+        return false;
+    }
+    if (!impl_->host.poll_events(error)) return false;
+    if (impl_->host.should_close()) {
+        error.clear();
+        return true;
+    }
+    return impl_->input.poll(input, error);
+}
+
+bool NativeHostLoopRuntime::present_framebuffer(
+    const std::uint32_t* pixels,
+    std::uint32_t width,
+    std::uint32_t height,
+    std::string& error)
+{
+    if (!impl_->initialized) {
+        error = "native host loop runtime is not initialized";
+        return false;
+    }
+    return impl_->host.present_framebuffer(pixels, width, height, error);
+}
+
+bool NativeHostLoopRuntime::queue_audio(
+    const std::int16_t* samples,
+    std::size_t sample_count,
+    std::string& error)
+{
+    if (!impl_->initialized) {
+        error = "native host loop runtime is not initialized";
+        return false;
+    }
+    return impl_->host.queue_audio(samples, sample_count, error);
+}
+
+bool NativeHostLoopRuntime::should_close() const
+{
+    return impl_->initialized && impl_->host.should_close();
+}
+
+void NativeHostLoopRuntime::shutdown()
+{
+    if (impl_ == nullptr) return;
+    impl_->input.shutdown();
+    impl_->host.shutdown();
+    impl_->initialized = false;
+}
+
 bool MemoryCardRuntime::open_slot(
     int slot,
     const std::string& file_path,

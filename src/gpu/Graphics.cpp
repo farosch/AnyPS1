@@ -156,16 +156,20 @@ GraphicsIr lower_gp0_gp1(
 
         switch (command) {
         case 0x00:
-            lowered.type = GraphicsCommandType::SetDisplayEnable;
+            lowered.type = GraphicsCommandType::ResetGpu;
             lowered.first = 0u;
             lowered.state = result.state;
             lowered.state.display_enabled = false;
             result.state = lowered.state;
             break;
         case 0x01:
+            lowered.type = GraphicsCommandType::ResetCommandBuffer;
+            lowered.first = 1u;
+            lowered.state = result.state;
+            break;
         case 0x02:
-            lowered.type = GraphicsCommandType::SetDisplayEnable;
-            lowered.first = result.state.display_enabled ? 1u : 0u;
+            lowered.type = GraphicsCommandType::AcknowledgeInterrupt;
+            lowered.first = parameter;
             lowered.state = result.state;
             break;
         case 0x03:

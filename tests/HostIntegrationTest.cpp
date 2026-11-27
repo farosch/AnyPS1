@@ -71,6 +71,13 @@ int main()
         if (!input.is_pressed(anyps1::Ps1Button::Cross)) {
             throw std::runtime_error("host input mapping did not lower PS1 input");
         }
+        anyps1::NativeHostLoopRuntime loop;
+        if (loop.should_close()) {
+            throw std::runtime_error("uninitialized native host loop reported closed");
+        }
+        if (loop.poll(input, host_error)) {
+            throw std::runtime_error("uninitialized native host loop unexpectedly polled");
+        }
 
         const anyps1::HostServiceMapping console =
             anyps1::map_host_service(anyps1::HostServiceKind::Console);
