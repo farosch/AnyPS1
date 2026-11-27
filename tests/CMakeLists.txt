@@ -59,3 +59,17 @@ target_link_libraries(anyps1_host_integration_test
 add_test(NAME host_integration_ir
     COMMAND anyps1_host_integration_test)
 
+add_test(NAME unsupported_instruction_inventory
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/inventory_unsupported_instructions.py
+        ${FIXTURE_OUTPUT_DIR}/mips/native-unsupported.ps-exe
+        --output ${CMAKE_BINARY_DIR}/unsupported-instruction-inventory.json)
+
+add_executable(anyps1_unsupported_instruction_test
+    UnsupportedInstructionsTest.cpp)
+target_include_directories(anyps1_unsupported_instruction_test
+    PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(anyps1_unsupported_instruction_test
+    PRIVATE anyps1_lowering)
+add_test(NAME unsupported_instruction_registry
+    COMMAND anyps1_unsupported_instruction_test)
+

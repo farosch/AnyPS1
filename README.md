@@ -86,6 +86,14 @@ The optional `tools/report_relink_gaps.py` helper scans locally extracted
 executables found through `SYSTEM.CNF` and reports their first native conversion
 gap. It is format-generic and contains no title-specific relinker behavior.
 
+To inventory unsupported instruction families in a boot executable:
+
+```sh
+python3 tools/inventory_unsupported_instructions.py \
+  "/path/to/executable.ps-exe" \
+  --output build/unsupported-instruction-inventory.json
+```
+
 ## Input mapping
 
 Native Linux and Windows builds can use SDL3 for PS1-style controller input,

@@ -8,6 +8,7 @@ add_library(anyps1_executable
 
 add_library(anyps1_lowering
     lowering/MipsLowerer.cpp
+    lowering/UnsupportedInstructions.cpp
 )
 
 add_library(anyps1_gpu

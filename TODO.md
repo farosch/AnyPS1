@@ -23,6 +23,12 @@
   rather than silently emulated.
 - [x] Provide generic integration surfaces for native launch, input polling,
   graphics IR lowering, Vulkan resource planning, and explicit host gaps.
+- [ ] Implement COP1 MIPS floating-point instructions and their load/store
+  operations through generic native floating-point lowering.
+- [ ] Implement PS-X GTE/COP2 matrix, vector, color, clipping, and compression
+  operations with native host lowering or explicit per-function stubs.
+- [ ] Implement COP3, LWC0-LWC3, and SWC0-SWC3 instruction family stubs and
+  classify unsupported reserved opcodes by exact opcode and SPECIAL function.
 
 ## Linux executable conversion
 

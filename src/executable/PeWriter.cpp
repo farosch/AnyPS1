@@ -26,7 +26,7 @@ constexpr std::uint32_t RDATA_RVA = 0x2000;
 constexpr std::uint32_t BSS_RVA = 0x3000;
 constexpr std::uint32_t RELOC_RVA = 0x4000;
 constexpr std::uint32_t IMAGE_SIZE = 0x5000;
-constexpr std::uint32_t IMAGE_BASE = 0x140000000u;
+constexpr std::uint64_t IMAGE_BASE = 0x140000000ull;
 
 void append_u16(std::vector<unsigned char>& output, std::uint16_t value)
 {
@@ -112,6 +112,9 @@ void write_pe_layout(const RelinkOptions& options,
         "initial_sp=" + hex32(initial_sp) + "\n"
         "payload_size=" + std::to_string(file_size) + "\n"
         "native Windows MIPS lowering is not implemented\n";
+    if (diagnostics.size() > 128u) {
+        diagnostics.resize(128u);
+    }
 
     if (data.size() < PSX_HEADER_SIZE + file_size) {
         throw std::runtime_error("truncated PS-X EXE payload");

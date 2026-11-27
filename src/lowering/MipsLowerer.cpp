@@ -1,6 +1,7 @@
 #include "MipsLowerer.h"
 #include "relinker/Relinker.h"
 #include "format/PsExe.h"
+#include "UnsupportedInstructions.h"
 
 #include <algorithm>
 #include <array>
@@ -46,6 +47,7 @@ void write_linux_native_cfg(
     std::uint32_t unsupported_count = 0;
     std::uint32_t first_unsupported_address = 0;
     std::uint32_t first_unsupported_word = 0;
+    std::string first_unsupported_name;
     std::uint32_t call_edges = 0;
     std::uint32_t unresolved_indirect_transfers = 0;
     leaders.insert(initial_pc);
@@ -162,6 +164,8 @@ void write_linux_native_cfg(
             if (first_unsupported_address == 0) {
                 first_unsupported_address = address;
                 first_unsupported_word = instruction;
+                first_unsupported_name =
+                    classify_unsupported_instruction(instruction).name;
             }
         }
     }
@@ -203,7 +207,8 @@ void write_linux_native_cfg(
         first_unsupported_address == 0
             ? "first_unsupported_gap=none\n"
             : "first_unsupported_gap=" + hex32(first_unsupported_address) +
-              " instruction=" + hex32(first_unsupported_word) + "\n";
+              " instruction=" + hex32(first_unsupported_word) +
+              " name=" + first_unsupported_name + "\n";
     const std::string completed = "native lowering complete\n";
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
@@ -259,12 +264,47 @@ void write_linux_native_cfg(
     source << "mov $" << first_gap.size() << ", %rdx\n";
     source << "call print_diag\n";
     source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
+    source << "unsupported_special_stub:\njmp unsupported_instruction_exit\n";
+    source << "unsupported_cop0_stub:\njmp unsupported_instruction_exit\n";
+    source << "unsupported_cop1_stub:\njmp unsupported_instruction_exit\n";
+    source << "unsupported_cop2_stub:\njmp unsupported_instruction_exit\n";
+    source << "unsupported_cop3_stub:\njmp unsupported_instruction_exit\n";
+    source << "unsupported_load_store_stub:\njmp unsupported_instruction_exit\n";
+    source << "unsupported_reserved_stub:\njmp unsupported_instruction_exit\n";
     source << ".text\n";
     source << "print_diag:\n";
     source << "mov $1, %edi\n";
     source << "mov $1, %eax\n";
     source << "syscall\n";
     source << "ret\n";
+
+    auto emit_unsupported_stub = [&](std::uint32_t instruction) {
+        const UnsupportedInstruction unsupported =
+            classify_unsupported_instruction(instruction);
+        switch (unsupported.kind) {
+        case UnsupportedInstructionKind::Special:
+            source << "jmp unsupported_special_stub\n";
+            break;
+        case UnsupportedInstructionKind::Cop0:
+            source << "jmp unsupported_cop0_stub\n";
+            break;
+        case UnsupportedInstructionKind::Cop1:
+            source << "jmp unsupported_cop1_stub\n";
+            break;
+        case UnsupportedInstructionKind::Cop2:
+            source << "jmp unsupported_cop2_stub\n";
+            break;
+        case UnsupportedInstructionKind::Cop3:
+            source << "jmp unsupported_cop3_stub\n";
+            break;
+        case UnsupportedInstructionKind::LoadStore:
+            source << "jmp unsupported_load_store_stub\n";
+            break;
+        case UnsupportedInstructionKind::ReservedOpcode:
+            source << "jmp unsupported_reserved_stub\n";
+            break;
+        }
+    };
 
     auto emit_normal = [&](std::uint32_t address, std::uint32_t instruction) {
         const std::uint32_t opcode = instruction >> 26;
@@ -332,7 +372,7 @@ void write_linux_native_cfg(
             } else if (special == 0x0D) {
                 source << "mov $9, %edi\nmov $60, %eax\nsyscall\n";
             } else {
-                source << "jmp unsupported_instruction_exit\n";
+                emit_unsupported_stub(instruction);
             }
         } else if (opcode == 0x10) {
             const std::uint32_t cop0_register = rd;
@@ -351,10 +391,10 @@ void write_linux_native_cfg(
                        << "andl $~3, %eax\n"
                        << "movl %eax, cop0+48(%rip)\n";
             } else {
-                source << "jmp unsupported_instruction_exit\n";
+                emit_unsupported_stub(instruction);
             }
         } else if (opcode == 0x12) {
-            source << "jmp unsupported_instruction_exit\n";
+            emit_unsupported_stub(instruction);
         } else if (opcode == 0x0F) {
             source << "movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x08) {
@@ -572,7 +612,7 @@ void write_linux_native_cfg(
             }
             source << "movl %eax, (%rbx,%rdi)\n";
         } else {
-            source << "jmp unsupported_instruction_exit\n";
+            emit_unsupported_stub(instruction);
         }
     };
 
@@ -647,7 +687,7 @@ void write_linux_native_cfg(
                     source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
                     source << "jge p" << std::hex << target << std::dec << "\n";
                 } else {
-                    source << "jmp unsupported_instruction_exit\n";
+                    emit_unsupported_stub(instruction);
                 }
             }
         } else if (jump) {
