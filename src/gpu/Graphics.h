@@ -66,6 +66,24 @@ struct SpirvShader {
     std::vector<std::uint32_t> words;
 };
 
+class VulkanSwapchainRuntime {
+public:
+    VulkanSwapchainRuntime();
+    ~VulkanSwapchainRuntime();
+
+    bool initialize(
+        const std::string& title,
+        std::uint32_t width,
+        std::uint32_t height,
+        std::string& error);
+    bool present(std::string& error);
+    void shutdown();
+
+private:
+    struct Impl;
+    Impl* impl_;
+};
+
 GraphicsIr lower_gp0_gp1(
     const std::vector<std::uint32_t>& gp0_words,
     const std::vector<std::uint32_t>& gp1_words);

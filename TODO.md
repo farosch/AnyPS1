@@ -145,15 +145,15 @@
 
 ### Remaining
 
-- [ ] Implement native file lowering for open/read/write/seek/close operations.
-- [ ] Integrate input polling into the actual generated executable loop.
-- [ ] Implement SDL3 window creation and event pumping in the Linux/Windows
+- [x] Implement native file lowering for open/read/write/seek/close operations.
+- [x] Integrate input polling into the actual generated executable loop.
+- [x] Implement SDL3 window creation and event pumping in the Linux/Windows
   host backend.
-- [ ] Implement native audio lowering for PS1 SPU operations.
-- [ ] Implement native video framebuffer presentation.
-- [ ] Implement native Vulkan swapchain, image, sampler, pipeline, and
+- [x] Implement native audio lowering for PS1 SPU operations.
+- [x] Implement native video framebuffer presentation.
+- [x] Implement native Vulkan swapchain, image, sampler, pipeline, and
   command-buffer resources.
-- [ ] Expose host-native diagnostics through structured exit codes and logs.
+- [x] Expose host-native diagnostics through structured exit codes and logs.
 - [ ] Implement title-independent memory-card storage mapping.
 - [ ] Implement title-independent CD/disc filesystem and asset access mapping.
 - [ ] Add explicit unsupported exits for every unimplemented BIOS vector and

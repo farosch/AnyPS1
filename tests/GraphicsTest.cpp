@@ -13,6 +13,11 @@
 int main()
 {
     try {
+        anyps1::VulkanSwapchainRuntime vulkan_runtime;
+        std::string vulkan_error;
+        if (vulkan_runtime.present(vulkan_error)) {
+            throw std::runtime_error("uninitialized Vulkan swapchain unexpectedly presented");
+        }
         const std::vector<std::uint32_t> gp1{
             0x03000000u,
             0x05010040u,
