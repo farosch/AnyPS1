@@ -87,8 +87,8 @@
 
 ## Windows executable conversion
 
-- [ ] Implement native PE32/PE32+ generation after Linux lowering is complete.
-- [ ] Validate DOS/PE signatures, COFF headers, optional headers, sections,
+- [x] Implement native PE32+ generation with explicit Windows lowering diagnostics.
+- [x] Validate DOS/PE signatures, COFF headers, optional headers, sections,
   entrypoint, imports, relocations, and architecture.
 - [ ] Test PE output with available Windows cross-toolchains and format inspectors.
 

@@ -22,7 +22,7 @@ void create_output_parent(const std::string& output)
 }
 }
 
-bool relink(const RelinkOptions& options)
+bool relink(RelinkOptions& options)
 {
     if (options.input.empty()) throw std::invalid_argument("input path is empty");
     if (!options.target.has_value()) {
@@ -36,6 +36,7 @@ bool relink(const RelinkOptions& options)
         if (output_root.empty()) output_root = ".";
         resolved.output = (output_root / (*options.target == TargetPlatform::Windows ? "game.exe" : "game.elf")).string();
     }
+    options.output = resolved.output;
     create_output_parent(resolved.output);
 
     std::ifstream input(resolved.input, std::ios::binary);

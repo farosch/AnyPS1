@@ -10,5 +10,5 @@ struct RelinkOptions {
     std::string output;
     std::optional<TargetPlatform> target;
 };
-bool relink(const RelinkOptions& options);
+bool relink(RelinkOptions& options);
 }

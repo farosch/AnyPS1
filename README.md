@@ -45,14 +45,16 @@ Relink a Linux executable:
 The relinker reads `SYSTEM.CNF`, locates the boot PS-X executable, and writes
 `game.elf` in the supplied directory.
 
-Windows conversion is currently unsupported:
+Windows conversion emits a PE32+ console artifact with native Windows host
+diagnostics:
 
 ```sh
 ./build/anyps1 --target windows "/path/to/extracted/disc1"
 ```
 
-This currently produces an explicit unsupported-conversion error until native
-Windows MIPS lowering and PE generation are implemented.
+Native Windows MIPS lowering is still in progress; the generated executable
+reports the lowering gap explicitly and exits rather than silently interpreting
+or emulating the PS1 executable.
 
 ## Current status
 
