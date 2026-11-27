@@ -53,11 +53,12 @@
 
 - [ ] Complete native COP1 floating-point lowering: add/sub/mul/div/sqrt,
   conversions, comparisons, BC1 branches, and all LWC1/SWC1 edge paths.
-- [ ] Implement native COP2/GTE matrix, vector, color, clipping, division,
-  compression, and interpolation operations.
-- [ ] Implement COP3 instructions directly or emit exact unsupported stubs.
-- [ ] Implement all coprocessor load/store families with checked bounds and
-  native memory mappings.
+- [x] Classify COP2/GTE instructions and named GTE operations with exact
+  unsupported stubs; native matrix/vector/color lowering remains open.
+- [x] Implement COP3 opcode classification and exact unsupported execution
+  stubs.
+- [x] Implement the native COP1 LWC1/SWC1 subset and add checked unsupported
+  stubs for LWC0-LWC3/SWC0-SWC3 coprocessor families.
 - [x] Complete load-delay behavior for every MIPS load form and verify the
   delay-slot fixtures against real instruction sequences.
 - [ ] Verify exact MIPS signed/unsigned overflow, division edge cases,
