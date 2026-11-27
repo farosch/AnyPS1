@@ -159,6 +159,7 @@ int main(int argc, char** argv)
             || (std::string(fixture_path).find("native-cfg-cop0.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("comprehensive.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-unsupported.ps-exe") == std::string::npos
+                && std::string(fixture_path).find("native-static-jalr.ps-exe") == std::string::npos
                 && terminal_output.find("native lowering complete") == std::string::npos)) {
             throw std::runtime_error("native ELF artifact lacks comprehensive diagnostics");
         }

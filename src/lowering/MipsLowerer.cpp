@@ -67,6 +67,7 @@ void validate_linux_elf64(const std::filesystem::path& path)
     if (elf.gcount() != static_cast<std::streamsize>(header.size())) {
         throw std::runtime_error("generated Linux ELF has a truncated ELF header");
     }
+
     if (header[0] != 0x7F || header[1] != 'E'
         || header[2] != 'L' || header[3] != 'F') {
         throw std::runtime_error("generated output does not contain an ELF signature");
@@ -105,6 +106,47 @@ void validate_linux_elf64(const std::filesystem::path& path)
     if (read64(40) == 0) {
         throw std::runtime_error("generated Linux ELF has no section-header table");
     }
+}
+
+std::uint32_t resolve_static_indirect_target(
+    const std::vector<unsigned char>& data,
+    std::uint32_t load_address,
+    std::uint32_t file_size,
+    std::uint32_t instruction_address,
+    std::uint32_t target_register)
+{
+    std::uint32_t value = 0;
+    bool initialized = false;
+    for (std::int32_t distance = -16; distance <= 0; distance += 4) {
+        const std::int64_t word_address =
+            static_cast<std::int64_t>(instruction_address) + distance;
+        if (word_address < load_address ||
+            word_address >= static_cast<std::int64_t>(load_address) + file_size) {
+            continue;
+        }
+        const std::uint32_t offset =
+            static_cast<std::uint32_t>(word_address - load_address);
+        const std::uint32_t instruction =
+            read_psx32(data, PSX_HEADER_SIZE + offset);
+        const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t rt = (instruction >> 16) & 31u;
+        const std::uint32_t immediate = instruction & 0xFFFFu;
+        if (rt != target_register) continue;
+        if (opcode == 0x0F) {
+            value = immediate << 16;
+            initialized = true;
+        } else if (opcode == 0x09) {
+            const std::int32_t signed_immediate =
+                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate));
+            value = static_cast<std::uint32_t>(
+                static_cast<std::int64_t>(value) + signed_immediate);
+            initialized = true;
+        } else if (opcode == 0x0D) {
+            value |= immediate;
+            initialized = true;
+        }
+    }
+    return initialized ? value : 0;
 }
 
 }
@@ -157,6 +199,8 @@ void write_linux_native_cfg(
         if (offset + 4 > file_size) continue;
         const std::uint32_t instruction = read_psx32(data, 2048 + offset);
         const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t rs = (instruction >> 21) & 31u;
+        const std::uint32_t rt = (instruction >> 16) & 31u;
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
@@ -201,7 +245,21 @@ void write_linux_native_cfg(
             work.push(address + 4);
         }
         if (jr || jalr) {
-            ++unresolved_indirect_transfers;
+            const std::uint32_t resolved_target =
+                resolve_static_indirect_target(
+                    data,
+                    load_address,
+                    file_size,
+                    address,
+                    rs);
+            if (resolved_target >= load_address &&
+                resolved_target < load_address + file_size &&
+                (resolved_target & 3u) == 0) {
+                leaders.insert(resolved_target);
+                work.push(resolved_target);
+            } else {
+                ++unresolved_indirect_transfers;
+            }
         }
         if (branch || jump || jr || jalr) {
             const std::uint32_t delay_address = address + 4;
@@ -695,7 +753,6 @@ void write_linux_native_cfg(
     };
 
     std::set<std::uint32_t> emitted_delay_slots;
-    std::set<std::uint32_t> emitted_jalr_targets;
     for (std::uint32_t address : leaders) {
         if (address < load_address || address >= load_address + file_size) continue;
         const std::uint32_t offset = address - load_address;
@@ -803,21 +860,20 @@ void write_linux_native_cfg(
         } else if (jalr) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "movl $" << address + 8 << ", " << rd * 4 << "(%r12)\n";
-            for (std::uint32_t target : leaders) {
-                if (target >= load_address && target < load_address + file_size) {
-                    source << "cmpl $" << target << ", %eax\n";
-                    source << "je jalr_target_" << std::hex << target << std::dec << "\n";
-                }
-            }
-            source << "jmp unsupported_jump_exit\n";
-            for (std::uint32_t target : leaders) {
-                if (target >= load_address && target < load_address + file_size) {
-                    if (emitted_jalr_targets.insert(target).second) {
-                        source << "jalr_target_" << std::hex << target << std::dec << ":\n";
-                        source << "call p" << std::hex << target << std::dec << "\n";
-                        source << "jmp p" << std::hex << address + 8 << std::dec << "\n";
-                    }
-                }
+            const std::uint32_t resolved_target =
+                resolve_static_indirect_target(
+                    data,
+                    load_address,
+                    file_size,
+                    address,
+                    rs);
+            if (resolved_target >= load_address &&
+                resolved_target < load_address + file_size &&
+                leaders.find(resolved_target) != leaders.end()) {
+                source << "call p" << std::hex << resolved_target << std::dec << "\n";
+                source << "jmp p" << std::hex << address + 8 << std::dec << "\n";
+            } else {
+                source << "jmp unsupported_jump_exit\n";
             }
         } else {
             emit_normal(address, instruction);

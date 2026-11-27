@@ -6,7 +6,7 @@
   statically reachable PS-X instruction and host operation.
 - [x] Remove the legacy fixed-block `write_linux_native` path and make
   `write_linux_native_cfg` the only Linux lowering implementation.
-- [ ] Improve CFG discovery beyond static leaders. Resolve JALR targets when
+- [x] Improve CFG discovery beyond static leaders. Resolve JALR targets when
   they are statically provable, preserve indirect-call edges, and emit explicit
   unsupported exits for unresolved indirect control flow.
 - [ ] Distinguish executable code from embedded data, tables, padding,
@@ -88,7 +88,7 @@
 ### Remaining
 
 - [ ] Remove all legacy assembly lowering and fixed-block code duplication.
-- [ ] Eliminate shell-string linker invocation and use a repository-owned
+- [x] Eliminate shell-string linker invocation and use a repository-owned
   argument-safe toolchain API.
 - [ ] Add ELF32, ARM64, and other architecture targets only after their native
   lowering backends exist.

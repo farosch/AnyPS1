@@ -78,3 +78,7 @@ add_test(NAME pe_format_inspector
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/valid.ps-exe)
 
+add_test(NAME relinker_static_jalr
+    COMMAND anyps1_relinker_test
+        ${FIXTURE_OUTPUT_DIR}/mips/native-static-jalr.ps-exe)
+
