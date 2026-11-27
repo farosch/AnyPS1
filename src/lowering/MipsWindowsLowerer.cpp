@@ -513,9 +513,30 @@ void MipsWindowsLowerer::lower(
             source << "add eax," << static_cast<std::int32_t>(
                 static_cast<std::int16_t>(immediate)) << "\n";
             source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+        } else if (opcode == 0x0A) {
+            source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+            source << "cmp eax," << static_cast<std::int32_t>(
+                static_cast<std::int16_t>(immediate)) << "\n";
+            source << "setl al\n";
+            source << "movzx eax,al\n";
+            source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+        } else if (opcode == 0x0B) {
+            source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+            source << "cmp eax," << immediate << "\n";
+            source << "setb al\n";
+            source << "movzx eax,al\n";
+            source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+        } else if (opcode == 0x0C) {
+            source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+            source << "and eax," << immediate << "\n";
+            source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
         } else if (opcode == 0x0D) {
             source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
             source << "or eax," << immediate << "\n";
+            source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
+        } else if (opcode == 0x0E) {
+            source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+            source << "xor eax," << immediate << "\n";
             source << "mov dword ptr [r12+" << rt * 4 << "],eax\n";
         } else if (opcode == 0x0F) {
             source << "mov dword ptr [r12+" << rt * 4 << "],"

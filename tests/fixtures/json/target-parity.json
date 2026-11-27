@@ -1,0 +1,72 @@
+{
+  "kind": "target_parity",
+  "mips": {
+    "known_special": [
+      "sll",
+      "srl",
+      "sra",
+      "jr",
+      "jalr",
+      "syscall",
+      "break",
+      "addu",
+      "subu",
+      "and",
+      "or",
+      "xor",
+      "nor",
+      "slt",
+      "sltu"
+    ],
+    "known_opcodes": [
+      "j",
+      "jal",
+      "beq",
+      "bne",
+      "blez",
+      "bgtz",
+      "addiu",
+      "slti",
+      "sltiu",
+      "andi",
+      "ori",
+      "xori",
+      "lui",
+      "lb",
+      "lh",
+      "lw",
+      "lbu",
+      "lhu",
+      "sb",
+      "sh",
+      "sw"
+    ]
+  },
+  "gpu": {
+    "primitives": [
+      "polygon",
+      "textured-polygon",
+      "sprite",
+      "rectangle",
+      "line",
+      "framebuffer"
+    ],
+    "gp0": [
+      "0x20",
+      "0x24",
+      "0x28",
+      "0x60",
+      "0x40",
+      "0xA0",
+      "0xC0"
+    ],
+    "gp1": [
+      "0x03",
+      "0x04",
+      "0x05",
+      "0x06",
+      "0x07",
+      "0x08"
+    ]
+  }
+}

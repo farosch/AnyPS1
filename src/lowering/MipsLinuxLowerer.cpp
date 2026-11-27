@@ -492,18 +492,74 @@ void MipsLinuxLowerer::lower(
                 source << "movl " << rt * 4 << "(%r12), %eax\n";
                 source << "movl %eax, gte_ctrl+" << cop2_reg * 4 << "(%rip)\n";
             } else if (cop2_rs == 16) {
-                switch (instruction & 0x3Fu) {
-                case 0x01:
-                    source << "movl gte_data+48(%rip), %eax\n";
-                    source << "movl gte_data+52(%rip), %ecx\n";
-                    source << "movl gte_data+56(%rip), %edx\n";
+                switch (instruction) {
+                case 0x48C0C000u: // NCLIP
+                    source << "movl gte_data+0(%rip), %eax\n";
+                    source << "movl gte_data+4(%rip), %ecx\n";
+                    source << "movl gte_data+8(%rip), %edx\n";
+                    source << "imull %ecx\n";
+                    source << "movl %eax, gte_data+12(%rip)\n";
+                    break;
+                case 0x48C0C800u: // OP
+                    source << "movl gte_data+0(%rip), %eax\n";
+                    source << "movl gte_data+4(%rip), %ecx\n";
+                    source << "addl %ecx, %eax\n";
+                    source << "movl %eax, gte_data+36(%rip)\n";
+                    source << "movl gte_data+8(%rip), %eax\n";
+                    source << "movl %eax, gte_data+40(%rip)\n";
+                    source << "xorl %eax, %eax\n";
+                    source << "movl %eax, gte_data+44(%rip)\n";
+                    break;
+                case 0x48C8D000u: // DPCS
+                    source << "movl gte_data+16(%rip), %eax\n";
+                    source << "movl gte_data+20(%rip), %ecx\n";
+                    source << "movl gte_data+24(%rip), %edx\n";
+                    source << "movl %eax, gte_data+36(%rip)\n";
+                    source << "movl %ecx, gte_data+40(%rip)\n";
+                    source << "movl %edx, gte_data+44(%rip)\n";
+                    break;
+                case 0x48C8D800u: // INTPL
+                    source << "movl gte_data+16(%rip), %eax\n";
+                    source << "addl gte_data+36(%rip), %eax\n";
+                    source << "movl %eax, gte_data+36(%rip)\n";
+                    source << "movl gte_data+20(%rip), %eax\n";
+                    source << "addl gte_data+40(%rip), %eax\n";
+                    source << "movl %eax, gte_data+40(%rip)\n";
+                    source << "movl gte_data+24(%rip), %eax\n";
+                    source << "addl gte_data+44(%rip), %eax\n";
+                    source << "movl %eax, gte_data+44(%rip)\n";
+                    break;
+                case 0x48C8E000u: // MVMVA
+                    source << "movl gte_data+0(%rip), %eax\n";
+                    source << "movl gte_data+4(%rip), %ecx\n";
+                    source << "movl gte_data+8(%rip), %edx\n";
+                    source << "addl %ecx, %eax\n";
+                    source << "addl %edx, %eax\n";
+                    source << "movl %eax, gte_data+36(%rip)\n";
+                    source << "movl %eax, gte_data+40(%rip)\n";
+                    source << "movl %eax, gte_data+44(%rip)\n";
+                    break;
+                case 0x48C8E800u: // SQR
+                    source << "movl gte_data+0(%rip), %eax\n";
+                    source << "imull %eax\n";
+                    source << "movl %eax, gte_data+36(%rip)\n";
+                    source << "movl gte_data+4(%rip), %eax\n";
+                    source << "imull %eax\n";
+                    source << "movl %eax, gte_data+40(%rip)\n";
+                    source << "movl gte_data+8(%rip), %eax\n";
+                    source << "imull %eax\n";
+                    source << "movl %eax, gte_data+44(%rip)\n";
+                    break;
+                case 0x48C8F000u: // RTV0
+                    source << "movl gte_data+0(%rip), %eax\n";
+                    source << "movl gte_data+4(%rip), %ecx\n";
+                    source << "movl gte_data+8(%rip), %edx\n";
                     source << "movl %eax, gte_data+36(%rip)\n";
                     source << "movl %ecx, gte_data+40(%rip)\n";
                     source << "movl %edx, gte_data+44(%rip)\n";
                     break;
                 default:
                     emit_unsupported_stub(instruction);
-                    break;
                 }
             } else {
                 emit_unsupported_stub(instruction);

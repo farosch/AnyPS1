@@ -19,6 +19,9 @@ add_custom_target(generate_test_fixtures DEPENDS ${FIXTURE_MANIFEST})
 
 add_test(NAME layout COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tests/check_layout.py)
 add_test(NAME psx_exe_header COMMAND "${PYTHON_EXECUTABLE}" -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p "test_*.py")
+add_test(NAME target_parity_fixture
+    COMMAND "${PYTHON_EXECUTABLE}"
+        ${CMAKE_SOURCE_DIR}/tests/test_target_parity.py)
 
 add_executable(anyps1_relinker_test RelinkerTest.cpp)
 target_include_directories(anyps1_relinker_test PRIVATE ${CMAKE_SOURCE_DIR}/src)

@@ -45,6 +45,8 @@
 - [x] Lower checked PS1 COP0 reads/writes where they correspond to host state.
 - [x] Add explicit COP0/COP1/COP2/COP3 and coprocessor load/store stubs.
 - [x] Name known GTE/COP2 operations and add exact GTE test coverage.
+- [x] Lower named GTE operations NCLIP, OP, DPCS, INTPL, MVMVA, SQR, and RTV0
+  directly in native Linux lowering and align exact inventory classification.
 - [x] Classify exact reserved opcodes and SPECIAL functions.
 - [x] Inventory unsupported instruction words and families across executable
   payloads.
@@ -192,6 +194,8 @@
 - [x] Create and validate Vulkan resources in the Linux/Windows runtime.
 - [x] Integrate shader validation and optimization into release builds.
 - [x] Add SPIR-V golden fixtures and malformed GPU command fixtures.
+- [x] Add a cross-target parity fixture covering common Linux/Windows MIPS
+  opcode sets and GPU primitive/resource-plan mappings.
 - [x] Preserve unsupported GPU commands as conversion failures, including no
   silent drop or emulator fallback.
 

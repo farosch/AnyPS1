@@ -1,6 +1,6 @@
 {
   "summary": {
-    "commit": "0508101",
+    "commit": "57fc718",
     "total": 78,
     "status_counts": {
       "tested": 17,
@@ -88,6 +88,7 @@
     "ctest_names": [
       "layout",
       "psx_exe_header",
+      "target_parity_fixture",
       "relinker_artifact",
       "relinker_native_subset",
       "relinker_native_memory",
@@ -470,7 +471,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 728,
+          "line": 784,
           "pattern": "opcode == 0x08"
         }
       ],
@@ -498,7 +499,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 732,
+          "line": 788,
           "pattern": "opcode == 0x0C"
         }
       ],
@@ -526,7 +527,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 736,
+          "line": 792,
           "pattern": "opcode == 0x0E"
         }
       ],
@@ -554,7 +555,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 760,
+          "line": 816,
           "pattern": "opcode == 0x20"
         }
       ],
@@ -568,7 +569,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 760,
+          "line": 816,
           "pattern": "opcode == 0x21"
         }
       ],
@@ -582,7 +583,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 760,
+          "line": 816,
           "pattern": "opcode == 0x23"
         }
       ],
@@ -596,7 +597,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 760,
+          "line": 816,
           "pattern": "opcode == 0x24"
         }
       ],
@@ -610,7 +611,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 760,
+          "line": 816,
           "pattern": "opcode == 0x25"
         }
       ],
@@ -624,7 +625,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 783,
+          "line": 839,
           "pattern": "opcode == 0x28"
         }
       ],
@@ -638,7 +639,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 783,
+          "line": 839,
           "pattern": "opcode == 0x29"
         }
       ],
@@ -652,7 +653,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 783,
+          "line": 839,
           "pattern": "opcode == 0x2B"
         }
       ],
@@ -666,7 +667,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 852,
+          "line": 908,
           "pattern": "opcode == 0x22"
         }
       ],
@@ -680,7 +681,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 852,
+          "line": 908,
           "pattern": "opcode == 0x26"
         }
       ],
@@ -898,7 +899,7 @@
       "source": [
         {
           "path": "src/lowering/MipsLinuxLowerer.cpp",
-          "line": 724,
+          "line": 780,
           "pattern": "opcode == 0x13"
         }
       ],
@@ -1230,7 +1231,7 @@
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 62,
+          "line": 83,
           "pattern": "SPIR-V"
         }
       ],
@@ -1255,7 +1256,7 @@
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 86,
+          "line": 107,
           "pattern": "spirv-val"
         }
       ],
@@ -1275,7 +1276,7 @@
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 50,
+          "line": 71,
           "pattern": "Polygon"
         }
       ],
@@ -1295,7 +1296,7 @@
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 51,
+          "line": 72,
           "pattern": "TexturedPolygon"
         }
       ],
@@ -1315,7 +1316,7 @@
       "tests": [
         {
           "path": "tests/GraphicsTest.cpp",
-          "line": 55,
+          "line": 76,
           "pattern": "Framebuffer"
         }
       ],
@@ -1370,7 +1371,7 @@
         },
         {
           "path": "tests/CMakeLists.txt",
-          "line": 52,
+          "line": 55,
           "pattern": "input_mapping"
         }
       ],

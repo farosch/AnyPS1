@@ -56,6 +56,26 @@ int main()
             cop2.name != "gte_sqr") {
             throw std::runtime_error("COP2/GTE instruction was not classified");
         }
+        const std::uint32_t gte_operations[] = {
+            0x48C0C000u,
+            0x48C0C800u,
+            0x48C8D000u,
+            0x48C8D800u,
+            0x48C8E000u,
+            0x48C8E800u,
+            0x48C8F000u
+        };
+        for (const std::uint32_t operation : gte_operations) {
+            if (!anyps1::is_supported_mips_instruction(operation)) {
+                throw std::runtime_error(
+                    "supported COP2/GTE operation was classified as unsupported");
+            }
+        }
+        if (!anyps1::is_supported_mips_instruction(0xC8200000u) ||
+            !anyps1::is_supported_mips_instruction(0xE8200000u)) {
+            throw std::runtime_error(
+                "COP2 load/store instruction was classified as unsupported");
+        }
 
         const anyps1::UnsupportedInstruction lwc1 =
             anyps1::classify_unsupported_instruction(0xC4200000u);

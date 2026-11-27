@@ -49,7 +49,14 @@ def materialize(source: Path, output: Path) -> None:
         kind = description.get("kind")
         target = output / rel
 
-        if kind in ("psx_exe", "raw"):
+        if kind == "target_parity":
+            target = target.with_suffix(".json")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps(description, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        elif kind in ("psx_exe", "raw"):
             target = target.with_suffix(".ps-exe")
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(build_psx_exe(description))

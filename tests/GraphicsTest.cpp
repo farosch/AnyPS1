@@ -45,6 +45,27 @@ int main()
             plan.pipeline_primitives.size() != 1) {
             throw std::runtime_error("unexpected Vulkan resource plan");
         }
+        const anyps1::VulkanResourcePlan windows_plan =
+            anyps1::lower_graphics_ir_to_vulkan(
+                graphics, anyps1::VulkanBackendPlatform::Windows);
+        if (windows_plan.framebuffer_width != plan.framebuffer_width ||
+            windows_plan.framebuffer_height != plan.framebuffer_height ||
+            windows_plan.pipeline_primitives != plan.pipeline_primitives ||
+            windows_plan.transfer_word_offsets != plan.transfer_word_offsets ||
+            windows_plan.transfer_directions != plan.transfer_directions ||
+            windows_plan.dithering != plan.dithering ||
+            windows_plan.display_mode != plan.display_mode ||
+            windows_plan.draw_area.x != plan.draw_area.x ||
+            windows_plan.draw_area.y != plan.draw_area.y ||
+            windows_plan.draw_area.width != plan.draw_area.width ||
+            windows_plan.draw_area.height != plan.draw_area.height ||
+            windows_plan.texture_window.x != plan.texture_window.x ||
+            windows_plan.texture_window.y != plan.texture_window.y ||
+            windows_plan.texture_window.width != plan.texture_window.width ||
+            windows_plan.texture_window.height != plan.texture_window.height) {
+            throw std::runtime_error(
+                "Linux and Windows GPU resource plans differ");
+        }
 
         const anyps1::GraphicsPrimitive primitives[] = {
             anyps1::GraphicsPrimitive::Polygon,
