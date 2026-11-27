@@ -61,10 +61,6 @@ bool relink(RelinkOptions& options)
         create_mips_lowerer(*resolved.target)->lower(resolved, data);
     }
     catch (...) {
-        if (*resolved.target == TargetPlatform::Linux) {
-            std::filesystem::remove(resolved.output + ".native.s");
-            std::filesystem::remove(resolved.output + ".native.bin");
-        }
         throw;
     }
     return true;

@@ -202,7 +202,8 @@ void ElfWriter::write(
         const int status = link(assembly, output);
         if (status != 0) {
             throw std::runtime_error(
-                "native Linux lowering toolchain failed");
+                "native Linux lowering toolchain failed (assembly retained: " +
+                assembly.string() + ")");
         }
         validate(output);
         std::filesystem::permissions(
@@ -212,10 +213,8 @@ void ElfWriter::write(
                 | std::filesystem::perms::others_exec,
             std::filesystem::perm_options::add);
     } catch (...) {
-        std::filesystem::remove(assembly);
         throw;
     }
-    std::filesystem::remove(assembly);
 }
 
 }
