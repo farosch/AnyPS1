@@ -1,46 +1,46 @@
 {
   "summary": {
-    "commit": "5db7b81",
+    "commit": "7e18a03",
     "total": 78,
     "status_counts": {
-      "tested": 16,
-      "implemented": 54,
-      "partial": 4,
+      "tested": 15,
+      "implemented": 2,
+      "partial": 0,
       "unsupported": 1,
-      "missing": 2,
+      "missing": 59,
       "not_applicable": 1
     },
     "subsystems": {
       "MIPS arithmetic": {
         "tested": 0,
-        "implemented": 24,
+        "implemented": 0,
         "partial": 0,
         "unsupported": 0,
-        "missing": 0,
+        "missing": 24,
         "not_applicable": 0
       },
       "MIPS immediate/load/store": {
         "tested": 0,
-        "implemented": 16,
+        "implemented": 0,
         "partial": 0,
         "unsupported": 0,
-        "missing": 0,
+        "missing": 16,
         "not_applicable": 0
       },
       "MIPS control": {
         "tested": 0,
-        "implemented": 10,
+        "implemented": 0,
         "partial": 0,
         "unsupported": 0,
-        "missing": 0,
+        "missing": 10,
         "not_applicable": 0
       },
       "COP0/COP2": {
         "tested": 0,
-        "implemented": 2,
-        "partial": 3,
+        "implemented": 0,
+        "partial": 0,
         "unsupported": 0,
-        "missing": 1,
+        "missing": 6,
         "not_applicable": 0
       },
       "PS-X format": {
@@ -52,11 +52,11 @@
         "not_applicable": 0
       },
       "Executable writers": {
-        "tested": 1,
+        "tested": 0,
         "implemented": 0,
-        "partial": 1,
+        "partial": 0,
         "unsupported": 1,
-        "missing": 0,
+        "missing": 2,
         "not_applicable": 0
       },
       "GP0/GP1": {
@@ -111,6 +111,8 @@
       "relinker_static_jalr",
       "relinker_native_cop1",
       "relinker_native_cop1_edge_cases",
+      "relinker_native_a0_file_calls",
+      "relinker_native_cop2_transfers",
       "relinker_load_family_delay",
       "relinker_sparse_cfg",
       "relinker_mips_edge_cases",
@@ -119,736 +121,424 @@
       "cfg_timeout",
       "memory_map_mmio_dma"
     ],
-    "implemented_percent": 96.1,
-    "tested_percent": 20.8,
-    "stale_test_coverage": 1
+    "implemented_percent": 22.1,
+    "tested_percent": 19.5,
+    "stale_test_coverage": 3
   },
   "features": [
     {
       "subsystem": "MIPS arithmetic",
       "name": "SLL",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 498,
-          "pattern": "special == 0x00"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SRL",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 500,
-          "pattern": "special == 0x02"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SRA",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 502,
-          "pattern": "special == 0x03"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SLLV",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 504,
-          "pattern": "special == 0x04"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SRLV",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 506,
-          "pattern": "special == 0x06"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SRAV",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 508,
-          "pattern": "special == 0x07"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "ADD",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 510,
-          "pattern": "special == 0x20"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "ADDU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 512,
-          "pattern": "special == 0x21"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SUB",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 514,
-          "pattern": "special == 0x22"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SUBU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 516,
-          "pattern": "special == 0x23"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "AND",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 518,
-          "pattern": "special == 0x24"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "OR",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 520,
-          "pattern": "special == 0x25"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "XOR",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 522,
-          "pattern": "special == 0x26"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "NOR",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 524,
-          "pattern": "special == 0x27"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SLT",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 526,
-          "pattern": "special == 0x2A"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "SLTU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 528,
-          "pattern": "special == 0x2B"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "MULT",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 530,
-          "pattern": "special == 0x18"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "MULTU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 532,
-          "pattern": "special == 0x19"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "DIV",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 534,
-          "pattern": "special == 0x1A"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "DIVU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 534,
-          "pattern": "special == 0x1B"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "MFHI",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 539,
-          "pattern": "special == 0x10"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "MFLO",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 543,
-          "pattern": "special == 0x12"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "MTHI",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 541,
-          "pattern": "special == 0x11"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS arithmetic",
       "name": "MTLO",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 545,
-          "pattern": "special == 0x13"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "ADDI",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 715,
-          "pattern": "opcode == 0x08"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "ADDIU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 175,
-          "pattern": "opcode == 0x09"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "ANDI",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 719,
-          "pattern": "opcode == 0x0C"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "ORI",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 181,
-          "pattern": "opcode == 0x0D"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "XORI",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 723,
-          "pattern": "opcode == 0x0E"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LUI",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 172,
-          "pattern": "opcode == 0x0F"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LB",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 729,
-          "pattern": "opcode == 0x20"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LH",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 729,
-          "pattern": "opcode == 0x21"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LW",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 729,
-          "pattern": "opcode == 0x23"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LBU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 729,
-          "pattern": "opcode == 0x24"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LHU",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 729,
-          "pattern": "opcode == 0x25"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "SB",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 752,
-          "pattern": "opcode == 0x28"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "SH",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 752,
-          "pattern": "opcode == 0x29"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "SW",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 752,
-          "pattern": "opcode == 0x2B"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LWL",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 797,
-          "pattern": "opcode == 0x22"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS immediate/load/store",
       "name": "LWR",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 797,
-          "pattern": "opcode == 0x26"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "BEQ",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 245,
-          "pattern": "opcode == 0x04"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "BNE",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 245,
-          "pattern": "opcode == 0x05"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "BLEZ",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 246,
-          "pattern": "opcode == 0x06"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "BGTZ",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 246,
-          "pattern": "opcode == 0x07"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "J",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 248,
-          "pattern": "opcode == 0x02"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "JAL",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 248,
-          "pattern": "opcode == 0x03"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "JR",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 249,
-          "pattern": "special == 0x08"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "JALR",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 250,
-          "pattern": "special == 0x09"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "SYSCALL",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 251,
-          "pattern": "special == 0x0C"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "MIPS control",
       "name": "BREAK",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 251,
-          "pattern": "special == 0x0D"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "COP0/COP2",
       "name": "MFC0",
-      "status": "partial",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 556,
-          "pattern": "opcode == 0x10"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "COP0/COP2",
       "name": "MTC0",
-      "status": "partial",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 556,
-          "pattern": "opcode == 0x10"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
@@ -863,42 +553,24 @@
     {
       "subsystem": "COP0/COP2",
       "name": "COP2/GTE",
-      "status": "partial",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 575,
-          "pattern": "opcode == 0x12"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "COP0/COP2",
       "name": "COP1",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 247,
-          "pattern": "opcode == 0x11"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
     {
       "subsystem": "COP0/COP2",
       "name": "COP3",
-      "status": "implemented",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 711,
-          "pattern": "opcode == 0x13"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [],
       "unsupported": []
     },
@@ -983,12 +655,12 @@
       "source": [
         {
           "path": "src/relinker/Relinker.cpp",
-          "line": 52,
+          "line": 56,
           "pattern": "declared size"
         },
         {
           "path": "src/relinker/Relinker.cpp",
-          "line": 45,
+          "line": 49,
           "pattern": "shorter than its header"
         }
       ],
@@ -998,14 +670,8 @@
     {
       "subsystem": "Executable writers",
       "name": "Linux ELF",
-      "status": "partial",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 191,
-          "pattern": "write_linux_native_cfg"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [
         {
           "path": "tests/RelinkerTest.cpp",
@@ -1038,19 +704,8 @@
     {
       "subsystem": "Executable writers",
       "name": "Native diagnostics",
-      "status": "tested",
-      "source": [
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 355,
-          "pattern": "native executable diagnostics"
-        },
-        {
-          "path": "src/lowering/MipsLowerer.cpp",
-          "line": 392,
-          "pattern": "unsupported_instructions"
-        }
-      ],
+      "status": "missing",
+      "source": [],
       "tests": [
         {
           "path": "tests/RelinkerTest.cpp",
@@ -1321,7 +976,7 @@
         },
         {
           "path": "src/host/HostServices.cpp",
-          "line": 37,
+          "line": 57,
           "pattern": "HostServiceKind"
         }
       ],

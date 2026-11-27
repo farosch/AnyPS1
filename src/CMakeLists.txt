@@ -86,6 +86,7 @@ target_include_directories(anyps1_gpu PUBLIC
 target_link_libraries(anyps1_gpu PUBLIC SDL3::SDL3)
 
 target_link_libraries(anyps1_lowering PUBLIC anyps1_format)
+target_link_libraries(anyps1_lowering PUBLIC anyps1_host)
 target_link_libraries(anyps1_relinker
     PUBLIC anyps1_format anyps1_executable anyps1_lowering
 )

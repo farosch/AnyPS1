@@ -100,6 +100,10 @@ add_test(NAME relinker_native_cop1_edge_cases
     COMMAND anyps1_relinker_test
         ${FIXTURE_OUTPUT_DIR}/mips/native-cop1-edge-cases.ps-exe)
 
+add_test(NAME relinker_native_a0_file_calls
+    COMMAND anyps1_relinker_test
+        ${FIXTURE_OUTPUT_DIR}/mips/native-a0-file-calls.ps-exe)
+
 add_test(NAME relinker_native_cop2_transfers
     COMMAND anyps1_relinker_test
         ${FIXTURE_OUTPUT_DIR}/mips/native-cop2-transfers.ps-exe)

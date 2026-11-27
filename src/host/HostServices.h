@@ -42,6 +42,24 @@ enum class HostExitCode : int {
 
 std::string host_exit_log(HostExitCode code);
 
+enum class Ps1FileCallKind {
+    Unsupported,
+    Open,
+    Read,
+    Seek,
+    Write,
+    Close,
+};
+
+struct Ps1FileCallPlan {
+    Ps1FileCallKind kind = Ps1FileCallKind::Unsupported;
+    std::uint32_t a0_vector = 0;
+    int linux_syscall = -1;
+    const char* windows_function = nullptr;
+};
+
+Ps1FileCallPlan map_ps1_file_call(std::uint32_t vector);
+
 class NativeFileRuntime {
 public:
     NativeFileRuntime();

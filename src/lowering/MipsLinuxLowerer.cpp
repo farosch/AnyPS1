@@ -4,6 +4,7 @@
 #include "UnsupportedInstructions.h"
 #include "PayloadRegion.h"
 #include "memory/MemoryMap.h"
+#include "host/HostServices.h"
 
 #include <algorithm>
 #include <array>
@@ -149,9 +150,9 @@ void validate_linux_elf64(const std::filesystem::path& path)
     const std::size_t program_header_offset =
         static_cast<std::size_t>(read64(32));
     const std::uint16_t program_header_count =
-        read16(56);
+        static_cast<std::uint16_t>(read16(56));
     const std::uint16_t program_header_size =
-        read16(54);
+        static_cast<std::uint16_t>(read16(54));
     if (program_header_count == 0 || program_header_size < 56) {
         throw std::runtime_error(
             "generated Linux ELF has invalid program-header metadata");
@@ -1234,7 +1235,48 @@ void MipsLinuxLowerer::lower(
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
             if (opcode == 0x03) {
                 source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
-                if (jump_target >= load_address && jump_target < load_address + file_size &&
+                const Ps1FileCallPlan file_call =
+                    map_ps1_file_call(jump_target);
+                if (file_call.kind != Ps1FileCallKind::Unsupported) {
+                    source << "movl 16(%r12), %eax\n";
+                    source << "andl $0x1FFFFF, %eax\n";
+                    source << "leaq ram(%rip), %rbx\n";
+                    source << "addq %rax, %rbx\n";
+                    if (file_call.kind == Ps1FileCallKind::Open) {
+                        source << "movq %rbx, %rdi\n";
+                        source << "movl 20(%r12), %esi\n";
+                        source << "movl 24(%r12), %edx\n";
+                        source << "mov $" << file_call.linux_syscall << ", %eax\n";
+                        source << "syscall\n";
+                        source << "movl %eax, 8(%r12)\n";
+                    } else if (file_call.kind == Ps1FileCallKind::Read) {
+                        source << "movl 16(%r12), %edi\n";
+                        source << "movq %rbx, %rsi\n";
+                        source << "movl 24(%r12), %edx\n";
+                        source << "mov $" << file_call.linux_syscall << ", %eax\n";
+                        source << "syscall\n";
+                        source << "movl %eax, 8(%r12)\n";
+                    } else if (file_call.kind == Ps1FileCallKind::Write) {
+                        source << "movl 16(%r12), %edi\n";
+                        source << "movq %rbx, %rsi\n";
+                        source << "movl 24(%r12), %edx\n";
+                        source << "mov $" << file_call.linux_syscall << ", %eax\n";
+                        source << "syscall\n";
+                        source << "movl %eax, 8(%r12)\n";
+                    } else if (file_call.kind == Ps1FileCallKind::Seek) {
+                        source << "movl 16(%r12), %edi\n";
+                        source << "movl 20(%r12), %esi\n";
+                        source << "movl 24(%r12), %edx\n";
+                        source << "mov $" << file_call.linux_syscall << ", %eax\n";
+                        source << "syscall\n";
+                        source << "movl %eax, 8(%r12)\n";
+                    } else if (file_call.kind == Ps1FileCallKind::Close) {
+                        source << "movl 16(%r12), %edi\n";
+                        source << "mov $" << file_call.linux_syscall << ", %eax\n";
+                        source << "syscall\n";
+                        source << "movl %eax, 8(%r12)\n";
+                    }
+                } else if (jump_target >= load_address && jump_target < load_address + file_size &&
                     leaders.find(jump_target) != leaders.end()) {
                     source << "call p" << std::hex << jump_target << std::dec << "\n";
                 } else {

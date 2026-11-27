@@ -14,6 +14,22 @@
 int main()
 {
     try {
+        const std::uint32_t open_vector = 0xA0000032u;
+        const anyps1::Ps1FileCallPlan open_call =
+            anyps1::map_ps1_file_call(open_vector);
+        if (open_call.kind != anyps1::Ps1FileCallKind::Open ||
+            open_call.linux_syscall != 2 ||
+            open_call.windows_function == nullptr ||
+            std::string(open_call.windows_function) != "CreateFileA") {
+            throw std::runtime_error("A0 open file call mapping failed");
+        }
+        const anyps1::Ps1FileCallPlan close_call =
+            anyps1::map_ps1_file_call(0xA0000036u);
+        if (close_call.kind != anyps1::Ps1FileCallKind::Close ||
+            close_call.linux_syscall != 3 ||
+            std::string(close_call.windows_function) != "CloseHandle") {
+            throw std::runtime_error("A0 close file call mapping failed");
+        }
         anyps1::NativeFileRuntime files;
         std::string host_error;
         const std::filesystem::path temp =
@@ -108,7 +124,7 @@ int main()
         const std::filesystem::path card =
             std::filesystem::temp_directory_path() /
             "anyps1-memory-card-test.bin";
-        std::remove(card.c_str());
+        std::filesystem::remove(card);
         anyps1::MemoryCardRuntime memory_card;
         std::uint8_t write_block[128]{};
         const char text[] = "memory-card";
@@ -133,7 +149,7 @@ int main()
             throw std::runtime_error("memory card runtime read/write failed");
         }
         memory_card.close_slot(0);
-        std::remove(card.c_str());
+        std::filesystem::remove(card);
 
         const std::filesystem::path disc =
             std::filesystem::temp_directory_path() /
@@ -152,7 +168,7 @@ int main()
             throw std::runtime_error("disc runtime sector read failed");
         }
         disc_runtime.close_disc();
-        std::remove(disc.c_str());
+        std::filesystem::remove(disc);
 
         if (anyps1::is_supported_bios_vector(0xA0000040u)) {
             throw std::runtime_error("unsupported BIOS vector was accepted");

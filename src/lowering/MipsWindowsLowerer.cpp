@@ -2,6 +2,7 @@
 #include "relinker/Relinker.h"
 #include "format/PsExe.h"
 #include "UnsupportedInstructions.h"
+#include "host/HostServices.h"
 
 #include <cstdint>
 #include <algorithm>
@@ -364,6 +365,10 @@ void MipsWindowsLowerer::lower(
     source << "EXTERN GetStdHandle:PROC\n";
     source << "EXTERN WriteFile:PROC\n";
     source << "EXTERN ExitProcess:PROC\n";
+    source << "EXTERN CreateFileA:PROC\n";
+    source << "EXTERN ReadFile:PROC\n";
+    source << "EXTERN SetFilePointer:PROC\n";
+    source << "EXTERN CloseHandle:PROC\n";
     source << ".code\n";
     source << "print_diag PROC\n";
     source << "sub rsp,40\n";
@@ -528,7 +533,39 @@ void MipsWindowsLowerer::lower(
                 ((instruction & 0x03FFFFFFu) << 2);
             if (opcode == 0x03) {
                 source << "mov dword ptr [r12+124]," << address + 8 << "\n";
-                source << "call p" << std::hex << target << std::dec << "\n";
+                const Ps1FileCallPlan file_call =
+                    map_ps1_file_call(target);
+                if (file_call.kind != Ps1FileCallKind::Unsupported &&
+                    file_call.windows_function != nullptr) {
+                    if (file_call.kind == Ps1FileCallKind::Close) {
+                        source << "mov ecx,dword ptr [r12+16]\n";
+                        source << "call CloseHandle\n";
+                    } else if (file_call.kind == Ps1FileCallKind::Read) {
+                        source << "mov ecx,dword ptr [r12+16]\n";
+                        source << "mov rdx,dword ptr [r12+20]\n";
+                        source << "mov r8d,dword ptr [r12+24]\n";
+                        source << "lea r9,written\n";
+                        source << "call ReadFile\n";
+                    } else if (file_call.kind == Ps1FileCallKind::Write) {
+                        source << "mov ecx,dword ptr [r12+16]\n";
+                        source << "mov rdx,dword ptr [r12+20]\n";
+                        source << "mov r8d,dword ptr [r12+24]\n";
+                        source << "lea r9,written\n";
+                        source << "call WriteFile\n";
+                    } else if (file_call.kind == Ps1FileCallKind::Seek) {
+                        source << "mov ecx,dword ptr [r12+16]\n";
+                        source << "mov edx,dword ptr [r12+20]\n";
+                        source << "xor r8d,r8d\n";
+                        source << "call SetFilePointer\n";
+                    } else {
+                        source << "mov ecx,dword ptr [r12+16]\n";
+                        source << "mov edx,dword ptr [r12+20]\n";
+                        source << "mov r8d,dword ptr [r12+24]\n";
+                        source << "call CreateFileA\n";
+                    }
+                } else {
+                    source << "call p" << std::hex << target << std::dec << "\n";
+                }
             } else {
                 source << "jmp p" << std::hex << target << std::dec << "\n";
             }

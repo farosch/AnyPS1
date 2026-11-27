@@ -32,7 +32,26 @@ std::string host_exit_log(HostExitCode code)
     case HostExitCode::HostRuntimeError:
         return "host_exit=18 host_runtime_error";
     }
+
     return "host_exit=18 host_runtime_error";
+}
+
+Ps1FileCallPlan map_ps1_file_call(std::uint32_t vector)
+{
+    switch (vector & 0x000000FFu) {
+    case 0x32:
+        return {Ps1FileCallKind::Open, vector, 2, "CreateFileA"};
+    case 0x33:
+        return {Ps1FileCallKind::Seek, vector, 8, "SetFilePointer"};
+    case 0x34:
+        return {Ps1FileCallKind::Read, vector, 0, "ReadFile"};
+    case 0x35:
+        return {Ps1FileCallKind::Write, vector, 1, "WriteFile"};
+    case 0x36:
+        return {Ps1FileCallKind::Close, vector, 3, "CloseHandle"};
+    default:
+        return {Ps1FileCallKind::Unsupported, vector, -1, nullptr};
+    }
 }
 
 HostServiceMapping map_host_service(HostServiceKind kind)

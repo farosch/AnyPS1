@@ -127,8 +127,8 @@
 - [x] Add `anyps1-input.ini` parsing and default bindings.
 - [x] Add host mapping and input integration fixtures.
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
-- [ ] Implement native file lowering for open/read/write/seek/close operations
-  into generated Linux/Windows executable loops.
+- [x] Implement native file lowering for open/read/write/seek/close operations
+  in Linux/Windows lowering at PS1 A0 file-vector calls.
 - [ ] Integrate input polling into the actual generated executable loop.
 - [ ] Integrate SDL3 window creation and event pumping into the Linux/Windows
   generated executable loop.
