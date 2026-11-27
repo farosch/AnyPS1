@@ -8,6 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
+option(ANYPS1_STRICT_WARNINGS "Enable project compiler warnings" ON)
+option(ANYPS1_BUILD_RELEASE_ARTIFACTS "Enable release packaging targets" ON)
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
 
@@ -58,6 +61,17 @@ target_link_libraries(anyps1 PRIVATE anyps1_relinker)
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
+
+if(ANYPS1_BUILD_RELEASE_ARTIFACTS)
+    include(CPack)
+    set(CPACK_PACKAGE_NAME "AnyPS1")
+    set(CPACK_PACKAGE_VENDOR "AnyPS1")
+    set(CPACK_PACKAGE_VERSION "0.1.0")
+    set(CPACK_GENERATOR "TGZ")
+endif()
+
+install(TARGETS anyps1
+    RUNTIME DESTINATION bin)
 
 add_custom_target(progress
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/progress/generate_progress.py

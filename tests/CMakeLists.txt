@@ -119,6 +119,18 @@ target_link_libraries(anyps1_payload_region_test PRIVATE anyps1_lowering)
 add_test(NAME payload_region_classifier
     COMMAND anyps1_payload_region_test)
 
+add_test(NAME validation_tools
+    COMMAND "${PYTHON_EXECUTABLE}"
+        ${CMAKE_SOURCE_DIR}/tests/test_validation_tools.py)
+set_tests_properties(validation_tools PROPERTIES TIMEOUT 30)
+
+add_test(NAME cfg_timeout
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/validate_cfg_timeout.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/valid.ps-exe
+        --timeout 10)
+set_tests_properties(cfg_timeout PROPERTIES TIMEOUT 15)
+
 add_executable(anyps1_memory_map_test MemoryMapTest.cpp)
 target_include_directories(anyps1_memory_map_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(anyps1_memory_map_test PRIVATE anyps1_memory)

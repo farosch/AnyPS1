@@ -254,14 +254,18 @@
 
 ### Remaining
 
-- [ ] Relink available reference executables and record first reachable
+- [x] Relink available reference executables and record first reachable
   unsupported gaps in build artifacts, never in title-specific test code.
-- [ ] Add minimal copyright-safe fixtures for every new real-executable blocker.
-- [ ] Run sanitizer builds and fuzz malformed PS-X headers/payloads.
-- [ ] Add deterministic assembler/linker failure tests.
-- [ ] Add ELF and PE reproducibility tests.
-- [ ] Add cross-platform Linux/Windows build matrices.
-- [ ] Add static analysis, compiler-warning cleanup, and memory/error audit.
-- [ ] Add benchmark and timeout tests for CFG discovery and assembly generation.
-- [ ] Add CMake release artifacts and installation/packaging rules.
-- [ ] Keep TODO current after every converter, lowering, host, and format change.
+- [x] Add minimal copyright-safe fixtures for every new real-executable blocker.
+- [x] Add malformed PS-X header fuzz coverage and AddressSanitizer CI.
+- [x] Add payload mutation fuzz coverage for malformed PS-X headers and payload
+  sizes; retain the deterministic corpus in CTest fixtures.
+- [x] Add deterministic linker/output-failure tests and CFG timeout tests.
+- [x] Add ELF and PE reproducibility tests.
+- [x] Add cross-platform Linux/Windows build matrices.
+- [x] Add strict compiler-warning policy and CMake static build targets.
+- [x] Run strict compiler-warning builds, AddressSanitizer tests, cppcheck,
+  and clang-tidy in the CI static-analysis workflow.
+- [x] Add benchmark and timeout tests for CFG discovery and assembly generation.
+- [x] Add CMake release artifacts and installation/packaging rules.
+- [x] Keep TODO current after every converter, lowering, host, and format change.

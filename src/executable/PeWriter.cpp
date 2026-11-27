@@ -168,12 +168,10 @@ void write_pe_layout(const RelinkOptions& options,
     pe.resize(RAW_HEADERS_SIZE + 0x200, 0);
     pe.resize(RAW_HEADERS_SIZE + 0x600, 0);
 
-    constexpr std::uint32_t import_descriptor_rva = RDATA_RVA + 0x40;
     constexpr std::uint32_t dll_name_rva = RDATA_RVA + 0xC0;
     constexpr std::uint32_t int_rva = RDATA_RVA + 0x80;
     constexpr std::uint32_t iat_rva = RDATA_RVA + 0xA0;
     constexpr std::uint32_t diagnostic_rva = RDATA_RVA + 0x180;
-    constexpr std::uint32_t written_rva = RDATA_RVA + 0x160;
     constexpr std::uint32_t get_std_handle_rva = RDATA_RVA + 0x100;
     constexpr std::uint32_t write_file_rva = RDATA_RVA + 0x110;
     constexpr std::uint32_t exit_process_rva = RDATA_RVA + 0x120;

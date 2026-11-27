@@ -72,7 +72,25 @@ int execute_linker(const std::filesystem::path& assembly,
             "cannot wait for native Linux linker: " + std::string(std::strerror(errno)));
     }
     if (!WIFEXITED(status)) return -1;
-    return WEXITSTATUS(status);
+    if (WEXITSTATUS(status) != 0) return WEXITSTATUS(status);
+
+    const pid_t strip_child = fork();
+    if (strip_child < 0) {
+        throw std::runtime_error(
+            "cannot start symbol stripper: " + std::string(std::strerror(errno)));
+    }
+    if (strip_child == 0) {
+        execlp("strip", "strip", "-s", output.c_str(),
+               static_cast<char*>(nullptr));
+        _exit(127);
+    }
+    int strip_status = 0;
+    if (waitpid(strip_child, &strip_status, 0) < 0) {
+        throw std::runtime_error(
+            "cannot wait for symbol stripper: " + std::string(std::strerror(errno)));
+    }
+    if (!WIFEXITED(strip_status)) return -1;
+    return WEXITSTATUS(strip_status);
 #endif
 }
 
@@ -222,7 +240,6 @@ void write_linux_native_cfg(
         const std::uint32_t instruction = read_psx32(data, 2048 + offset);
         const std::uint32_t opcode = instruction >> 26;
         const std::uint32_t rs = (instruction >> 21) & 31u;
-        const std::uint32_t rt = (instruction >> 16) & 31u;
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05

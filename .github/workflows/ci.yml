@@ -12,6 +12,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  sanitizer-linux:
+    name: Linux AddressSanitizer build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Configure AddressSanitizer
+        run: cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+      - name: Build AddressSanitizer
+        run: cmake --build build-asan --parallel
+      - name: Run AddressSanitizer tests
+        run: ctest --test-dir build-asan --output-on-failure
+  static-analysis:
+    name: Linux static analysis and warnings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure strict warnings
+        run: cmake -S . -B build-strict -G Ninja -DCMAKE_BUILD_TYPE=Debug -DANYPS1_STRICT_WARNINGS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - name: Build strict warnings
+        run: cmake --build build-strict --parallel
+      - name: Install static-analysis tools
+        run: sudo apt-get update && sudo apt-get install -y clang-tidy cppcheck
+      - name: Run cppcheck
+        run: cppcheck --enable=warning,performance,portability --error-exitcode=1 --std=c++17 --suppress=missingIncludeSystem src
+      - name: Run clang-tidy
+        run: find src -name '*.cpp' -print0 | xargs -0 -r clang-tidy -p build-strict
   test-linux:
     name: Linux build and tests
     runs-on: ubuntu-latest

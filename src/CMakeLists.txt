@@ -50,6 +50,27 @@ foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1
     target_include_directories(${target} PUBLIC ${CMAKE_SOURCE_DIR}/src)
 endforeach()
 
+if(ANYPS1_STRICT_WARNINGS)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        foreach(target anyps1_format anyps1_executable anyps1_lowering
+                        anyps1_gpu anyps1_input anyps1_host anyps1_memory
+                        anyps1_relinker anyps1)
+            if(TARGET ${target})
+                target_compile_options(${target} PRIVATE
+                    -Wall -Wextra -Wpedantic -Werror)
+            endif()
+        endforeach()
+    elseif(MSVC)
+        foreach(target anyps1_format anyps1_executable anyps1_lowering
+                        anyps1_gpu anyps1_input anyps1_host anyps1_memory
+                        anyps1_relinker anyps1)
+            if(TARGET ${target})
+                target_compile_options(${target} PRIVATE /W4 /WX)
+            endif()
+        endforeach()
+    endif()
+endif()
+
 foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1_input anyps1_host anyps1_relinker)
     target_include_directories(${target} PUBLIC ${CMAKE_BINARY_DIR}/generated)
     add_dependencies(${target} generate_mips_opcode_registry)
