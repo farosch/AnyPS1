@@ -337,6 +337,19 @@ bool SdlInputRuntime::initialize(const InputConfig& config, std::string& error)
 bool SdlInputRuntime::poll(Ps1InputState& state, std::string& error)
 {
     SDL_PumpEvents();
+    for (SDL_Gamepad* gamepad : impl_->gamepads) {
+        if (gamepad != nullptr) SDL_CloseGamepad(gamepad);
+    }
+    impl_->gamepads.clear();
+    int count = 0;
+    SDL_JoystickID* ids = SDL_GetGamepads(&count);
+    if (ids != nullptr) {
+        for (int index = 0; index < count; ++index) {
+            SDL_Gamepad* gamepad = SDL_OpenGamepad(ids[index]);
+            if (gamepad != nullptr) impl_->gamepads.push_back(gamepad);
+        }
+        SDL_free(ids);
+    }
     state = {};
     state.buttons = 0xFFFFu;
 

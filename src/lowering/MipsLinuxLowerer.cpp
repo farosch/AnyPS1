@@ -295,6 +295,8 @@ void MipsLinuxLowerer::lower(
         const std::uint32_t special = instruction & 63u;
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
             || opcode == 0x06 || opcode == 0x07
+            || opcode == 0x14 || opcode == 0x15
+            || opcode == 0x16 || opcode == 0x17
             || (opcode == 0x11 && (rs == 8 || rs == 12));
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
@@ -901,6 +903,24 @@ void MipsLinuxLowerer::lower(
             source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nsetl %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x0B) {
             source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nsetb %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x14 || opcode == 0x15 ||
+                   opcode == 0x16 || opcode == 0x17) {
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            if (opcode == 0x14 || opcode == 0x15) {
+                source << "cmpl " << rt * 4 << "(%r12), %eax\n";
+                source << (opcode == 0x14 ? "je " : "jne ");
+            } else {
+                source << "testl %eax, %eax\n";
+                source << (opcode == 0x16 ? "jle " : "jg ");
+            }
+            const std::int32_t displacement =
+                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+            const std::uint32_t target =
+                static_cast<std::uint32_t>(
+                    static_cast<std::int64_t>(address) + 4 + displacement);
+            source << "p" << std::hex << target << std::dec << "\n";
+        } else if (opcode == 0x2F) {
+            // Host cache operations are folded into native memory protection/state.
         } else if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 || opcode == 0x24 || opcode == 0x25) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
@@ -1176,6 +1196,8 @@ void MipsLinuxLowerer::lower(
             const bool address_is_control =
                 opcode == 0x01 || opcode == 0x04 || opcode == 0x05 ||
                 opcode == 0x06 || opcode == 0x07 ||
+                opcode == 0x14 || opcode == 0x15 ||
+                opcode == 0x16 || opcode == 0x17 ||
                 opcode == 0x02 || opcode == 0x03 ||
                 (opcode == 0 && (special == 0x08 || special == 0x09));
             if (!address_is_control) {
@@ -1186,6 +1208,8 @@ void MipsLinuxLowerer::lower(
         }
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
             || opcode == 0x06 || opcode == 0x07
+            || opcode == 0x14 || opcode == 0x15
+            || opcode == 0x16 || opcode == 0x17
             || (opcode == 0x11 && rs == 8);
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
@@ -1227,6 +1251,18 @@ void MipsLinuxLowerer::lower(
             } else if (opcode == 0x06) {
                 source << "cmpl $0, " << rs * 4 << "(%r12)\njle p" << std::hex << branch_target << std::dec << "\n";
             } else if (opcode == 0x07) {
+                source << "cmpl $0, " << rs * 4 << "(%r12)\njg p" << std::hex << branch_target << std::dec << "\n";
+            } else if (opcode == 0x14) {
+                source << "movl " << rs * 4 << "(%r12), %eax\n";
+                source << "cmpl " << rt * 4 << "(%r12), %eax\n";
+                source << "je p" << std::hex << branch_target << std::dec << "\n";
+            } else if (opcode == 0x15) {
+                source << "movl " << rs * 4 << "(%r12), %eax\n";
+                source << "cmpl " << rt * 4 << "(%r12), %eax\n";
+                source << "jne p" << std::hex << branch_target << std::dec << "\n";
+            } else if (opcode == 0x16) {
+                source << "cmpl $0, " << rs * 4 << "(%r12)\njle p" << std::hex << branch_target << std::dec << "\n";
+            } else if (opcode == 0x17) {
                 source << "cmpl $0, " << rs * 4 << "(%r12)\njg p" << std::hex << branch_target << std::dec << "\n";
             } else {
                 source << "cmpl $0, " << rs * 4 << "(%r12)\n";

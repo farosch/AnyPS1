@@ -23,7 +23,7 @@ constexpr std::uint32_t SECTION_ALIGNMENT = 0x1000;
 constexpr std::uint32_t FILE_ALIGNMENT = 0x200;
 constexpr std::uint32_t TEXT_RVA = 0x1000;
 constexpr std::uint32_t RDATA_RVA = 0x2000;
-constexpr std::uint32_t IMAGE_SIZE = 0x3000;
+constexpr std::uint32_t IMAGE_SIZE = 0x205000;
 constexpr std::uint64_t IMAGE_BASE = 0x140000000u;
 
 void append_u32(std::vector<unsigned char>& output, std::uint32_t value)
@@ -114,7 +114,7 @@ void write_pe_layout(const RelinkOptions& options,
     pe[PE_SIGNATURE_OFFSET + 3] = '\0';
 
     write_u16(pe, COFF_OFFSET, 0x8664);
-    write_u16(pe, COFF_OFFSET + 2, 2);
+    write_u16(pe, COFF_OFFSET + 2, 4);
     write_u32(pe, COFF_OFFSET + 4, 0);
     write_u32(pe, COFF_OFFSET + 8, SECTION_TABLE_OFFSET);
     write_u16(pe, COFF_OFFSET + 16, 240);
@@ -147,8 +147,8 @@ void write_pe_layout(const RelinkOptions& options,
     write_u32(pe, OPTIONAL_OFFSET + 108, 16);
     write_u32(pe, OPTIONAL_OFFSET + 112, 0);
     write_u32(pe, OPTIONAL_OFFSET + 116, 0);
-    write_u32(pe, OPTIONAL_OFFSET + 120, RDATA_RVA + 0x40);
-    write_u32(pe, OPTIONAL_OFFSET + 124, 20);
+    write_u32(pe, OPTIONAL_OFFSET + 120, RDATA_RVA + 0x120);
+    write_u32(pe, OPTIONAL_OFFSET + 124, 40);
 
     std::memcpy(pe.data() + SECTION_TABLE_OFFSET, ".text", 5);
     write_u32(pe, SECTION_TABLE_OFFSET + 8, 0x200);
@@ -164,6 +164,20 @@ void write_pe_layout(const RelinkOptions& options,
     write_u32(pe, SECTION_TABLE_OFFSET + 60, RAW_HEADERS_SIZE + 0x200);
     write_u32(pe, SECTION_TABLE_OFFSET + 76, 0x40000040);
 
+    std::memcpy(pe.data() + SECTION_TABLE_OFFSET + 80, ".data", 5);
+    write_u32(pe, SECTION_TABLE_OFFSET + 88, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 92, 0x3000);
+    write_u32(pe, SECTION_TABLE_OFFSET + 96, 0);
+    write_u32(pe, SECTION_TABLE_OFFSET + 100, 0);
+    write_u32(pe, SECTION_TABLE_OFFSET + 116, 0x40300040);
+
+    std::memcpy(pe.data() + SECTION_TABLE_OFFSET + 120, ".reloc", 6);
+    write_u32(pe, SECTION_TABLE_OFFSET + 128, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 132, 0x204000);
+    write_u32(pe, SECTION_TABLE_OFFSET + 136, 0);
+    write_u32(pe, SECTION_TABLE_OFFSET + 140, 0);
+    write_u32(pe, SECTION_TABLE_OFFSET + 156, 0xc0000080);
+
     pe.resize(RAW_HEADERS_SIZE);
     pe.resize(RAW_HEADERS_SIZE + 0x200, 0);
     pe.resize(RAW_HEADERS_SIZE + 0x600, 0);
@@ -172,9 +186,9 @@ void write_pe_layout(const RelinkOptions& options,
     constexpr std::uint32_t int_rva = RDATA_RVA + 0x80;
     constexpr std::uint32_t iat_rva = RDATA_RVA + 0xA0;
     constexpr std::uint32_t diagnostic_rva = RDATA_RVA + 0x180;
-    constexpr std::uint32_t get_std_handle_rva = RDATA_RVA + 0x100;
-    constexpr std::uint32_t write_file_rva = RDATA_RVA + 0x110;
-    constexpr std::uint32_t exit_process_rva = RDATA_RVA + 0x120;
+    constexpr std::uint32_t get_std_handle_rva = RDATA_RVA + 0x140;
+    constexpr std::uint32_t write_file_rva = RDATA_RVA + 0x150;
+    constexpr std::uint32_t exit_process_rva = RDATA_RVA + 0x160;
 
     std::vector<unsigned char> code;
     code.push_back(0x48); code.push_back(0x83); code.push_back(0xEC); code.push_back(0x28);
@@ -219,9 +233,9 @@ void write_pe_layout(const RelinkOptions& options,
     std::memcpy(pe.data() + RAW_HEADERS_SIZE, code.data(), code.size());
 
     std::vector<unsigned char> rdata(0x400, 0);
-    write_u32(rdata, 0x40, int_rva);
-    write_u32(rdata, 0x4C, dll_name_rva);
-    write_u32(rdata, 0x50, iat_rva);
+    write_u32(rdata, 0x120, int_rva);
+    write_u32(rdata, 0x12C, dll_name_rva);
+    write_u32(rdata, 0x130, iat_rva);
     std::memcpy(rdata.data() + 0xC0, "KERNEL32.dll", 13);
 
     write_u64(rdata, 0x80, get_std_handle_rva);
@@ -232,15 +246,15 @@ void write_pe_layout(const RelinkOptions& options,
     write_u64(rdata, 0xA8, write_file_rva);
     write_u64(rdata, 0xB0, exit_process_rva);
 
-    rdata[0x100] = 0;
-    rdata[0x101] = 0;
-    std::memcpy(rdata.data() + 0x102, "GetStdHandle", 13);
-    rdata[0x110] = 0;
-    rdata[0x111] = 0;
-    std::memcpy(rdata.data() + 0x112, "WriteFile", 10);
-    rdata[0x120] = 0;
-    rdata[0x121] = 0;
-    std::memcpy(rdata.data() + 0x122, "ExitProcess", 12);
+    rdata[0x140] = 0;
+    rdata[0x141] = 0;
+    std::memcpy(rdata.data() + 0x142, "GetStdHandle", 13);
+    rdata[0x150] = 0;
+    rdata[0x151] = 0;
+    std::memcpy(rdata.data() + 0x152, "WriteFile", 10);
+    rdata[0x160] = 0;
+    rdata[0x161] = 0;
+    std::memcpy(rdata.data() + 0x162, "ExitProcess", 12);
     std::memcpy(rdata.data() + 0x180, diagnostics.data(), diagnostics.size());
     std::memcpy(pe.data() + RAW_HEADERS_SIZE + 0x200, rdata.data(), rdata.size());
 

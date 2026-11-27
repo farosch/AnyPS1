@@ -119,6 +119,9 @@ add_test(NAME relinker_sparse_cfg
 add_test(NAME relinker_mips_edge_cases
     COMMAND anyps1_relinker_test
         ${FIXTURE_OUTPUT_DIR}/mips/mips-edge-cases.ps-exe)
+add_test(NAME relinker_native_likely_branches
+    COMMAND anyps1_relinker_test
+        ${FIXTURE_OUTPUT_DIR}/mips/native-likely-branches.ps-exe)
 
 
 add_executable(anyps1_payload_region_test PayloadRegionTest.cpp)

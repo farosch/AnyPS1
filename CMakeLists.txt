@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(AnyPS1 LANGUAGES CXX)
+include(GNUInstallDirs)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -51,12 +52,27 @@ endif()
 
 add_subdirectory(src)
 
+if(NOT TARGET SDL3::SDL3)
+    message(FATAL_ERROR "AnyPS1 requires SDL3 for controller, window, audio, and video support")
+endif()
+
 add_executable(anyps1
     src/main.cpp
 )
 
 target_include_directories(anyps1 PRIVATE src)
 target_link_libraries(anyps1 PRIVATE anyps1_relinker)
+
+if(WIN32)
+    add_custom_command(TARGET anyps1 POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:SDL3::SDL3>"
+            "$<TARGET_FILE_DIR:anyps1>")
+elseif(UNIX AND NOT APPLE)
+    set_target_properties(anyps1 PROPERTIES
+        BUILD_RPATH "$ORIGIN/../lib;$ORIGIN"
+        INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN")
+endif()
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
@@ -71,7 +87,15 @@ if(ANYPS1_BUILD_RELEASE_ARTIFACTS)
 endif()
 
 install(TARGETS anyps1
-    RUNTIME DESTINATION bin)
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+if(TARGET SDL3::SDL3)
+    install(TARGETS SDL3-shared
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 
 add_custom_target(progress
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/progress/generate_progress.py

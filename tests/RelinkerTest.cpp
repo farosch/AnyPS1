@@ -227,6 +227,7 @@ int main(int argc, char** argv)
                 && std::string(fixture_path).find("native-cop1-edge-cases.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-a0-file-calls.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-sparse-cfg.ps-exe") == std::string::npos
+                && std::string(fixture_path).find("native-likely-branches.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("mips-edge-cases.ps-exe") == std::string::npos
                 && terminal_output.find("native lowering complete") == std::string::npos)) {
             throw std::runtime_error("native ELF artifact lacks comprehensive diagnostics");

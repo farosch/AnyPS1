@@ -248,7 +248,9 @@ void MipsWindowsLowerer::lower(
         const std::uint32_t special = instruction & 63u;
         const bool branch = opcode == 0x01 ||
             opcode == 0x04 || opcode == 0x05 ||
-            opcode == 0x06 || opcode == 0x07;
+            opcode == 0x06 || opcode == 0x07 ||
+            opcode == 0x14 || opcode == 0x15 ||
+            opcode == 0x16 || opcode == 0x17;
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
         const bool jalr = opcode == 0 && special == 0x09;
@@ -416,6 +418,8 @@ void MipsWindowsLowerer::lower(
 
     if (unsupported_count != 0) {
         source << "mov ecx,16\n";
+    } else if (opcode == 0x2F) {
+        source << "nop\n";
     } else {
         source << "mov ecx,0\n";
     }
@@ -517,7 +521,9 @@ void MipsWindowsLowerer::lower(
             source << "mov dword ptr [r12+" << rt * 4 << "],"
                    << (immediate << 16) << "\n";
         } else if (opcode == 0x04 || opcode == 0x05 ||
-                   opcode == 0x06 || opcode == 0x07) {
+                   opcode == 0x06 || opcode == 0x07 ||
+                   opcode == 0x14 || opcode == 0x15 ||
+                   opcode == 0x16 || opcode == 0x17) {
             const std::int32_t displacement =
                 static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
             const std::uint32_t target =
@@ -534,7 +540,21 @@ void MipsWindowsLowerer::lower(
             } else if (opcode == 0x06) {
                 source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
                 source << "jle p" << std::hex << target << std::dec << "\n";
-            } else {
+            } else if (opcode == 0x07) {
+                source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
+                source << "jg p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x14) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "cmp eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "je p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x15) {
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "cmp eax,dword ptr [r12+" << rt * 4 << "]\n";
+                source << "jne p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x16) {
+                source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
+                source << "jle p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x17) {
                 source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
                 source << "jg p" << std::hex << target << std::dec << "\n";
             }
