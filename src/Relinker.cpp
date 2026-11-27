@@ -46,7 +46,12 @@ void write_linux_native_cfg(
     const std::uint32_t load_address = read32(data, 0x18);
     const std::uint32_t initial_pc = read32(data, 0x10);
     const std::uint32_t initial_gp = read32(data, 0x14);
-    const std::uint32_t initial_sp = 0x801FF000u;
+    const std::uint32_t initial_sp_base = read32(data, 0x30);
+    const std::uint32_t initial_sp_offset = read32(data, 0x34);
+    const std::uint32_t initial_sp =
+        initial_sp_base == 0 && initial_sp_offset == 0
+            ? 0x801FF000u
+            : initial_sp_base + initial_sp_offset;
     if (file_size == 0 || file_size % 4 != 0) {
         throw std::runtime_error("unsupported native lowering: executable size is not a MIPS word sequence");
     }
@@ -76,6 +81,7 @@ void write_linux_native_cfg(
             || opcode == 0x06 || opcode == 0x07;
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
+        const bool jalr = opcode == 0 && special == 0x09;
         const bool stop = opcode == 0 && (special == 0x0C || special == 0x0D);
         if (branch) {
             const std::int32_t displacement =
@@ -106,7 +112,14 @@ void write_linux_native_cfg(
             leaders.insert(address + 4);
             work.push(address + 4);
         }
-        if (branch || jump || jr) {
+        if (jr || jalr) {
+            for (std::uint32_t candidate = load_address;
+                 candidate < load_address + file_size;
+                 candidate += 4) {
+                leaders.insert(candidate);
+            }
+        }
+        if (branch || jump || jr || jalr) {
             const std::uint32_t delay_address = address + 4;
             if (delay_address >= load_address && delay_address < load_address + file_size) {
                 delay_slots.insert(delay_address);
@@ -137,6 +150,7 @@ void write_linux_native_cfg(
     const std::string completed = "native lowering complete\n";
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
+    source << "cop0:\n.skip 128\n";
     source << ".section .rodata\n";
     source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
     source << "diag_target:.asciz \"" << escape_assembly_string(target) << "\"\n";
@@ -172,6 +186,7 @@ void write_linux_native_cfg(
     source << "divide_zero_exit:\nmov $11, %edi\nmov $60, %eax\nsyscall\n";
     source << "memory_fault_exit:\nmov $13, %edi\nmov $60, %eax\nsyscall\n";
     source << "mmio_exit:\nmov $14, %edi\nmov $60, %eax\nsyscall\n";
+    source << "unsupported_jump_exit:\nmov $15, %edi\nmov $60, %eax\nsyscall\n";
     source << ".text\n";
     source << "print_diag:\n";
     source << "mov $1, %edi\n";
@@ -247,6 +262,29 @@ void write_linux_native_cfg(
             } else {
                 throw std::runtime_error("unsupported native MIPS instruction at " + hex32(address));
             }
+        } else if (opcode == 0x10) {
+            const std::uint32_t cop0_register = rd;
+            if (rs == 0) {
+                source << "movl cop0+" << cop0_register * 4 << "(%rip), " << rt * 4 << "(%r12)\n";
+            } else if (rs == 2) {
+                source << "movl cop0+" << cop0_register * 4 << "(%rip), " << rt * 4 << "(%r12)\n";
+            } else if (rs == 4) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n"
+                       << "movl %eax, cop0+" << cop0_register * 4 << "(%rip)\n";
+            } else if (rs == 6) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n"
+                       << "movl %eax, cop0+" << cop0_register * 4 << "(%rip)\n";
+            } else if (rs == 16 && (instruction & 0x3Fu) == 0x10) {
+                source << "movl cop0+48(%rip), %eax\n"
+                       << "andl $~3, %eax\n"
+                       << "movl %eax, cop0+48(%rip)\n";
+            } else {
+                throw std::runtime_error(
+                    "unsupported native COP0 operation at " + hex32(address));
+            }
+        } else if (opcode == 0x12) {
+            throw std::runtime_error(
+                "unsupported native COP2/GTE instruction at " + hex32(address));
         } else if (opcode == 0x0F) {
             source << "movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x08) {
@@ -262,7 +300,7 @@ void write_linux_native_cfg(
         } else if (opcode == 0x0A) {
             source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nsetl %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x0B) {
-            source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << immediate << ", %eax\nsetb %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+            source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nsetb %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 || opcode == 0x24 || opcode == 0x25) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
@@ -307,8 +345,162 @@ void write_linux_native_cfg(
             if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
             else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
             else source << "movl %edx, (%rbx,%rcx)\n";
-        } else if (opcode == 0x22 || opcode == 0x26 || opcode == 0x2A || opcode == 0x2E) {
-            throw std::runtime_error("unsupported native MIPS unaligned load/store at " + hex32(address));
+        } else if (opcode == 0x22 || opcode == 0x26) {
+            // Little-endian PS1 LWL/LWR: merge a word-aligned load
+            // according to the effective address alignment.
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
+            source << "movl %eax, %ecx\n";
+            source << "andl $0x1FFFFFFF, %ecx\n";
+            source << "movl %ecx, %edx\n";
+            source << "andl $3, %edx\n";
+            source << "andl $~3, %ecx\n";
+            source << "movl %ecx, %edi\n";
+            source << "cmpl $0x1F800000, %ecx\n";
+            source << "jb unaligned_ram_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1F800400, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %edi\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp unaligned_loaded_" << std::hex << address << std::dec << "\n";
+            source << "unaligned_ram_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x200000, %edi\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq ram(%rip), %rbx\n";
+            source << "unaligned_loaded_" << std::hex << address << std::dec << ": \n";
+            source << "movl " << rt * 4 << "(%r12), %esi\n";
+            source << "movl (%rbx,%rdi), %eax\n";
+            if (opcode == 0x22) {
+                source << "cmpl $0, %edx\n";
+                source << "je lwl0_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $1, %edx\n";
+                source << "je lwl1_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $2, %edx\n";
+                source << "je lwl2_" << std::hex << address << std::dec << "\n";
+                source << "movl %eax, %esi\n";
+                source << "jmp lwl_done_" << std::hex << address << std::dec << "\n";
+                source << "lwl0_" << std::hex << address << std::dec << ": \n";
+                source << "shll $24, %eax\n";
+                source << "andl $0x00FFFFFF, %esi\n";
+                source << "orl %eax, %esi\n";
+                source << "jmp lwl_done_" << std::hex << address << std::dec << "\n";
+                source << "lwl1_" << std::hex << address << std::dec << ": \n";
+                source << "shll $16, %eax\n";
+                source << "andl $0x0000FFFF, %esi\n";
+                source << "orl %eax, %esi\n";
+                source << "jmp lwl_done_" << std::hex << address << std::dec << "\n";
+                source << "lwl2_" << std::hex << address << std::dec << ": \n";
+                source << "shll $8, %eax\n";
+                source << "andl $0x000000FF, %esi\n";
+                source << "orl %eax, %esi\n";
+                source << "lwl_done_" << std::hex << address << std::dec << ": \n";
+            } else {
+                source << "cmpl $0, %edx\n";
+                source << "je lwr0_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $1, %edx\n";
+                source << "je lwr1_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $2, %edx\n";
+                source << "je lwr2_" << std::hex << address << std::dec << "\n";
+                source << "shrl $24, %eax\n";
+                source << "andl $0xFFFFFF00, %esi\n";
+                source << "orl %eax, %esi\n";
+                source << "jmp lwr_done_" << std::hex << address << std::dec << "\n";
+                source << "lwr0_" << std::hex << address << std::dec << ": \n";
+                source << "movl %eax, %esi\n";
+                source << "jmp lwr_done_" << std::hex << address << std::dec << "\n";
+                source << "lwr1_" << std::hex << address << std::dec << ": \n";
+                source << "shrl $8, %eax\n";
+                source << "andl $0xFF000000, %esi\n";
+                source << "orl %eax, %esi\n";
+                source << "jmp lwr_done_" << std::hex << address << std::dec << "\n";
+                source << "lwr2_" << std::hex << address << std::dec << ": \n";
+                source << "shrl $16, %eax\n";
+                source << "andl $0xFFFF0000, %esi\n";
+                source << "orl %eax, %esi\n";
+                source << "lwr_done_" << std::hex << address << std::dec << ": \n";
+            }
+            source << "movl %esi, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x2A || opcode == 0x2E) {
+            // Little-endian PS1 SWL/SWR: merge a register into a
+            // word-aligned store according to the effective address.
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
+            source << "movl %eax, %ecx\n";
+            source << "andl $0x1FFFFFFF, %ecx\n";
+            source << "movl %ecx, %edx\n";
+            source << "andl $3, %edx\n";
+            source << "andl $~3, %ecx\n";
+            source << "movl %ecx, %edi\n";
+            source << "cmpl $0x1F800000, %ecx\n";
+            source << "jb unaligned_store_ram_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1F800400, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %edi\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp unaligned_store_loaded_" << std::hex << address << std::dec << "\n";
+            source << "unaligned_store_ram_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x200000, %edi\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq ram(%rip), %rbx\n";
+            source << "unaligned_store_loaded_" << std::hex << address << std::dec << ": \n";
+            source << "movl " << rt * 4 << "(%r12), %esi\n";
+            source << "movl (%rbx,%rdi), %eax\n";
+            if (opcode == 0x2A) {
+                source << "cmpl $0, %edx\n";
+                source << "je swl0_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $1, %edx\n";
+                source << "je swl1_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $2, %edx\n";
+                source << "je swl2_" << std::hex << address << std::dec << "\n";
+                source << "movl %esi, %eax\n";
+                source << "jmp swl_done_" << std::hex << address << std::dec << "\n";
+                source << "swl0_" << std::hex << address << std::dec << ": \n";
+                source << "andl $0xFFFFFF00, %eax\n";
+                source << "movl %esi, %ecx\n";
+                source << "shrl $24, %ecx\n";
+                source << "orl %ecx, %eax\n";
+                source << "jmp swl_done_" << std::hex << address << std::dec << "\n";
+                source << "swl1_" << std::hex << address << std::dec << ": \n";
+                source << "andl $0xFFFF0000, %eax\n";
+                source << "movl %esi, %ecx\n";
+                source << "shrl $16, %ecx\n";
+                source << "orl %ecx, %eax\n";
+                source << "jmp swl_done_" << std::hex << address << std::dec << "\n";
+                source << "swl2_" << std::hex << address << std::dec << ": \n";
+                source << "andl $0xFF000000, %eax\n";
+                source << "movl %esi, %ecx\n";
+                source << "shrl $8, %ecx\n";
+                source << "orl %ecx, %eax\n";
+                source << "swl_done_" << std::hex << address << std::dec << ": \n";
+            } else {
+                source << "cmpl $0, %edx\n";
+                source << "je swr0_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $1, %edx\n";
+                source << "je swr1_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $2, %edx\n";
+                source << "je swr2_" << std::hex << address << std::dec << "\n";
+                source << "andl $0x00FFFFFF, %eax\n";
+                source << "movl %esi, %ecx\n";
+                source << "shll $24, %ecx\n";
+                source << "orl %ecx, %eax\n";
+                source << "jmp swr_done_" << std::hex << address << std::dec << "\n";
+                source << "swr0_" << std::hex << address << std::dec << ": \n";
+                source << "movl %esi, %eax\n";
+                source << "jmp swr_done_" << std::hex << address << std::dec << "\n";
+                source << "swr1_" << std::hex << address << std::dec << ": \n";
+                source << "andl $0x000000FF, %eax\n";
+                source << "movl %esi, %ecx\n";
+                source << "shll $8, %ecx\n";
+                source << "orl %ecx, %eax\n";
+                source << "jmp swr_done_" << std::hex << address << std::dec << "\n";
+                source << "swr2_" << std::hex << address << std::dec << ": \n";
+                source << "andl $0x0000FFFF, %eax\n";
+                source << "movl %esi, %ecx\n";
+                source << "shll $16, %ecx\n";
+                source << "orl %ecx, %eax\n";
+                source << "swr_done_" << std::hex << address << std::dec << ": \n";
+            }
+            source << "movl %eax, (%rbx,%rdi)\n";
         } else {
             throw std::runtime_error("unsupported native MIPS opcode at " + hex32(address));
         }
@@ -323,6 +515,7 @@ void write_linux_native_cfg(
         const std::uint32_t opcode = instruction >> 26;
         const std::uint32_t rs = (instruction >> 21) & 31u;
         const std::uint32_t rt = (instruction >> 16) & 31u;
+        const std::uint32_t rd = (instruction >> 11) & 31u;
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
         source << "p" << std::hex << address << std::dec << ":\n";
@@ -344,7 +537,6 @@ void write_linux_native_cfg(
             if (delay_address >= load_address && delay_address < load_address + file_size) {
                 const std::uint32_t delay_offset = delay_address - load_address;
                 if (delay_offset + 4 <= file_size) {
-                    source << "p" << std::hex << delay_address << std::dec << ":\n";
                     emit_normal(delay_address, read32(data, 2048 + delay_offset));
                     emitted_delay_slots.insert(delay_address);
                 }
@@ -365,8 +557,20 @@ void write_linux_native_cfg(
                 source << "cmpl $0, " << rs * 4 << "(%r12)\njg p" << std::hex << target << std::dec << "\n";
             } else {
                 source << "cmpl $0, " << rs * 4 << "(%r12)\n";
-                if ((instruction >> 16 & 31u) == 0) source << "jl p" << std::hex << target << std::dec << "\n";
-                else source << "jge p" << std::hex << target << std::dec << "\n";
+                if (rt == 0) {
+                    source << "jl p" << std::hex << target << std::dec << "\n";
+                } else if (rt == 1) {
+                    source << "jge p" << std::hex << target << std::dec << "\n";
+                } else if (rt == 16) {
+                    source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
+                    source << "jl p" << std::hex << target << std::dec << "\n";
+                } else if (rt == 17) {
+                    source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
+                    source << "jge p" << std::hex << target << std::dec << "\n";
+                } else {
+                    throw std::runtime_error(
+                        "unsupported native MIPS REGIMM branch at " + hex32(address));
+                }
             }
         } else if (jump) {
             const std::uint32_t target =
@@ -378,10 +582,35 @@ void write_linux_native_cfg(
                 source << "jmp p" << std::hex << target << std::dec << "\n";
             }
         } else if (jr) {
-            if (rs == 31) source << "ret\n";
-            else throw std::runtime_error("unsupported native indirect JR at " + hex32(address));
+            if (rs == 31) {
+                source << "ret\n";
+            } else {
+                source << "movl " << rs * 4 << "(%r12), %eax\n";
+                for (std::uint32_t target : leaders) {
+                    if (target >= load_address && target < load_address + file_size) {
+                        source << "cmpl $" << target << ", %eax\n";
+                        source << "je p" << std::hex << target << std::dec << "\n";
+                    }
+                }
+                source << "jmp unsupported_jump_exit\n";
+            }
         } else if (jalr) {
-            throw std::runtime_error("unsupported native JALR at " + hex32(address));
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "movl $" << address + 8 << ", " << rd * 4 << "(%r12)\n";
+            for (std::uint32_t target : leaders) {
+                if (target >= load_address && target < load_address + file_size) {
+                    source << "cmpl $" << target << ", %eax\n";
+                    source << "je jalr_target_" << std::hex << target << std::dec << "\n";
+                }
+            }
+            source << "jmp unsupported_jump_exit\n";
+            for (std::uint32_t target : leaders) {
+                if (target >= load_address && target < load_address + file_size) {
+                    source << "jalr_target_" << std::hex << target << std::dec << ":\n";
+                    source << "call p" << std::hex << target << std::dec << "\n";
+                    source << "jmp p" << std::hex << address + 8 << std::dec << "\n";
+                }
+            }
         } else {
             emit_normal(address, instruction);
         }

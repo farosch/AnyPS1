@@ -17,7 +17,7 @@
 - [x] Add a direct lowering path for NOP and a tested arithmetic/control subset.
 - [x] Lower variable SLLV/SRLV/SRAV shifts and MTHI/MTLO in native entry and
   JAL target blocks.
-- [ ] Lower every MIPS I instruction used by PS-X executables:
+- [x] Lower every MIPS I instruction used by PS-X executables:
   ADD/ADDU/SUB/SUBU, AND/OR/XOR/NOR, SLT/SLTU, shifts, variable shifts,
   ADDI/ADDIU/ANDI/ORI/XORI/LUI, SLTI/SLTIU, load/store byte/half/word,
   branches, J/JAL/JR/JALR, MULT/MULTU/DIV/DIVU, MFHI/MFLO/MTHI/MTLO,
@@ -28,12 +28,12 @@
   ADDI, SUB, DIV, and DIVU paths.
 - [x] Add native control-flow graph discovery for entry blocks, static branch
   targets, jump targets, delay slots, and fallthrough leaders.
-- [ ] Complete CFG lowering for indirect jumps/JALR and multiple functions.
-- [ ] Lower MIPS COP0 reads/writes where they correspond to host-platform state.
-- [ ] Replace unsupported COP0/COP2 behavior with explicit conversion errors.
-- [ ] Lower MIPS GTE/COP2 instructions directly or classify them as
+- [x] Complete CFG lowering for indirect jumps/JALR and multiple functions.
+- [x] Lower MIPS COP0 reads/writes where they correspond to host-platform state.
+- [x] Replace unsupported COP0/COP2 behavior with explicit conversion errors.
+- [x] Lower MIPS GTE/COP2 instructions directly or classify them as
   unsupported executable conversion features.
-- [ ] Preserve the PS-X load address, stack pointer, global pointer, and entry
+- [x] Preserve the PS-X load address, stack pointer, global pointer, and entry
   point in native lowered code.
 
 ## Memory and address lowering
