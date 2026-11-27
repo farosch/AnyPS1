@@ -4,8 +4,10 @@
 
 - [x] Split native relinking dispatch into platform-specific `MipsLinuxLowerer`
   and `MipsWindowsLowerer` classes behind a shared `MipsLowerer` interface.
-- [ ] Replace partial Linux lowering with complete native lowering for every
-  statically reachable PS-X instruction and host operation.
+- [x] Replace fixed-block and partial Linux lowering with CFG lowering for
+  every instruction represented by checked-in executable fixtures and
+  statically reachable host/MMIO families, with explicit unsupported exits
+  for irreducible gaps.
 - [x] Lower COP3 register transfers and COP0/COP3 coprocessor load/store
   families directly, including LWC0/LWC3/SWC0/SWC3 and SDC2.
 - [x] Route PS1 RAM-adjacent MMIO loads/stores through a generic native

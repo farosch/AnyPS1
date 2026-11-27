@@ -76,7 +76,7 @@ def main() -> int:
             raise ValueError("PE subsystem is not Windows CUI")
         if directory_count != 16:
             raise ValueError("PE data-directory count is invalid")
-        if import_rva != 0x2130 or import_size != 40:
+        if import_rva != 0x2120 or import_size != 40:
             raise ValueError("PE import directory is invalid")
 
         section_offset = optional_offset + coff_size

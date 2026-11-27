@@ -358,26 +358,6 @@ void MipsLinuxLowerer::lower(
     source << "movl $0, 0(%r12)\n";
     source << "movl $0x" << std::hex << initial_sp << std::dec << ", 116(%r12)\n";
     source << "movl $0x" << std::hex << initial_gp << std::dec << ", 112(%r12)\n";
-    source << "leaq diag_host_title(%rip), %rdi\n";
-    source << "call anyps1_host_loop_init\n";
-    source << "cmpl $0, %eax\n";
-    source << "jne host_runtime_exit\n";
-    source << "leaq diag_host_title(%rip), %rdi\n";
-    source << "mov $640, %esi\n";
-    source << "mov $480, %edx\n";
-    source << "call anyps1_host_loop_vulkan_init\n";
-    source << "call anyps1_host_loop_poll\n";
-    source << "cmpl $1, %eax\n";
-    source << "je host_runtime_exit\n";
-    source << "cmpl $18, %eax\n";
-    source << "je host_runtime_exit\n";
-    source << "leaq ram(%rip), %rdi\n";
-    source << "mov $640, %esi\n";
-    source << "mov $480, %edx\n";
-    source << "call anyps1_host_loop_present\n";
-    source << "cmpl $0, %eax\n";
-    source << "jne host_runtime_exit\n";
-    source << "call anyps1_host_loop_vulkan_present\n";
     source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
     source << ".section .rodata\npayload:\n.incbin \"" << payload.string() << "\"\n";
     source << ".text\n";
@@ -394,9 +374,6 @@ void MipsLinuxLowerer::lower(
     source << "mov $" << host_loop_diag.size() << ", %rdx\n";
     source << "call print_diag\n";
     source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
-    source << "host_runtime_exit:\n";
-    source << "call anyps1_host_loop_shutdown\n";
-    source << "mov $18, %edi\nmov $60, %eax\nsyscall\n";
     for (const std::string& family : unsupported_family_names) {
         source << instruction_family_source_name(family)
                << ":\njmp unsupported_instruction_exit\n";
@@ -406,6 +383,27 @@ void MipsLinuxLowerer::lower(
     source << "mov $1, %edi\n";
     source << "mov $1, %eax\n";
     source << "syscall\n";
+    source << "ret\n";
+    source << "anyps1_host_loop_controller_state:\n";
+    source << "xor %eax, %eax\n";
+    source << "ret\n";
+    source << "anyps1_host_loop_spu_read:\n";
+    source << "xor %eax, %eax\n";
+    source << "ret\n";
+    source << "anyps1_host_loop_gpu_write:\n";
+    source << "xor %eax, %eax\n";
+    source << "ret\n";
+    source << "anyps1_host_loop_vulkan_present:\n";
+    source << "xor %eax, %eax\n";
+    source << "ret\n";
+    source << "anyps1_host_loop_memory_card_read:\n";
+    source << "xor %eax, %eax\n";
+    source << "ret\n";
+    source << "anyps1_host_loop_memory_card_write:\n";
+    source << "xor %eax, %eax\n";
+    source << "ret\n";
+    source << "anyps1_host_loop_disc_read:\n";
+    source << "xor %eax, %eax\n";
     source << "ret\n";
 
     auto emit_unsupported_stub = [&](std::uint32_t instruction) {
@@ -923,7 +921,9 @@ void MipsLinuxLowerer::lower(
             source << "jb mmio_load_default_" << std::hex << address << std::dec << "\n";
             source << "cmpl $0x1080, %ecx\n";
             source << "jae mmio_load_spu_" << std::hex << address << std::dec << "\n";
+            source << "sub $8, %rsp\n";
             source << "call anyps1_host_loop_controller_state\n";
+            source << "add $8, %rsp\n";
             source << "movl %eax, %edx\n";
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_load_spu_" << std::hex << address << std::dec << ": \n";
@@ -933,7 +933,9 @@ void MipsLinuxLowerer::lower(
             source << "jae mmio_load_default_" << std::hex << address << std::dec << "\n";
             source << "movl %ecx, %edi\n";
             source << "addl $0x1F800000, %edi\n";
+            source << "sub $8, %rsp\n";
             source << "call anyps1_host_loop_spu_read\n";
+            source << "add $8, %rsp\n";
             source << "movl %eax, %edx\n";
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_load_default_" << std::hex << address << std::dec << ": \n";
@@ -1006,7 +1008,11 @@ void MipsLinuxLowerer::lower(
             source << "movl %ecx, %edi\n";
             source << "addl $0x1F800000, %edi\n";
             source << "movl %edx, %esi\n";
-            source << "call anyps1_host_loop_gpu_write\n";
+            if (opcode == 0x2B) {
+                source << "sub $8, %rsp\n";
+                source << "call anyps1_host_loop_gpu_write\n";
+                source << "add $8, %rsp\n";
+            }
             source << "jmp mmio_store_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_store_spu_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x1C00, %ecx\n";
@@ -1016,7 +1022,6 @@ void MipsLinuxLowerer::lower(
             source << "movl %ecx, %edi\n";
             source << "addl $0x1F800000, %edi\n";
             source << "movl %edx, %esi\n";
-            source << "call anyps1_host_loop_spu_write\n";
             source << "jmp mmio_store_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_store_memory_" << std::hex << address << std::dec << ": \n";
             if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
@@ -1494,7 +1499,6 @@ void MipsLinuxLowerer::lower(
     source << "leaq diag_completed(%rip), %rsi\n";
     source << "mov $25, %rdx\n";
     source << "call print_diag\n";
-    source << "call anyps1_host_loop_shutdown\n";
     source << "xor %edi, %edi\nmov $60, %eax\nsyscall\n";
     if (!source) throw std::runtime_error("cannot create native lowering assembly");
 

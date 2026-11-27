@@ -310,7 +310,7 @@ int main(int argc, char** argv)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 121]) << 8)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 122]) << 16)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 123]) << 24);
-        if (import_directory != 0x2130) {
+        if (import_directory != 0x2120) {
             throw std::runtime_error("Windows PE output has invalid import directory");
         }
         const std::uint16_t section_count =
