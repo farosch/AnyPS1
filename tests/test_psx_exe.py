@@ -1,3 +1,4 @@
+import json
 import struct
 import sys
 import unittest
@@ -5,6 +6,7 @@ from pathlib import Path
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from inspect_psx_disc import extract_psx_code, parse_psx_exe_header
 from analyze_psx_exe import (
@@ -19,11 +21,18 @@ from extract_psx_game import parse_cue, prepare_extraction_output, safe_output_p
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
+JSON_FIXTURES = FIXTURES / "json"
+
+
+def load_json_fixture(relative_path):
+    description = json.loads((JSON_FIXTURES / relative_path).read_text(encoding="utf-8"))
+    from fixture_loader import build_psx_exe
+    return build_psx_exe(description)
 
 
 class PsxExeHeaderTest(unittest.TestCase):
     def test_parse_valid_header(self):
-        data = (FIXTURES / "valid.ps-exe").read_bytes()
+        data = load_json_fixture("valid.json")
 
         header = parse_psx_exe_header(data)
 
@@ -33,17 +42,17 @@ class PsxExeHeaderTest(unittest.TestCase):
 
     def test_reject_invalid_header(self):
         with self.assertRaises(ValueError):
-            parse_psx_exe_header((FIXTURES / "invalid.ps-exe").read_bytes())
+            parse_psx_exe_header(load_json_fixture("invalid.json"))
 
     def test_extract_declared_code_section(self):
-        header, code = extract_psx_code((FIXTURES / "declared-code.ps-exe").read_bytes())
+        header, code = extract_psx_code(load_json_fixture("declared-code.json"))
 
         self.assertEqual(header["load_address"], 0x80010000)
         self.assertEqual(code, b"\x00\x00\x00\x24")
 
     def test_extract_rejects_truncated_code(self):
         with self.assertRaises(ValueError):
-            extract_psx_code((FIXTURES / "truncated.ps-exe").read_bytes())
+            extract_psx_code(load_json_fixture("truncated.json"))
 
 
 class MipsDisassemblerTest(unittest.TestCase):
@@ -65,13 +74,15 @@ class MipsDisassemblerTest(unittest.TestCase):
         )
 
     def test_range_preserves_address(self):
-        code = (FIXTURES / "mips" / "instructions.bin").read_bytes()[:8]
+        description = json.loads((JSON_FIXTURES / "mips" / "instructions.json").read_text())
+        code = b"".join(struct.pack("<I", word) for word in description["words"])[:8]
         instructions = list(disassemble_range(code, 0x80010000, count=2))
         self.assertEqual(instructions[0][0], 0x80010000)
         self.assertEqual(instructions[1][0], 0x80010004)
 
     def test_control_flow_adds_branch_edges(self):
-        code = (FIXTURES / "mips" / "control-flow.bin").read_bytes()
+        description = json.loads((JSON_FIXTURES / "mips" / "control-flow.json").read_text())
+        code = b"".join(struct.pack("<I", word) for word in description["words"])
         cfg = control_flow_map(code, 0x80010000)
         self.assertGreaterEqual(len(cfg["blocks"]), 2)
 

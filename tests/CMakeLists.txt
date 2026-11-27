@@ -1,13 +1,34 @@
+set(FIXTURE_SOURCE_DIR ${CMAKE_SOURCE_DIR}/tests/fixtures/json)
+set(FIXTURE_OUTPUT_DIR ${CMAKE_BINARY_DIR}/tests/fixtures)
+set(FIXTURE_MANIFEST ${FIXTURE_OUTPUT_DIR}/fixture-manifest.json)
+
+file(GLOB FIXTURE_JSON_FILES CONFIGURE_DEPENDS
+    ${FIXTURE_SOURCE_DIR}/*.json
+    ${FIXTURE_SOURCE_DIR}/*/*.json
+    ${FIXTURE_SOURCE_DIR}/*/*/*.json
+)
+add_custom_command(
+    OUTPUT ${FIXTURE_MANIFEST}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/fixture_loader.py
+        --source ${FIXTURE_SOURCE_DIR}
+        --output ${FIXTURE_OUTPUT_DIR}
+    DEPENDS ${FIXTURE_JSON_FILES} ${CMAKE_SOURCE_DIR}/tests/fixture_loader.py
+    VERBATIM
+)
+add_custom_target(generate_test_fixtures DEPENDS ${FIXTURE_MANIFEST})
+
 add_test(NAME layout COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/check_layout.py)
 add_test(NAME psx_exe_header COMMAND python3 -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p "test_*.py")
 
 add_executable(anyps1_relinker_test RelinkerTest.cpp)
 target_include_directories(anyps1_relinker_test PRIVATE ${CMAKE_SOURCE_DIR}/core)
 target_link_libraries(anyps1_relinker_test PRIVATE anyps1_relinker anyps1_runtime)
-add_test(NAME relinker_artifact COMMAND anyps1_relinker_test ${CMAKE_SOURCE_DIR}/tests/fixtures/valid.ps-exe)
+add_dependencies(anyps1_relinker_test generate_test_fixtures)
+add_test(NAME relinker_artifact COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/valid.ps-exe)
 
 add_executable(anyps1_runtime_test RuntimeTest.cpp)
 target_include_directories(anyps1_runtime_test PRIVATE ${CMAKE_SOURCE_DIR}/core)
 target_link_libraries(anyps1_runtime_test PRIVATE anyps1_runtime)
-add_test(NAME runtime_fixture_states COMMAND anyps1_runtime_test ${CMAKE_SOURCE_DIR}/tests/fixtures/runtime)
+add_dependencies(anyps1_runtime_test generate_test_fixtures)
+add_test(NAME runtime_fixture_states COMMAND anyps1_runtime_test ${FIXTURE_OUTPUT_DIR}/runtime)
 

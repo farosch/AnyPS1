@@ -4,6 +4,8 @@ AnyPS1 converts PlayStation 1 executable images into native Linux or Windows pro
 
 - Keep the relinker focused on executable conversion and avoid emulator runtime work.
 - Unsupported executable formats and relinking states must fail explicitly.
+- Store executable test fixtures as JSON descriptions under `tests/fixtures/json/`;
+  materialize `.ps-exe` binaries only in the build tree for test execution.
 - Functions must never fail silently; report or return errors through the
   appropriate exception, return value, log, or caller-visible result.
 - Put third-party code under `3rdparty/<name>` as a submodule.

@@ -13,7 +13,7 @@
 int main(int argc, char** argv)
 {
     if (argc != 2) {
-        std::cerr << "Usage: anyps1_relinker_test <fixture.ps-exe>\n";
+        std::cerr << "Usage: anyps1_relinker_test <generated-fixture.ps-exe>\n";
         return 1;
     }
     const char* fixture_path = argv[1];
