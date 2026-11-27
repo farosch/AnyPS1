@@ -17,6 +17,8 @@
 
 namespace anyps1 {
 
+constexpr std::uint32_t MAX_NATIVE_LEADERS = 512u;
+
 void write_linux_native_cfg(
     const RelinkOptions& options,
     const std::vector<unsigned char>& data
@@ -41,6 +43,7 @@ void write_linux_native_cfg(
 
     std::set<std::uint32_t> leaders;
     std::set<std::uint32_t> delay_slots;
+    std::set<std::uint32_t> processed;
     std::queue<std::uint32_t> work;
     std::uint32_t unsupported_count = 0;
     std::uint32_t first_unsupported_address = 0;
@@ -50,6 +53,7 @@ void write_linux_native_cfg(
     while (!work.empty()) {
         const std::uint32_t address = work.front();
         work.pop();
+        if (!processed.insert(address).second) continue;
         if (address < load_address || address >= load_address + file_size
             || (address & 3u) != 0) {
             continue;
@@ -102,6 +106,10 @@ void write_linux_native_cfg(
                 leaders.insert(delay_address);
                 work.push(delay_address);
             }
+        }
+        if (leaders.size() >= MAX_NATIVE_LEADERS) {
+            while (!work.empty()) work.pop();
+            break;
         }
 
     }
@@ -544,6 +552,7 @@ void write_linux_native_cfg(
     };
 
     std::set<std::uint32_t> emitted_delay_slots;
+    std::set<std::uint32_t> emitted_jalr_targets;
     for (std::uint32_t address : leaders) {
         if (address < load_address || address >= load_address + file_size) continue;
         const std::uint32_t offset = address - load_address;
@@ -584,7 +593,8 @@ void write_linux_native_cfg(
                 static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
             const std::uint32_t target =
                 static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
-            if (target < load_address || target >= load_address + file_size) {
+            if (target < load_address || target >= load_address + file_size ||
+                leaders.find(target) == leaders.end()) {
                 source << "jmp unsupported_jump_exit\n";
             } else
             if (opcode == 0x04) {
@@ -620,13 +630,15 @@ void write_linux_native_cfg(
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
             if (opcode == 0x03) {
                 source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
-                if (target >= load_address && target < load_address + file_size) {
+                if (target >= load_address && target < load_address + file_size &&
+                    leaders.find(target) != leaders.end()) {
                     source << "call p" << std::hex << target << std::dec << "\n";
                 } else {
                     source << "jmp unsupported_jump_exit\n";
                 }
             } else {
-                if (target >= load_address && target < load_address + file_size) {
+                if (target >= load_address && target < load_address + file_size &&
+                    leaders.find(target) != leaders.end()) {
                     source << "jmp p" << std::hex << target << std::dec << "\n";
                 } else {
                     source << "jmp unsupported_jump_exit\n";
@@ -657,9 +669,11 @@ void write_linux_native_cfg(
             source << "jmp unsupported_jump_exit\n";
             for (std::uint32_t target : leaders) {
                 if (target >= load_address && target < load_address + file_size) {
-                    source << "jalr_target_" << std::hex << target << std::dec << ":\n";
-                    source << "call p" << std::hex << target << std::dec << "\n";
-                    source << "jmp p" << std::hex << address + 8 << std::dec << "\n";
+                    if (emitted_jalr_targets.insert(target).second) {
+                        source << "jalr_target_" << std::hex << target << std::dec << ":\n";
+                        source << "call p" << std::hex << target << std::dec << "\n";
+                        source << "jmp p" << std::hex << address + 8 << std::dec << "\n";
+                    }
                 }
             }
         } else {
