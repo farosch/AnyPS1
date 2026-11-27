@@ -127,17 +127,23 @@
 - [x] Add `anyps1-input.ini` parsing and default bindings.
 - [x] Add host mapping and input integration fixtures.
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
-- [x] Implement native file lowering for open/read/write/seek/close operations.
-- [x] Integrate input polling into the actual generated executable loop.
-- [x] Implement SDL3 window creation and event pumping in the Linux/Windows
-  host backend.
-- [x] Implement native audio lowering for PS1 SPU operations.
-- [x] Implement native video framebuffer presentation.
-- [x] Implement native Vulkan swapchain, image, sampler, pipeline, and
+- [ ] Implement native file lowering for open/read/write/seek/close operations
+  into generated Linux/Windows executable loops.
+- [ ] Integrate input polling into the actual generated executable loop.
+- [ ] Integrate SDL3 window creation and event pumping into the Linux/Windows
+  generated executable loop.
+- [ ] Integrate native audio lowering for PS1 SPU operations into generated
+  executable loops.
+- [ ] Integrate native video framebuffer presentation into generated executable
+  loops.
+- [ ] Integrate native Vulkan swapchain, image, sampler, pipeline, and
   command-buffer resources.
-- [x] Expose host-native diagnostics through structured exit codes and logs.
-- [x] Implement title-independent memory-card storage mapping.
-- [x] Implement title-independent CD/disc filesystem and asset access mapping.
+- [ ] Expose host-native diagnostics through generated executable structured
+  exit codes and logs.
+- [ ] Integrate title-independent memory-card storage mapping into generated
+  executable loops.
+- [ ] Integrate title-independent CD/disc filesystem and asset access mapping
+  into generated executable loops.
 - [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.
 
