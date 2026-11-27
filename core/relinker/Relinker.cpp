@@ -6,17 +6,17 @@
 #include <fstream>
 #include <filesystem>
 #include <iterator>
+#include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <unistd.h>
 
 namespace anyps1 {
 
 namespace {
 
 constexpr std::uint32_t PSX_HEADER_SIZE = 2048;
-constexpr char NATIVE_PSX_MAGIC[] = "ANYPS1-PSX-IMAGE";
 
 void trim(std::string& value)
 {
@@ -170,98 +170,8 @@ void write_pe_layout(
     std::uint32_t file_size
 )
 {
-    std::ofstream output(options.output, std::ios::binary | std::ios::trunc);
-    if (!output) {
-        throw std::runtime_error("cannot open output artifact: " + options.output);
-    }
-    const std::uint32_t pe_offset = 128;
-    const std::uint32_t optional_header_size = 240;
-    const std::uint32_t raw_offset = 512;
-    const std::uint64_t psx_size = data.size();
-    const std::uint64_t payload_offset = raw_offset + 16;
-    const std::uint64_t trailer_offset = payload_offset + psx_size;
-    const std::uint64_t raw_size = ((trailer_offset + 24 + 511) / 512) * 512;
-
-    unsigned char dos[128]{};
-    dos[0] = 'M';
-    dos[1] = 'Z';
-    dos[60] = static_cast<unsigned char>(pe_offset);
-    dos[61] = static_cast<unsigned char>(pe_offset >> 8);
-    dos[62] = static_cast<unsigned char>(pe_offset >> 16);
-    dos[63] = static_cast<unsigned char>(pe_offset >> 24);
-    output.write(reinterpret_cast<const char*>(dos), sizeof(dos));
-
-    output.write("PE\0\0", 4);
-    write16(output, 0x8664);
-    write16(output, 1);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0);
-    write16(output, optional_header_size);
-    write16(output, 0x0102);
-
-    write16(output, 0x20B);
-    write16(output, 0);
-    write32(output, 16);
-    write32(output, 0);
-    write32(output, 0);
-    write32(output, 0x1000);
-    write32(output, 0x1000);
-    write64(output, 0x140000000ULL);
-    write32(output, 4096);
-    write32(output, 512);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write16(output, 6);
-    write16(output, 0);
-    write32(output, 0);
-    write32(output, static_cast<std::uint32_t>(raw_size));
-    write32(output, raw_offset);
-    write32(output, 0);
-    write16(output, 3);
-    write16(output, 0);
-    write64(output, 0x100000ULL);
-    write64(output, 0x1000ULL);
-    write64(output, 0x100000ULL);
-    write64(output, 0x1000ULL);
-    write32(output, 0);
-    write32(output, 16);
-    for (std::uint32_t index = 0; index < 16; ++index) {
-        write64(output, 0);
-    }
-
-    output.write(".text\0\0\0", 8);
-    write32(output, 512);
-    write32(output, 0x1000);
-    write32(output, 512);
-    write32(output, raw_offset);
-    write32(output, 0);
-    write32(output, 0);
-    write16(output, 0);
-    write16(output, 0);
-    write32(output, 0x60000020);
-
-    while (output.tellp() >= 0 && static_cast<std::uint64_t>(output.tellp()) < raw_offset) {
-        output.put('\0');
-    }
-    const unsigned char stub[] = {0x31, 0xC0, 0xC3};
-    output.write(reinterpret_cast<const char*>(stub), sizeof(stub));
-    while (static_cast<std::uint64_t>(output.tellp()) < payload_offset) {
-        output.put('\0');
-    }
-    output.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(psx_size));
-    output.write(NATIVE_PSX_MAGIC, 16);
-    for (std::uint32_t index = 0; index < 8; ++index) {
-        output.put(static_cast<char>((psx_size >> (index * 8)) & 0xFF));
-    }
-    while (static_cast<std::uint64_t>(output.tellp()) < raw_size) {
-        output.put('\0');
-    }
-    if (!output) {
-        throw std::runtime_error("failed while writing Windows native artifact");
-    }
+    throw std::runtime_error(
+        "native Windows MIPS lowering is not implemented; refusing emulator-style relinking");
 }
 
 void write_linux_native(
@@ -269,32 +179,53 @@ void write_linux_native(
     const std::vector<unsigned char>& data
 )
 {
-    char executable[4096]{};
-    const ssize_t length = readlink("/proc/self/exe", executable, sizeof(executable) - 1);
-    if (length <= 0) {
-        throw std::runtime_error("cannot locate the AnyPS1 native launcher executable");
+    const std::uint32_t file_size = read32(data, 0x1C);
+    const std::uint32_t load_address = read32(data, 0x18);
+    if (file_size == 0 || file_size % 4 != 0) {
+        throw std::runtime_error("unsupported native lowering: executable size is not a MIPS word sequence");
     }
-    executable[length] = '\0';
+    for (std::uint32_t offset = 0; offset < file_size; offset += 4) {
+        const std::uint32_t instruction = read32(data, PSX_HEADER_SIZE + offset);
+        if (instruction != 0) {
+            throw std::runtime_error(
+                "unsupported native MIPS lowering at 0x"
+                + [] (std::uint32_t value) {
+                    char output[9]{};
+                    std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
+                    return std::string(output);
+                }(load_address + offset)
+                + ": opcode 0x"
+                + [] (std::uint32_t value) {
+                    char output[9]{};
+                    std::snprintf(output, sizeof(output), "%08X", static_cast<unsigned>(value));
+                    return std::string(output);
+                }(instruction)
+                + "; emulator-style relinking is forbidden");
+        }
+    }
 
-    std::filesystem::remove(options.output);
-    std::filesystem::copy_file(
-        executable,
-        options.output,
-        std::filesystem::copy_options::overwrite_existing
-    );
-    std::ofstream output(options.output, std::ios::binary | std::ios::app);
-    if (!output) {
-        throw std::runtime_error("cannot append PS-X image to Linux native launcher");
+    const std::filesystem::path assembly =
+        std::filesystem::temp_directory_path()
+        / (options.output + ".native.s");
+    {
+        std::ofstream source(assembly, std::ios::trunc);
+        source << ".text\n";
+        source << ".globl _start\n";
+        source << "_start:\n";
+        source << "    xor %edi, %edi\n";
+        source << "    mov $60, %eax\n";
+        source << "    syscall\n";
+        if (!source) {
+            throw std::runtime_error("cannot create native lowering assembly");
+        }
     }
-    output.write(reinterpret_cast<const char*>(data.data()),
-        static_cast<std::streamsize>(data.size()));
-    output.write(NATIVE_PSX_MAGIC, 16);
-    const std::uint64_t psx_size = data.size();
-    for (std::uint32_t index = 0; index < 8; ++index) {
-        output.put(static_cast<char>((psx_size >> (index * 8)) & 0xFF));
-    }
-    if (!output) {
-        throw std::runtime_error("failed while writing Linux native artifact");
+
+    std::string command = "gcc -nostdlib -no-pie -Wl,-e,_start -o \""
+        + options.output + "\" \"" + assembly.string() + "\"";
+    const int status = std::system(command.c_str());
+    std::filesystem::remove(assembly);
+    if (status != 0) {
+        throw std::runtime_error("native Linux lowering toolchain failed");
     }
     std::filesystem::permissions(
         options.output,

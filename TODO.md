@@ -2,10 +2,11 @@
 
 ## Relinker
 
-- [ ] Validate native Windows PE runtime launcher beyond header construction.
-- [ ] Translate or lower MIPS instructions into native Linux/Windows code.
+- [ ] Validate native Windows PE conversion after MIPS lowering.
+- [ ] Expand direct MIPS lowering beyond NOP fixtures for Linux/Windows code.
 - [ ] Add checked-in, minimal PS-X executable fixtures for more executable layouts and malformed cases.
-- [x] Replace layout-only relinking with native Linux and PE launcher artifacts that embed PS-X images; direct instruction lowering remains separate.
+- [ ] Expand direct Linux MIPS lowering beyond NOP-only fixtures.
+- [ ] Replace layout-only relinking with direct native Linux and PE instruction lowering; emulator-style wrappers are forbidden.
 
 ## CPU
 
