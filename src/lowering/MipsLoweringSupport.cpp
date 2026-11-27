@@ -30,20 +30,80 @@ std::uint32_t resolve_static_indirect_target(
             PSX_HEADER_SIZE +
                 static_cast<std::uint32_t>(word_address - load_address));
         const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t rs = (instruction >> 21) & 31u;
         const std::uint32_t rt = (instruction >> 16) & 31u;
+        const std::uint32_t rd = (instruction >> 11) & 31u;
         const std::uint32_t immediate = instruction & 0xFFFFu;
-        if (rt != target_register) continue;
         if (opcode == 0x0F) {
-            value = immediate << 16;
-            initialized = true;
-        } else if (opcode == 0x09) {
-            value = static_cast<std::uint32_t>(
-                static_cast<std::int64_t>(value) +
-                static_cast<std::int16_t>(immediate));
-            initialized = true;
+            if (rt == target_register) {
+                value = immediate << 16;
+                initialized = true;
+            }
+        } else if (opcode == 0x09 || opcode == 0x08) {
+            if (rt == target_register) {
+                if (rs != target_register) {
+                    initialized = false;
+                } else if (initialized) {
+                    value = static_cast<std::uint32_t>(
+                        static_cast<std::int64_t>(value) +
+                        static_cast<std::int16_t>(immediate));
+                }
+            }
         } else if (opcode == 0x0D) {
-            value |= immediate;
-            initialized = true;
+            if (rt == target_register) {
+                if (rs != target_register || !initialized) {
+                    initialized = false;
+                } else {
+                    value |= immediate;
+                }
+            }
+        } else if (opcode == 0x23 && rt == target_register) {
+            if (rs != target_register || !initialized) {
+                initialized = false;
+                continue;
+            }
+            const std::uint32_t load_target_address =
+                value + static_cast<std::int32_t>(
+                    static_cast<std::int16_t>(immediate));
+            if (load_target_address < load_address ||
+                load_target_address >=
+                    load_address + file_size ||
+                (load_target_address & 3u) != 0) {
+                initialized = false;
+                continue;
+            }
+            value = read_psx32(
+                data,
+                PSX_HEADER_SIZE + load_target_address - load_address);
+            initialized = value >= load_address &&
+                value < load_address + file_size &&
+                (value & 3u) == 0;
+        } else {
+            const bool writes_rt =
+                (opcode >= 0x08 && opcode <= 0x0E) ||
+                (opcode >= 0x10 && opcode <= 0x13 && rs <= 0x02) ||
+                (opcode >= 0x20 && opcode <= 0x27);
+            const std::uint32_t special = instruction & 63u;
+            const bool writes_rd =
+                opcode == 0x00 &&
+                (special == 0x00 || special == 0x02 ||
+                 special == 0x03 || special == 0x04 ||
+                 special == 0x06 || special == 0x07 ||
+                 special == 0x09 || special == 0x10 ||
+                 special == 0x12 || special == 0x20 ||
+                 special == 0x21 || special == 0x22 ||
+                 special == 0x23 || special == 0x24 ||
+                 special == 0x25 || special == 0x26 ||
+                 special == 0x27 || special == 0x2A ||
+                 special == 0x2B);
+            const bool writes_link =
+                opcode == 0x03 ||
+                (opcode == 0x01 && (rt == 0x10 || rt == 0x11));
+            if ((writes_rt && rt == target_register) ||
+                (writes_rd && rd == target_register) ||
+                (writes_link && target_register == 31u)) {
+                initialized = false;
+            }
         }
     }
     return initialized ? value : 0;

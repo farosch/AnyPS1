@@ -35,6 +35,7 @@ add_test(NAME relinker_native_bios_vector COMMAND anyps1_relinker_test ${FIXTURE
 add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-load-delay.ps-exe)
 add_test(NAME relinker_zero_register COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/zero-register.ps-exe)
 add_test(NAME relinker_taken_delay_slot COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/delay-slot-taken.ps-exe)
+add_test(NAME relinker_delay_slot_data_boundary COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/delay-slot-data-boundary.ps-exe)
 add_test(NAME relinker_memory_boundary COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/memory-boundary.ps-exe)
 add_test(NAME relinker_platform_parity
     COMMAND anyps1_relinker_test
@@ -54,6 +55,7 @@ set_tests_properties(
     relinker_native_load_delay
     relinker_zero_register
     relinker_taken_delay_slot
+    relinker_delay_slot_data_boundary
     relinker_memory_boundary
     relinker_platform_parity
     relinker_native_cfg_cop0
@@ -128,6 +130,10 @@ add_test(NAME pe_semantic_taken_delay_slot
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/delay-slot-taken.ps-exe)
+add_test(NAME pe_delay_slot_data_boundary
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/delay-slot-data-boundary.ps-exe)
 add_test(NAME pe_host_mmio_state
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
@@ -194,6 +200,15 @@ target_include_directories(anyps1_payload_region_test PRIVATE ${CMAKE_SOURCE_DIR
 target_link_libraries(anyps1_payload_region_test PRIVATE anyps1_lowering)
 add_test(NAME payload_region_classifier
     COMMAND anyps1_payload_region_test)
+
+add_executable(anyps1_mips_lowering_support_test
+    MipsLoweringSupportTest.cpp)
+target_include_directories(anyps1_mips_lowering_support_test
+    PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(anyps1_mips_lowering_support_test
+    PRIVATE anyps1_lowering)
+add_test(NAME mips_lowering_support
+    COMMAND anyps1_mips_lowering_support_test)
 
 add_test(NAME validation_tools
     COMMAND "${PYTHON_EXECUTABLE}"

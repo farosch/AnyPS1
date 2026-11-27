@@ -179,7 +179,6 @@ void MipsLinuxLowerer::lower(
             if (delay_address >= load_address && delay_address < load_address + file_size) {
                 delay_slots.insert(delay_address);
                 leaders.insert(delay_address);
-                work.push(delay_address);
             }
         }
     }

@@ -346,7 +346,6 @@ void MipsWindowsLowerer::lower(
                 delay_address < static_cast<std::uint64_t>(load_address) + file_size) {
                 delay_slots.insert(delay_address);
                 leaders.insert(delay_address);
-                work.push(delay_address);
             }
         }
     }

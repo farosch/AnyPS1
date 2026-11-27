@@ -254,6 +254,15 @@ int main(int argc, char** argv)
              terminal_output.find("first_unsupported_gap=0x") == std::string::npos)) {
             throw std::runtime_error("partial native ELF lacks unsupported lowering diagnostics");
         }
+        if (std::string(fixture_path).find("delay-slot-data-boundary.ps-exe") !=
+                std::string::npos &&
+            (terminal_output.find("unsupported_instructions=0\n") ==
+                 std::string::npos ||
+             terminal_output.find("first_unsupported_gap=none") ==
+                 std::string::npos)) {
+            throw std::runtime_error(
+                "delay-slot fall-through incorrectly reached embedded data");
+        }
         if (terminal_output.find("lowered_coverage_percent=") == std::string::npos ||
             terminal_output.find("call_edges=") == std::string::npos ||
             terminal_output.find("unresolved_indirect_transfers=") == std::string::npos ||
