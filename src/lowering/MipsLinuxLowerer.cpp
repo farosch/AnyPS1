@@ -908,6 +908,11 @@ void MipsLinuxLowerer::lower(
             source << "cmpl $" << (0x1F802001u - access_size) << ", %ecx\n";
             source << "jae mmio_exit\n";
             source << "subl $0x1F800000, %ecx\n";
+            source << "movl %ecx, %edi\n";
+            source << "addl $0x1F800000, %edi\n";
+            source << "call anyps1_host_loop_mmio_read\n";
+            source << "movl %eax, %edx\n";
+            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "leaq mmio_state(%rip), %rbx\n";
             source << "andl $0x1FFF, %ecx\n";
             source << "cmpl $0x1050, %ecx\n";
@@ -1000,6 +1005,13 @@ void MipsLinuxLowerer::lower(
             source << "cmpl $" << (0x1F802001u - access_size) << ", %ecx\n";
             source << "jae mmio_exit\n";
             source << "subl $0x1F800000, %ecx\n";
+            source << "movl %ecx, %edi\n";
+            source << "addl $0x1F800000, %edi\n";
+            source << "movl " << rt * 4 << "(%r12), %esi\n";
+            source << "call anyps1_host_loop_mmio_write\n";
+            source << "cmpl $0, %eax\n";
+            source << "jne host_runtime_exit\n";
+            source << "jmp mmio_store_done_" << std::hex << address << std::dec << "\n";
             source << "leaq mmio_state(%rip), %rbx\n";
             source << "andl $0x1FFF, %ecx\n";
             source << "movl " << rt * 4 << "(%r12), %edx\n";
@@ -1349,6 +1361,10 @@ void MipsLinuxLowerer::lower(
             source << "jb host_frame_tick_done_" << std::hex << address << std::dec << "\n";
             source << "movl $0, host_frame_counter(%rip)\n";
             source << "call anyps1_host_loop_poll\n";
+            source << "testl %eax, %eax\n";
+            source << "jne host_shutdown_exit\n";
+            source << "movl $1024, %edi\n";
+            source << "call anyps1_host_loop_tick\n";
             source << "testl %eax, %eax\n";
             source << "jne host_shutdown_exit\n";
             source << "host_frame_tick_done_" << std::hex << address << std::dec << ":\n";

@@ -462,6 +462,10 @@ struct NativeHostLoopRuntime::Impl {
     std::map<std::uint32_t, std::uint32_t> spu_registers;
     std::vector<std::int16_t> spu_output;
     std::vector<std::uint32_t> gpu_vram;
+    std::map<std::uint32_t, std::uint32_t> mmio;
+    std::uint32_t timer_cycles = 0;
+    std::uint32_t interrupt_status = 0;
+    std::uint32_t interrupt_mask = 0;
     Ps1InputState input_state;
     bool initialized = false;
     bool headless = false;
@@ -714,6 +718,61 @@ int NativeHostLoopRuntime::gpu_write(
         return 17;
     }
     return 0;
+}
+
+std::uint32_t NativeHostLoopRuntime::mmio_read(std::uint32_t address)
+{
+    const std::uint32_t normalized = address & 0x1FFFFFFFu;
+    if (normalized == 0x1F801070u) return impl_->interrupt_status;
+    if (normalized == 0x1F801074u) return impl_->interrupt_mask;
+    if (normalized >= 0x1F801100u && normalized < 0x1F801130u) {
+        const std::uint32_t timer = (normalized - 0x1F801100u) / 16u;
+        const std::uint32_t offset = (normalized - 0x1F801100u) % 16u;
+        if (offset == 0u) return impl_->timer_cycles + timer * 0x400u;
+    }
+    const auto found = impl_->mmio.find(normalized);
+    return found == impl_->mmio.end() ? 0u : found->second;
+}
+
+int NativeHostLoopRuntime::mmio_write(
+    std::uint32_t address,
+    std::uint32_t value)
+{
+    const std::uint32_t normalized = address & 0x1FFFFFFFu;
+    if (normalized == 0x1F801070u) {
+        impl_->interrupt_status &= ~value;
+        return 0;
+    }
+    if (normalized == 0x1F801074u) {
+        impl_->interrupt_mask = value;
+        return 0;
+    }
+    if (normalized >= 0x1F801080u && normalized < 0x1F801100u) {
+        impl_->mmio[normalized] = value;
+        if ((normalized & 15u) == 12u && (value & 0x1000000u) != 0) {
+            impl_->mmio[normalized] = value & ~0x1000000u;
+        }
+        return 0;
+    }
+    if (normalized >= 0x1F801100u && normalized < 0x1F801130u) {
+        impl_->mmio[normalized] = value;
+        return 0;
+    }
+    impl_->mmio[normalized] = value;
+    return 0;
+}
+
+int NativeHostLoopRuntime::tick(std::uint32_t cycles)
+{
+    if (!impl_->initialized) return 18;
+    impl_->timer_cycles += cycles;
+    if ((impl_->timer_cycles / 1024u) != 0u) {
+        impl_->interrupt_status |= 0x4u;
+    }
+    std::string error;
+    anyps1::Ps1InputState input;
+    if (!poll(input, error)) return 18;
+    return should_close() ? 1 : 0;
 }
 
 int NativeHostLoopRuntime::vulkan_init(

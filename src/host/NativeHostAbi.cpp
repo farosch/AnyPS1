@@ -98,6 +98,29 @@ int anyps1_host_loop_gpu_write(
         : native_host_loop->gpu_write(address, value);
 }
 
+std::uint32_t anyps1_host_loop_mmio_read(std::uint32_t address)
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->mmio_read(address);
+}
+
+int anyps1_host_loop_mmio_write(
+    std::uint32_t address,
+    std::uint32_t value)
+{
+    return native_host_loop == nullptr
+        ? host_runtime_error()
+        : native_host_loop->mmio_write(address, value);
+}
+
+int anyps1_host_loop_tick(std::uint32_t cycles)
+{
+    return native_host_loop == nullptr
+        ? host_runtime_error()
+        : native_host_loop->tick(cycles);
+}
+
 int anyps1_host_loop_vulkan_init(
     const char* title,
     std::uint32_t width,

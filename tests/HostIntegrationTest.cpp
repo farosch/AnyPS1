@@ -121,6 +121,32 @@ int main()
                 0) != 18) {
             throw std::runtime_error("uninitialized disc open did not report host runtime error");
         }
+        if (anyps1::anyps1_host_loop_tick(1024) != 18) {
+            throw std::runtime_error("uninitialized host tick did not report runtime error");
+        }
+        {
+            anyps1::NativeHostLoopRuntime runtime;
+            if (!runtime.initialize(
+                    "AnyPS1 headless",
+                    320,
+                    240,
+                    "",
+                    host_error)) {
+                throw std::runtime_error(host_error);
+            }
+            if (runtime.mmio_write(0x1F801074u, 0x4u) != 0 ||
+                runtime.mmio_read(0x1F801074u) != 0x4u) {
+                throw std::runtime_error("interrupt mask MMIO round trip failed");
+            }
+            if (runtime.tick(1024u) != 1 ||
+                runtime.mmio_read(0x1F801070u) != 0x4u) {
+                throw std::runtime_error("timer tick did not assert VBlank status");
+            }
+            if (runtime.mmio_write(0x1F801070u, 0x4u) != 0 ||
+                runtime.mmio_read(0x1F801070u) != 0u) {
+                throw std::runtime_error("interrupt acknowledge did not clear status");
+            }
+        }
         const anyps1::HostServiceMapping audio =
             anyps1::map_host_service(anyps1::HostServiceKind::Audio);
         const anyps1::HostServiceMapping video =

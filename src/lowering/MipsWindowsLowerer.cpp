@@ -402,6 +402,8 @@ void MipsWindowsLowerer::lower(
     source << "hi_lo dd 2 dup(0)\n";
     source << "ram db 2097152 dup(0)\n";
     source << "scratchpad db 1024 dup(0)\n";
+    source << "mmio_state db 8192 dup(0)\n";
+    source << "host_cycles dd 0\n";
     source << "cop0 db 128 dup(0)\n";
     source << "cop3_data db 128 dup(0)\n";
     source << "fregs dd 32 dup(0)\n";
@@ -579,6 +581,12 @@ void MipsWindowsLowerer::lower(
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
         source << "p" << std::hex << address << std::dec << "::\n";
+        source << "inc dword ptr host_cycles\n";
+        source << "cmp dword ptr host_cycles,1024\n";
+        source << "jb host_tick_done_" << std::hex << address << std::dec << "\n";
+        source << "mov dword ptr host_cycles,0\n";
+        source << "or dword ptr mmio_state+070h,4\n";
+        source << "host_tick_done_" << std::hex << address << std::dec << ":\n";
         source << "mov al,byte ptr pending_load_valid\n";
         source << "mov byte ptr previous_load_valid,al\n";
         source << "mov al,byte ptr pending_load_register\n";
@@ -1155,7 +1163,17 @@ void MipsWindowsLowerer::lower(
             source << "jb host_address_continue_" << std::hex << address << std::dec << "\n";
             source << "cmp eax,1F802000h\n";
             source << "jae host_address_continue_" << std::hex << address << std::dec << "\n";
-            source << "jmp unsupported_host_exit\n";
+            source << "sub eax,1F801000h\n";
+            source << "lea rbx,mmio_state\n";
+            if (opcode == 0x20) source << "movsx edx,byte ptr [rbx+rax]\n";
+            else if (opcode == 0x21) source << "movsx edx,word ptr [rbx+rax]\n";
+            else if (opcode == 0x23) source << "mov edx,dword ptr [rbx+rax]\n";
+            else if (opcode == 0x24) source << "movzx edx,byte ptr [rbx+rax]\n";
+            else source << "movzx edx,word ptr [rbx+rax]\n";
+            source << "mov dword ptr pending_load_value,edx\n";
+            source << "mov byte ptr pending_load_register," << rt << "\n";
+            source << "mov byte ptr pending_load_valid,1\n";
+            source << "jmp mmio_load_complete_" << std::hex << address << std::dec << "\n";
             source << "host_address_continue_" << std::hex << address << std::dec << ":\n";
             source << "cmp eax,1F800000h\n";
             source << "jb ram_load_" << std::hex << address << std::dec << "\n";
@@ -1210,6 +1228,7 @@ void MipsWindowsLowerer::lower(
                 source << "mov byte ptr pending_load_register," << rt << "\n";
                 source << "mov byte ptr pending_load_valid,1\n";
             }
+            source << "mmio_load_complete_" << std::hex << address << std::dec << ":\n";
         } else if (opcode == 0x2B || opcode == 0x29 || opcode == 0x28 ||
                    opcode == 0x2E || opcode == 0x39 || opcode == 0x3A ||
                    opcode == 0x2A) {
@@ -1223,7 +1242,13 @@ void MipsWindowsLowerer::lower(
             source << "jb host_store_continue_" << std::hex << address << std::dec << "\n";
             source << "cmp eax,1F802000h\n";
             source << "jae host_store_continue_" << std::hex << address << std::dec << "\n";
-            source << "jmp unsupported_host_exit\n";
+            source << "sub eax,1F801000h\n";
+            source << "lea rbx,mmio_state\n";
+            source << "mov edx,dword ptr [r12+" << rt * 4 << "]\n";
+            if (opcode == 0x28) source << "mov byte ptr [rbx+rax],dl\n";
+            else if (opcode == 0x29) source << "mov word ptr [rbx+rax],dx\n";
+            else source << "mov dword ptr [rbx+rax],edx\n";
+            source << "jmp mmio_store_complete_" << std::hex << address << std::dec << "\n";
             source << "host_store_continue_" << std::hex << address << std::dec << ":\n";
             source << "cmp eax,1F800000h\n";
             source << "jb ram_store_" << std::hex << address << std::dec << "\n";
@@ -1274,6 +1299,7 @@ void MipsWindowsLowerer::lower(
             } else {
                 source << "mov dword ptr [rbx+rax],edx\n";
             }
+            source << "mmio_store_complete_" << std::hex << address << std::dec << ":\n";
         } else {
             source << "jmp unsupported_exit\n";
         }

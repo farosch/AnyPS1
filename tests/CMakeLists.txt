@@ -128,7 +128,7 @@ add_test(NAME pe_semantic_taken_delay_slot
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/delay-slot-taken.ps-exe)
-add_test(NAME pe_host_mmio_unsupported
+add_test(NAME pe_host_mmio_state
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-host-integration.ps-exe)

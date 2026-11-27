@@ -222,6 +222,9 @@ public:
     int spu_write(std::uint32_t address, std::uint32_t value);
     std::uint32_t spu_read(std::uint32_t address) const;
     int gpu_write(std::uint32_t address, std::uint32_t value);
+    std::uint32_t mmio_read(std::uint32_t address);
+    int mmio_write(std::uint32_t address, std::uint32_t value);
+    int tick(std::uint32_t cycles);
     int vulkan_init(
         const std::string& title,
         std::uint32_t width,
@@ -253,6 +256,11 @@ int anyps1_host_loop_audio_queue(
 int anyps1_host_loop_gpu_write(
     std::uint32_t address,
     std::uint32_t value);
+std::uint32_t anyps1_host_loop_mmio_read(std::uint32_t address);
+int anyps1_host_loop_mmio_write(
+    std::uint32_t address,
+    std::uint32_t value);
+int anyps1_host_loop_tick(std::uint32_t cycles);
 int anyps1_host_loop_memory_card_open(
     int slot,
     const char* path);
