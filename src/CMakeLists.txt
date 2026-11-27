@@ -17,6 +17,7 @@ add_custom_target(generate_mips_opcode_registry
     DEPENDS ${MIPS_OPCODE_REGISTRY_HEADER})
 
 add_library(anyps1_executable
+    executable/ElfWriter.cpp
     executable/PeWriter.cpp
 )
 

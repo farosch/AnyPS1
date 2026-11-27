@@ -88,7 +88,7 @@
     {
       "name":"Executable writers",
       "items":[
-        {"name":"Linux ELF","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["MipsLinuxLowerer::lower"]},{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["gcc -nostdlib"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native ELF"]},{"path":"tests/RelinkerTest.cpp","patterns":["native_elF"]}]},
+        {"name":"Linux ELF","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["MipsLinuxLowerer::lower"]},{"path":"src/executable/ElfWriter.cpp","patterns":["ElfWriter::write"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native ELF"]},{"path":"tests/RelinkerTest.cpp","patterns":["native_elF"]}]},
         {"name":"Windows PE","source_patterns":[{"path":"src/executable/PeWriter.cpp","patterns":["write_pe_layout"]},{"path":"src/lowering/MipsWindowsLowerer.cpp","patterns":["MipsWindowsLowerer::lower"]}]},
         {"name":"Native diagnostics","source_patterns":[{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["native executable diagnostics"]},{"path":"src/lowering/MipsLinuxLowerer.cpp","patterns":["unsupported_instructions"]},{"path":"src/lowering/MipsWindowsLowerer.cpp","patterns":["native executable diagnostics"]}],"test_patterns":[{"path":"tests/RelinkerTest.cpp","patterns":["native"]}]}
       ]

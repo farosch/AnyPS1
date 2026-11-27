@@ -85,6 +85,8 @@
 - [x] Keep native executable permissions on generated Linux artifacts.
 - [x] Eliminate shell-string linker invocation and use a repository-owned
   argument-safe toolchain API.
+- [x] Separate Linux ELF linking and ELF64 validation into `ElfWriter` under
+  `src/executable/`, mirroring `PeWriter`.
 - [x] Remove all legacy assembly lowering and fixed-block code duplication.
 - [x] Gate ELF32, ARM64, and other architecture targets behind native lowering
   backends; unsupported architectures fail explicitly instead of relinking.
