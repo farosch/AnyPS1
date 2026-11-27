@@ -87,7 +87,7 @@ NativeFileRuntime::~NativeFileRuntime()
 #ifdef _WIN32
         _close(entry.second);
 #else
-        close(entry.second);
+        ::close(entry.second);
 #endif
     }
     delete impl_;
@@ -195,7 +195,7 @@ bool NativeFileRuntime::close(int handle, std::string& error)
 #ifdef _WIN32
     const int result = _close(entry->second);
 #else
-    const int result = close(entry->second);
+    const int result = ::close(entry->second);
 #endif
     impl_->descriptors.erase(entry);
     if (result != 0) {

@@ -81,17 +81,17 @@
 - [x] Exit at unsupported instructions with a dedicated native status and
   first-gap diagnostic.
 - [x] Keep native executable permissions on generated Linux artifacts.
-- [ ] Remove all legacy assembly lowering and fixed-block code duplication.
 - [x] Eliminate shell-string linker invocation and use a repository-owned
   argument-safe toolchain API.
+- [x] Remove all legacy assembly lowering and fixed-block code duplication.
 - [ ] Add ELF32, ARM64, and other architecture targets only after their native
   lowering backends exist.
 - [ ] Add PIE/ASLR support only if it is compatible with preserved PS1 addresses.
-- [ ] Verify generated ELF program-header permissions and file offsets for
+- [x] Verify generated ELF program-header permissions and file offsets for
   text, rodata, bss, payload, and symbol tables.
-- [ ] Verify generated ELF artifacts with `readelf`, `file`, a linker validator,
+- [x] Verify generated ELF artifacts with `readelf`, `file`, a linker validator,
   and direct launch in every supported Linux build environment.
-- [ ] Emit host-native sections only; reject or exclude PS1 payload bytes from
+- [x] Emit host-native sections only; reject or exclude PS1 payload bytes from
   executable state that are not referenced by lowered native code.
 
 ## Memory and address lowering
