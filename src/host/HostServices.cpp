@@ -1,4 +1,5 @@
 #include "host/HostServices.h"
+#include "gpu/Graphics.h"
 
 #include <SDL3/SDL.h>
 
@@ -439,6 +440,11 @@ struct NativeHostLoopRuntime::Impl {
     SdlInputRuntime input;
     MemoryCardRuntime memory_card;
     DiscImageRuntime disc;
+    VulkanSwapchainRuntime vulkan;
+    std::map<std::uint32_t, std::uint32_t> spu_registers;
+    std::vector<std::int16_t> spu_output;
+    std::vector<std::uint32_t> gpu_vram;
+    Ps1InputState input_state;
     bool initialized = false;
 };
 
@@ -473,6 +479,7 @@ bool NativeHostLoopRuntime::initialize(
         impl_->host.shutdown();
         return false;
     }
+    impl_->gpu_vram.assign(1024u * 512u, 0u);
     impl_->initialized = true;
     error.clear();
     return true;
@@ -489,7 +496,9 @@ bool NativeHostLoopRuntime::poll(Ps1InputState& input, std::string& error)
         error.clear();
         return true;
     }
-    return impl_->input.poll(input, error);
+    if (!impl_->input.poll(input, error)) return false;
+    impl_->input_state = input;
+    return true;
 }
 
 bool NativeHostLoopRuntime::present_framebuffer(
@@ -583,9 +592,70 @@ std::string NativeHostLoopRuntime::structured_exit_log(
     return host_exit_log(code);
 }
 
+std::uint32_t NativeHostLoopRuntime::controller_state() const
+{
+    return impl_->initialized
+        ? static_cast<std::uint32_t>(impl_->input_state.buttons)
+        : 0xFFFFu;
+}
+
+int NativeHostLoopRuntime::spu_write(
+    std::uint32_t address,
+    std::uint32_t value)
+{
+    impl_->spu_registers[address & 0x1FFFu] = value;
+    if (address >= 0x1F801C00u && address < 0x1F801D80u) {
+        impl_->spu_output.assign(512u, 0);
+        std::string error;
+        if (!impl_->host.queue_audio(
+                impl_->spu_output.data(),
+                impl_->spu_output.size(),
+                error)) {
+            return 18;
+        }
+        return 0;
+    }
+    return 17;
+}
+
+std::uint32_t NativeHostLoopRuntime::spu_read(std::uint32_t address) const
+{
+    const auto found = impl_->spu_registers.find(address & 0x1FFFu);
+    return found == impl_->spu_registers.end() ? 0u : found->second;
+}
+
+int NativeHostLoopRuntime::gpu_write(
+    std::uint32_t address,
+    std::uint32_t value)
+{
+    if (address == 0x1F801810u) {
+        if (!impl_->gpu_vram.empty()) impl_->gpu_vram[0] = value;
+    } else if (address == 0x1F801814u) {
+        if (!impl_->gpu_vram.empty()) impl_->gpu_vram[1] = value;
+    } else {
+        return 17;
+    }
+    return 0;
+}
+
+int NativeHostLoopRuntime::vulkan_init(
+    const std::string& title,
+    std::uint32_t width,
+    std::uint32_t height,
+    std::string& error)
+{
+    return impl_->vulkan.initialize(title, width, height, error) ? 0 : 18;
+}
+
+int NativeHostLoopRuntime::vulkan_present(std::string& error)
+{
+    return impl_->vulkan.present(error) ? 0 : 18;
+}
+
 void NativeHostLoopRuntime::shutdown()
 {
     if (impl_ == nullptr) return;
+    impl_->vulkan.shutdown();
     impl_->input.shutdown();
     impl_->host.shutdown();
     impl_->initialized = false;
@@ -807,6 +877,69 @@ int anyps1_host_loop_present(
         return 18;
     }
     return 0;
+}
+
+std::uint32_t anyps1_host_loop_controller_state()
+{
+    if (anyps1_native_host_loop == nullptr) return 0xFFFFu;
+    return anyps1_native_host_loop->controller_state();
+}
+
+int anyps1_host_loop_spu_write(
+    std::uint32_t address,
+    std::uint32_t value)
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    return anyps1_native_host_loop->spu_write(address, value);
+}
+
+std::uint32_t anyps1_host_loop_spu_read(std::uint32_t address)
+{
+    if (anyps1_native_host_loop == nullptr) return 0u;
+    return anyps1_native_host_loop->spu_read(address);
+}
+
+int anyps1_host_loop_audio_queue(
+    const std::int16_t* samples,
+    std::size_t sample_count)
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    std::string error;
+    return anyps1_native_host_loop->queue_audio(
+        samples,
+        sample_count,
+        error) ? 0 : 18;
+}
+
+int anyps1_host_loop_gpu_write(
+    std::uint32_t address,
+    std::uint32_t value)
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    return anyps1_native_host_loop->gpu_write(address, value);
+}
+
+int anyps1_host_loop_vulkan_init(
+    const char* title,
+    std::uint32_t width,
+    std::uint32_t height)
+{
+    if (anyps1_native_host_loop == nullptr) {
+        anyps1_native_host_loop = new anyps1::NativeHostLoopRuntime();
+    }
+    std::string error;
+    return anyps1_native_host_loop->vulkan_init(
+        title == nullptr ? "AnyPS1" : title,
+        width,
+        height,
+        error);
+}
+
+int anyps1_host_loop_vulkan_present()
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    std::string error;
+    return anyps1_native_host_loop->vulkan_present(error);
 }
 
 void anyps1_host_loop_shutdown()

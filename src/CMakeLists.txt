@@ -86,6 +86,7 @@ target_link_libraries(anyps1_input PUBLIC SDL3::SDL3)
 target_link_libraries(anyps1_lowering PUBLIC anyps1_memory)
 target_link_libraries(anyps1_host PUBLIC SDL3::SDL3)
 target_link_libraries(anyps1_host PUBLIC anyps1_input)
+target_link_libraries(anyps1_host PUBLIC anyps1_gpu)
 target_include_directories(anyps1_gpu PUBLIC
     ${CMAKE_SOURCE_DIR}/3rdparty/Vulkan-Headers/include)
 target_link_libraries(anyps1_gpu PUBLIC SDL3::SDL3)

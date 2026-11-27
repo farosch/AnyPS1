@@ -118,8 +118,8 @@ class MipsOpcodeRegistryTest(unittest.TestCase):
                 }
             }
             report = inventory.inventory(path, previous)
-        self.assertEqual(report["resolved_families"], ["cop1"])
-        self.assertEqual(report["remaining_unsupported_families"], {"sdc2": 1})
+        self.assertEqual(report["resolved_families"], ["cop1", "sdc2"])
+        self.assertEqual(report["remaining_unsupported_families"], {})
 
 
 if __name__ == "__main__":

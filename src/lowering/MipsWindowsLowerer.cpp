@@ -190,10 +190,17 @@ void emit_string(std::ofstream& source,
 {
     source << label << " db ";
     bool first = true;
+    std::size_t characters_in_line = 0;
     for (unsigned char character : value) {
+        if (characters_in_line == 32) {
+            source << "\n db ";
+            characters_in_line = 0;
+            first = true;
+        }
         if (!first) source << ',';
         source << static_cast<unsigned int>(character);
         first = false;
+        ++characters_in_line;
     }
     if (!first) source << ',';
     source << "0\n";
@@ -583,8 +590,6 @@ void MipsWindowsLowerer::lower(
 
     if (unsupported_count != 0) {
         source << "mov ecx,16\n";
-    } else if (opcode == 0x2F) {
-        source << "nop\n";
     } else {
         source << "mov ecx,0\n";
     }

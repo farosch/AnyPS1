@@ -99,6 +99,18 @@ int main()
         if (!console.implemented || !file.implemented || !host_input.implemented) {
             throw std::runtime_error("required host mapping is not implemented");
         }
+        if (anyps1::anyps1_host_loop_controller_state() != 0xFFFFu) {
+            throw std::runtime_error("uninitialized controller state is invalid");
+        }
+        if (anyps1::anyps1_host_loop_spu_read(0x1F801C00u) != 0u) {
+            throw std::runtime_error("uninitialized SPU state is invalid");
+        }
+        if (anyps1::anyps1_host_loop_spu_write(0x1F801C00u, 0x1234u) != 18) {
+            throw std::runtime_error("uninitialized SPU write did not report host runtime error");
+        }
+        if (anyps1::anyps1_host_loop_gpu_write(0x1F801810u, 0u) != 18) {
+            throw std::runtime_error("uninitialized GPU write did not report host runtime error");
+        }
         const anyps1::HostServiceMapping audio =
             anyps1::map_host_service(anyps1::HostServiceKind::Audio);
         const anyps1::HostServiceMapping video =

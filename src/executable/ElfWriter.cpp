@@ -129,8 +129,10 @@ void ElfWriter::validate(const std::filesystem::path& path)
     }
 
     const auto read16 = [&](std::size_t offset) {
-        return static_cast<std::uint16_t>(header[offset])
-            | (static_cast<std::uint16_t>(header[offset + 1]) << 8);
+        return static_cast<std::uint16_t>(
+            static_cast<std::uint16_t>(header[offset])
+            | static_cast<std::uint16_t>(
+                  static_cast<std::uint16_t>(header[offset + 1]) << 8));
     };
     const auto read64 = [&](std::size_t offset) {
         std::uint64_t value = 0;

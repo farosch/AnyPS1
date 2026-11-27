@@ -218,6 +218,16 @@ public:
         std::string& error);
     void close_disc();
     std::string structured_exit_log(HostExitCode code) const;
+    std::uint32_t controller_state() const;
+    int spu_write(std::uint32_t address, std::uint32_t value);
+    std::uint32_t spu_read(std::uint32_t address) const;
+    int gpu_write(std::uint32_t address, std::uint32_t value);
+    int vulkan_init(
+        const std::string& title,
+        std::uint32_t width,
+        std::uint32_t height,
+        std::string& error);
+    int vulkan_present(std::string& error);
     void shutdown();
 
 private:
@@ -232,6 +242,22 @@ int anyps1_host_loop_present(
     const std::uint32_t* pixels,
     std::uint32_t width,
     std::uint32_t height);
+std::uint32_t anyps1_host_loop_controller_state();
+int anyps1_host_loop_spu_write(
+    std::uint32_t address,
+    std::uint32_t value);
+std::uint32_t anyps1_host_loop_spu_read(std::uint32_t address);
+int anyps1_host_loop_audio_queue(
+    const std::int16_t* samples,
+    std::size_t sample_count);
+int anyps1_host_loop_gpu_write(
+    std::uint32_t address,
+    std::uint32_t value);
+int anyps1_host_loop_vulkan_init(
+    const char* title,
+    std::uint32_t width,
+    std::uint32_t height);
+int anyps1_host_loop_vulkan_present();
 void anyps1_host_loop_shutdown();
 }
 

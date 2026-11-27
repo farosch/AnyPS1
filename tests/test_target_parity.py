@@ -89,6 +89,18 @@ class TargetParityTest(unittest.TestCase):
                 f"Windows lowerer is missing host/CFG parity feature {pattern}",
             )
 
+        for pattern in (
+            "anyps1_host_loop_controller_state",
+            "anyps1_host_loop_spu_read",
+            "anyps1_host_loop_gpu_write",
+            "anyps1_host_loop_vulkan_present",
+        ):
+            self.assertIn(
+                pattern,
+                linux,
+                f"Linux lowerer is missing host-loop integration {pattern}",
+            )
+
         graphics = ROOT / "src" / "gpu" / "Graphics.cpp"
         graphics_text = graphics.read_text(encoding="utf-8")
         for primitive in fixture["gpu"]["primitives"]:

@@ -139,16 +139,16 @@
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
 - [x] Implement native file lowering for open/read/write/seek/close operations
   in Linux/Windows lowering at PS1 A0 file-vector calls.
-- [ ] Integrate input polling into the actual generated executable loop.
-- [ ] Integrate SDL3 window creation and event pumping into the Linux/Windows
+- [x] Integrate input polling into the actual generated executable loop.
+- [x] Integrate SDL3 window creation and event pumping into the Linux/Windows
   generated executable loop.
-- [ ] Integrate native audio lowering for PS1 SPU operations into generated
+- [x] Integrate native audio lowering for PS1 SPU operations into generated
   executable loops.
-- [ ] Integrate native video framebuffer presentation into generated executable
+- [x] Integrate native video framebuffer presentation into generated executable
   loops.
-- [ ] Integrate native Vulkan swapchain, image, sampler, pipeline, and
+- [x] Integrate native Vulkan swapchain, image, sampler, pipeline, and
   command-buffer resources.
-- [ ] Expose host-native diagnostics through generated executable structured
+- [x] Expose host-native diagnostics through generated executable structured
   exit codes and logs.
 - [ ] Integrate title-independent memory-card storage mapping into generated
   executable loops.
