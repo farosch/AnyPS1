@@ -25,6 +25,7 @@ namespace anyps1 {
 
 namespace {
 
+#ifdef _WIN32
 std::uint32_t resolve_static_indirect_target(
     const std::vector<unsigned char>& data,
     std::uint32_t load_address,
@@ -65,6 +66,8 @@ std::uint32_t resolve_static_indirect_target(
     }
     return initialized ? value : 0;
 }
+
+#endif
 
 #ifdef _WIN32
 std::filesystem::path find_windows_tool(const char* name)

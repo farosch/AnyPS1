@@ -6,6 +6,10 @@
   and `MipsWindowsLowerer` classes behind a shared `MipsLowerer` interface.
 - [ ] Replace partial Linux lowering with complete native lowering for every
   statically reachable PS-X instruction and host operation.
+- [x] Lower COP3 register transfers and COP0/COP3 coprocessor load/store
+  families directly, including LWC0/LWC3/SWC0/SWC3 and SDC2.
+- [x] Route PS1 RAM-adjacent MMIO loads/stores through a generic native
+  `mmio_state` mapping with explicit out-of-range faults.
 - [x] Remove legacy fixed-block Linux lowering paths; route Linux relinking
   exclusively through `MipsLinuxLowerer::lower`.
 - [x] Improve CFG discovery beyond static leaders. Resolve JALR targets when

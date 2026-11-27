@@ -298,6 +298,8 @@ void MipsLinuxLowerer::lower(
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
     source << "cop0:\n.skip 128\n";
+    source << "cop3_data:\n.skip 128\n";
+    source << "mmio_state:\n.skip 8192\n";
     source << "gte_data:\n.skip 128\ngte_ctrl:\n.skip 128\n";
     source << "fregs:\n.skip 256\nfpcsr:\n.skip 4\n";
     source << ".section .rodata\n";
@@ -778,7 +780,22 @@ void MipsLinuxLowerer::lower(
                 emit_unsupported_stub(instruction);
             }
         } else if (opcode == 0x13) {
-            emit_unsupported_stub(instruction);
+            const std::uint32_t cop3_register = rd;
+            if (rs == 0) {
+                source << "movl cop3_data+" << cop3_register * 4 << "(%rip), %eax\n";
+                source << "movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (rs == 2) {
+                source << "movl cop3_data+" << cop3_register * 4 << "(%rip), %eax\n";
+                source << "movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (rs == 4) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n";
+                source << "movl %eax, cop3_data+" << cop3_register * 4 << "(%rip)\n";
+            } else if (rs == 6) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n";
+                source << "movl %eax, cop3_data+" << cop3_register * 4 << "(%rip)\n";
+            } else {
+                emit_unsupported_stub(instruction);
+            }
         } else if (opcode == 0x0F) {
             source << "movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x08) {
@@ -821,10 +838,23 @@ void MipsLinuxLowerer::lower(
             source << "cmpl $0x1F800000, %ecx\n";
             source << "jb ram_load_" << std::hex << address << std::dec << "\n";
             source << "cmpl $0x1F800400, %ecx\n";
-            source << "jae mmio_exit\n";
+            source << "jae mmio_load_" << std::hex << address << std::dec << "\n";
             source << "subl $0x1F800000, %ecx\n";
             source << "leaq scratchpad(%rip), %rbx\n";
             source << "jmp scratch_load_" << std::hex << address << std::dec << "\n";
+            source << "mmio_load_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x1F802000, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "leaq mmio_state(%rip), %rbx\n";
+            source << "andl $0x1FFF, %ecx\n";
+            if (opcode == 0x20) source << "movsbl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x21) source << "movswl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x23) source << "movl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x24) source << "movzbl (%rbx,%rcx), %edx\n";
+            else source << "movzwl (%rbx,%rcx), %edx\n";
+            source << "movl %edx, " << rt * 4 << "(%r12)\n";
+            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "ram_load_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x200000, %ecx\n";
             source << "jae memory_fault_exit\n";
@@ -836,6 +866,7 @@ void MipsLinuxLowerer::lower(
             else if (opcode == 0x24) source << "movzbl (%rbx,%rcx), %edx\n";
             else source << "movzwl (%rbx,%rcx), %edx\n";
             source << "movl %edx, " << rt * 4 << "(%r12)\n";
+            source << "mmio_load_done_" << std::hex << address << std::dec << ": \n";
         } else if (opcode == 0x28 || opcode == 0x29 || opcode == 0x2B) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
@@ -844,10 +875,22 @@ void MipsLinuxLowerer::lower(
             source << "cmpl $0x1F800000, %ecx\n";
             source << "jb ram_store_" << std::hex << address << std::dec << "\n";
             source << "cmpl $0x1F800400, %ecx\n";
-            source << "jae mmio_exit\n";
+            source << "jae mmio_store_" << std::hex << address << std::dec << "\n";
             source << "subl $0x1F800000, %ecx\n";
             source << "leaq scratchpad(%rip), %rbx\n";
             source << "jmp scratch_store_" << std::hex << address << std::dec << "\n";
+            source << "mmio_store_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x1F802000, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "leaq mmio_state(%rip), %rbx\n";
+            source << "andl $0x1FFF, %ecx\n";
+            source << "movl " << rt * 4 << "(%r12), %edx\n";
+            if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
+            else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
+            else source << "movl %edx, (%rbx,%rcx)\n";
+            source << "mmio_store_done_" << std::hex << address << std::dec << ": \n";
+            source << "jmp mmio_store_done_" << std::hex << address << std::dec << "\n";
             source << "ram_store_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x200000, %ecx\n";
             source << "jae memory_fault_exit\n";
@@ -904,6 +947,33 @@ void MipsLinuxLowerer::lower(
             } else {
                 source << "movss fregs+" << rt * 4 << "(%rip), %xmm0\n";
                 source << "movss %xmm0, (%rbx,%rcx)\n";
+            }
+        } else if (opcode == 0x30 || opcode == 0x33 ||
+                   opcode == 0x38 || opcode == 0x3B ||
+                   opcode == 0x3E) {
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
+            source << "andl $0x1FFFFFFF, %eax\n";
+            source << "leaq ram(%rip), %rbx\n";
+            source << "cmpl $0x200000, %eax\n";
+            source << "jae mmio_exit\n";
+            if (opcode == 0x30) {
+                source << "movl (%rbx,%rax), %eax\n";
+                source << "movl %eax, cop0+" << rt * 4 << "(%rip)\n";
+            } else if (opcode == 0x33) {
+                source << "movl (%rbx,%rax), %eax\n";
+                source << "movl %eax, cop3_data+" << rt * 4 << "(%rip)\n";
+            } else if (opcode == 0x38) {
+                source << "movl cop0+" << rt * 4 << "(%rip), %edx\n";
+                source << "movl %edx, (%rbx,%rax)\n";
+            } else if (opcode == 0x3B) {
+                source << "movl cop3_data+" << rt * 4 << "(%rip), %edx\n";
+                source << "movl %edx, (%rbx,%rax)\n";
+            } else {
+                source << "movl gte_data+" << rt * 4 << "(%rip), %edx\n";
+                source << "movl %edx, (%rbx,%rax)\n";
+                source << "movl gte_data+" << ((rt + 1u) & 31u) * 4 << "(%rip), %edx\n";
+                source << "movl %edx, 4(%rbx,%rax)\n";
             }
         } else if (opcode == 0x22 || opcode == 0x26) {
             // Little-endian PS1 LWL/LWR: merge a word-aligned load

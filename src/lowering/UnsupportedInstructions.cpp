@@ -126,6 +126,9 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
             return false;
         }
     }
+    if (opcode == 0x13) {
+        return true;
+    }
     if (opcode == 0x10) {
         return rs == 0x00 || rs == 0x02 || rs == 0x04 ||
                rs == 0x06 || (rs == 0x10 && special == 0x10);
@@ -157,7 +160,8 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
     case 0x21: case 0x22: case 0x23: case 0x24:
     case 0x25: case 0x26: case 0x28: case 0x29:
     case 0x2A: case 0x2B: case 0x2E: case 0x2F: case 0x31:
-    case 0x32: case 0x39: case 0x3A:
+    case 0x30: case 0x32: case 0x33: case 0x38:
+    case 0x39: case 0x3A: case 0x3B: case 0x3E:
         return true;
     default:
         return false;

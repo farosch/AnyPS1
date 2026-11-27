@@ -32,7 +32,6 @@ std::string host_exit_log(HostExitCode code)
     case HostExitCode::HostRuntimeError:
         return "host_exit=18 host_runtime_error";
     }
-
     return "host_exit=18 host_runtime_error";
 }
 

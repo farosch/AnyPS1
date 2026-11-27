@@ -1,6 +1,7 @@
 #include "lowering/UnsupportedInstructions.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <iostream>
 #include <stdexcept>
 
@@ -75,6 +76,27 @@ int main()
             !anyps1::is_supported_mips_instruction(0xE8200000u)) {
             throw std::runtime_error(
                 "COP2 load/store instruction was classified as unsupported");
+        }
+        const std::uint32_t cop3_load_store_words[] = {
+            0x4C000000u,
+            0x4C000000u,
+            0xC0000000u,
+            0xCC000000u,
+            0xE0000000u,
+            0xEC000000u,
+            0xF8000000u,
+            0xE0000000u,
+        };
+        for (const std::uint32_t word : cop3_load_store_words) {
+            if (!anyps1::is_supported_mips_instruction(word)) {
+                throw std::runtime_error(
+                    "COP3/coprocessor operation was classified as unsupported: 0x" +
+                    [] (std::uint32_t value) {
+                        char buffer[9];
+                        std::snprintf(buffer, sizeof(buffer), "%08X", value);
+                        return std::string(buffer);
+                    }(word));
+            }
         }
 
         const anyps1::UnsupportedInstruction lwc1 =
