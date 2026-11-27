@@ -26,8 +26,6 @@
 
 ## MIPS and COP lowering
 
-### Implemented
-
 - [x] Add direct native lowering for NOP and the arithmetic/control subset.
 - [x] Lower fixed and variable shifts.
 - [x] Lower MIPS I arithmetic, logical, compare, immediate, branch, and jump
@@ -49,8 +47,6 @@
 - [x] Inventory unsupported instruction words and families across executable
   payloads.
 
-### Remaining
-
 - [x] Add native COP1 MFC1/MTC1/CFC1/CTC1, add/sub/mul/div/sqrt, Cvt.S.W,
   Cvt.W.S, C.EQ/LT/LE, BC1 branches, and checked LWC1/SWC1 memory paths.
 - [x] Add remaining COP1 conversions/comparison variants and exhaustive
@@ -70,8 +66,6 @@
 
 ## Linux executable conversion
 
-### Implemented
-
 - [x] Add an explicit `--target linux|windows` parameter.
 - [x] Generate ELF64 x86-64 executables with a native `_start` entrypoint.
 - [x] Emit valid ELF entry, program-header, section-header, text, rodata,
@@ -89,8 +83,6 @@
   first-gap diagnostic.
 - [x] Keep native executable permissions on generated Linux artifacts.
 
-### Remaining
-
 - [ ] Remove all legacy assembly lowering and fixed-block code duplication.
 - [x] Eliminate shell-string linker invocation and use a repository-owned
   argument-safe toolchain API.
@@ -106,8 +98,6 @@
 
 ## Memory and address lowering
 
-### Implemented
-
 - [x] Map 2 MiB PS1 RAM and 1 KiB scratchpad into native memory.
 - [x] Normalize 32-bit PS1 addresses to host RAM/scratchpad offsets.
 - [x] Preserve 8/16/32-bit load/store behavior and signed/unsigned extensions.
@@ -115,8 +105,6 @@
 - [x] Route out-of-range and MMIO accesses to explicit fault/unsupported exits.
 - [x] Preserve executable payload bytes for native payload copying.
 - [x] Remove title-specific, BIOS-dependent, and virtualized-memory behavior.
-
-### Remaining
 
 - [x] Implement page/range validation for executable sections and RAM boundaries.
 - [x] Add executable-section protection and separate code/data/rodata mappings.
@@ -131,8 +119,6 @@
 
 ## Host integration
 
-### Implemented
-
 - [x] Replace BIOS-vector assumptions with native host services or explicit
   unsupported results.
 - [x] Add native Linux console write and process exit handling.
@@ -142,8 +128,6 @@
 - [x] Add `anyps1-input.ini` parsing and default bindings.
 - [x] Add host mapping and input integration fixtures.
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
-
-### Remaining
 
 - [x] Implement native file lowering for open/read/write/seek/close operations.
 - [x] Integrate input polling into the actual generated executable loop.
@@ -161,8 +145,6 @@
 
 ## Windows executable conversion
 
-### Implemented
-
 - [x] Generate PE32+ layout for AMD64 with DOS and PE signatures.
 - [x] Add COFF headers, optional headers, text/rdata sections, entrypoint,
   imports, relocations, architecture fields, and host diagnostics.
@@ -170,8 +152,6 @@
   fixture validation.
 - [x] Add `objdump`/`llvm-readobj` format-inspector support.
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
-
-### Remaining
 
 - [ ] Implement native Windows MIPS lowering equivalent to Linux lowering.
 - [ ] Generate imports and relocations for real Windows host-native code.
@@ -184,8 +164,6 @@
 
 ## PS1 GPU lowering and Vulkan shaders
 
-### Implemented
-
 - [x] Define a generic GP0/GP1 and VRAM graphics IR.
 - [x] Lower GP0/GP1 state changes into Vulkan resource plans.
 - [x] Emit direct SPIR-V shader modules for polygon, textured-polygon, sprite,
@@ -194,8 +172,6 @@
 - [x] Add Vulkan/Linux and Vulkan/Windows platform enums without CUDA/NVIDIA
   dependencies.
 - [x] Preserve unsupported GPU commands as explicit conversion failures.
-
-### Remaining
 
 - [ ] Model GP0/GP1 command payloads completely, including VRAM transfers,
   draw areas, texture windows, display areas, display modes, DMA direction,
@@ -214,8 +190,6 @@
 
 ## Unsupported instruction tracking
 
-### Implemented
-
 - [x] Add a C++ unsupported-instruction classifier for SPECIAL, COP0/COP1/COP2/
   COP3, coprocessor load/store, and reserved opcodes.
 - [x] Add exact GTE/COP2 function names for known operations.
@@ -225,8 +199,6 @@
 - [x] Add a JSON inventory tool for exact instruction words, addresses, and
   family counts.
 - [x] Add fixture tests for COP1/COP2/COP3 and reserved-opcode classification.
-
-### Remaining
 
 - [x] Replace separate Python and C++ opcode-name tables with one generated or
   shared canonical opcode registry.
@@ -240,8 +212,6 @@
 
 ## Validation and quality
 
-### Implemented
-
 - [x] Add checked-in JSON executable fixtures for arithmetic, loads/stores,
   branches, calls, delay slots, entrypoints, memory, host integration, and
   unsupported paths.
@@ -251,8 +221,6 @@
   tests.
 - [x] Add an opt-in generic reference-executable inventory/report tool.
 - [x] Add CMake, CTest, layout, fixture, build, and format validation targets.
-
-### Remaining
 
 - [x] Relink available reference executables and record first reachable
   unsupported gaps in build artifacts, never in title-specific test code.
