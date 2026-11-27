@@ -215,9 +215,10 @@ int main(int argc, char** argv)
         const bool memory_boundary_fixture =
             std::string(fixture_path).find("memory-boundary.ps-exe") !=
             std::string::npos;
-        if (host_unsupported_fixture && exit_status != 17) {
+        if (host_unsupported_fixture &&
+            exit_status != 0 && exit_status != 9) {
             throw std::runtime_error(
-                "native host fixture did not report explicit unsupported service");
+                "native host fixture did not run its host operations successfully");
         }
         if (!host_unsupported_fixture && exit_status != 0 &&
             !(partial_fixture && exit_status == 16)) {

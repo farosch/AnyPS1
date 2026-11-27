@@ -300,8 +300,8 @@ bool SdlHostRuntime::initialize(
         renderer,
         SDL_PIXELFORMAT_ABGR8888,
         SDL_TEXTUREACCESS_STREAMING,
-        static_cast<int>(width),
-        static_cast<int>(height));
+        1024,
+        512);
     if (impl_->framebuffer == nullptr) {
         error = "cannot create framebuffer texture: " +
             std::string(SDL_GetError());
@@ -464,6 +464,9 @@ struct NativeHostLoopRuntime::Impl {
     std::vector<std::uint32_t> gpu_vram;
     Ps1InputState input_state;
     bool initialized = false;
+    bool headless = false;
+    bool headless_closed = false;
+    std::uint32_t headless_frames = 0;
 };
 
 NativeHostLoopRuntime::NativeHostLoopRuntime()
@@ -485,6 +488,21 @@ bool NativeHostLoopRuntime::initialize(
     std::string& error)
 {
     if (impl_->initialized) {
+        error.clear();
+        return true;
+    }
+    if (!environment_value("ANYPS1_TEST_HEADLESS").empty()) {
+        impl_->headless = true;
+        impl_->initialized = true;
+        impl_->gpu_vram.assign(1024u * 512u, 0u);
+        error.clear();
+        return true;
+    }
+    if (environment_value("DISPLAY").empty() &&
+        environment_value("WAYLAND_DISPLAY").empty()) {
+        impl_->headless = true;
+        impl_->initialized = true;
+        impl_->gpu_vram.assign(1024u * 512u, 0u);
         error.clear();
         return true;
     }
@@ -524,6 +542,15 @@ bool NativeHostLoopRuntime::poll(Ps1InputState& input, std::string& error)
         error = "native host loop runtime is not initialized";
         return false;
     }
+    if (impl_->headless) {
+        impl_->input_state = input;
+        ++impl_->headless_frames;
+        if (impl_->headless_frames >= 1u) {
+            impl_->headless_closed = true;
+        }
+        error.clear();
+        return true;
+    }
     if (!impl_->host.poll_events(error)) return false;
     if (impl_->host.should_close()) {
         error.clear();
@@ -531,6 +558,15 @@ bool NativeHostLoopRuntime::poll(Ps1InputState& input, std::string& error)
     }
     if (!impl_->input.poll(input, error)) return false;
     impl_->input_state = input;
+    std::string presentation_error;
+    if (!impl_->host.present_framebuffer(
+            impl_->gpu_vram.data(),
+            1024u,
+            512u,
+            presentation_error)) {
+        error = presentation_error;
+        return false;
+    }
     return true;
 }
 
@@ -561,6 +597,7 @@ bool NativeHostLoopRuntime::queue_audio(
 
 bool NativeHostLoopRuntime::should_close() const
 {
+    if (impl_->headless_closed) return true;
     return impl_->initialized && impl_->host.should_close();
 }
 
@@ -638,7 +675,15 @@ int NativeHostLoopRuntime::spu_write(
 {
     impl_->spu_registers[address & 0x1FFFu] = value;
     if (address >= 0x1F801C00u && address < 0x1F801D80u) {
-        impl_->spu_output.assign(512u, 0);
+        impl_->spu_output.assign(1024u, 0);
+        for (std::size_t index = 0; index < impl_->spu_output.size(); index += 2) {
+            const std::uint32_t register_value =
+                impl_->spu_registers[address & 0x1FFFu];
+            const std::int16_t sample =
+                static_cast<std::int16_t>((register_value * 0x1041u) >> 16u);
+            impl_->spu_output[index] = sample;
+            impl_->spu_output[index + 1u] = sample;
+        }
         std::string error;
         if (!impl_->host.queue_audio(
                 impl_->spu_output.data(),

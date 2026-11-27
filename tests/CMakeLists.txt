@@ -45,6 +45,26 @@ add_test(NAME relinker_native_comprehensive COMMAND anyps1_relinker_test ${FIXTU
 add_test(NAME relinker_native_partial COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-unsupported.ps-exe)
 add_test(NAME relinker_invalid_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/invalid.ps-exe)
 add_test(NAME relinker_truncated_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/truncated.ps-exe)
+set_tests_properties(
+    relinker_artifact
+    relinker_native_subset
+    relinker_native_memory
+    relinker_native_host_integration
+    relinker_native_bios_vector
+    relinker_native_load_delay
+    relinker_zero_register
+    relinker_taken_delay_slot
+    relinker_memory_boundary
+    relinker_platform_parity
+    relinker_native_cfg_cop0
+    relinker_native_unaligned
+    relinker_native_comprehensive
+    relinker_native_partial
+    relinker_invalid_fixture
+    relinker_truncated_fixture
+    PROPERTIES
+        ENVIRONMENT "ANYPS1_TEST_HEADLESS=1"
+        TIMEOUT 15)
 
 find_program(SPIRV_VAL_EXECUTABLE NAMES spirv-val)
 find_program(SPIRV_OPT_EXECUTABLE NAMES spirv-opt)

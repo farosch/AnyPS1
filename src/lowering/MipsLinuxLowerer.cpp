@@ -72,6 +72,7 @@ void MipsLinuxLowerer::lower(
     std::uint32_t call_edges = 0;
     std::uint32_t unresolved_indirect_transfers = 0;
     std::set<std::string> unsupported_family_names;
+    bool native_host_loop_required = false;
     leaders.insert(initial_pc);
     work.push(initial_pc);
     while (!work.empty()) {
@@ -86,6 +87,14 @@ void MipsLinuxLowerer::lower(
         if (offset + 4 > file_size) continue;
         const std::uint32_t instruction = read_psx32(data, 2048 + offset);
         const std::uint32_t opcode = instruction >> 26;
+        if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 ||
+            opcode == 0x24 || opcode == 0x25 || opcode == 0x28 ||
+            opcode == 0x29 || opcode == 0x2B || opcode == 0x30 ||
+            opcode == 0x31 || opcode == 0x32 || opcode == 0x33 ||
+            opcode == 0x35 || opcode == 0x36 || opcode == 0x38 ||
+            opcode == 0x39 || opcode == 0x3A || opcode == 0x3B) {
+            native_host_loop_required = true;
+        }
         const std::uint32_t rs = (instruction >> 21) & 31u;
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
@@ -267,6 +276,7 @@ void MipsLinuxLowerer::lower(
     source << "pending_load_value:\n.skip 4\n";
     source << "previous_load_valid:\n.skip 1\nprevious_load_register:\n.skip 1\n";
     source << "previous_load_value:\n.skip 4\n";
+    source << "host_frame_counter:\n.skip 4\n";
     source << ".section .rodata\n";
     source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
     source << "diag_target:.asciz \"" << escape_assembly_string(target) << "\"\n";
@@ -322,6 +332,13 @@ void MipsLinuxLowerer::lower(
     source << "movl $0, 0(%r12)\n";
     source << "movl $0x" << std::hex << initial_sp << std::dec << ", 116(%r12)\n";
     source << "movl $0x" << std::hex << initial_gp << std::dec << ", 112(%r12)\n";
+    if (native_host_loop_required) {
+        source << "leaq diag_host_title(%rip), %rdi\n";
+        source << "call anyps1_host_loop_init\n";
+        source << "testl %eax, %eax\n";
+        source << "jne host_runtime_exit\n";
+        source << "movl $0, host_frame_counter(%rip)\n";
+    }
     source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
     source << ".section .rodata\npayload:\n.incbin \"" << payload.string() << "\"\n";
     source << ".text\n";
@@ -338,6 +355,12 @@ void MipsLinuxLowerer::lower(
     source << "mov $" << host_loop_diag.size() << ", %rdx\n";
     source << "call print_diag\n";
     source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
+    source << "host_runtime_exit:\n";
+    source << "call anyps1_host_loop_shutdown\n";
+    source << "mov $18, %edi\nmov $60, %eax\nsyscall\n";
+    source << "host_shutdown_exit:\n";
+    source << "call anyps1_host_loop_shutdown\n";
+    source << "xor %edi, %edi\nmov $60, %eax\nsyscall\n";
     for (const std::string& family : unsupported_family_names) {
         source << instruction_family_source_name(family)
                << ":\njmp unsupported_instruction_exit\n";
@@ -348,21 +371,6 @@ void MipsLinuxLowerer::lower(
     source << "mov $1, %eax\n";
     source << "syscall\n";
     source << "ret\n";
-    source << "anyps1_host_loop_controller_state:\n";
-    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
-    source << "anyps1_host_loop_spu_read:\n";
-    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
-    source << "anyps1_host_loop_gpu_write:\n";
-    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
-    source << "anyps1_host_loop_vulkan_present:\n";
-    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
-    source << "anyps1_host_loop_memory_card_read:\n";
-    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
-    source << "anyps1_host_loop_memory_card_write:\n";
-    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
-    source << "anyps1_host_loop_disc_read:\n";
-    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
-
     auto emit_unsupported_stub = [&](std::uint32_t instruction) {
         const UnsupportedInstruction unsupported =
             classify_unsupported_instruction(instruction);
@@ -898,9 +906,7 @@ void MipsLinuxLowerer::lower(
             source << "jb mmio_load_default_" << std::hex << address << std::dec << "\n";
             source << "cmpl $0x1080, %ecx\n";
             source << "jae mmio_load_spu_" << std::hex << address << std::dec << "\n";
-            source << "sub $8, %rsp\n";
             source << "call anyps1_host_loop_controller_state\n";
-            source << "add $8, %rsp\n";
             source << "movl %eax, %edx\n";
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_load_spu_" << std::hex << address << std::dec << ": \n";
@@ -910,9 +916,7 @@ void MipsLinuxLowerer::lower(
             source << "jae mmio_load_default_" << std::hex << address << std::dec << "\n";
             source << "movl %ecx, %edi\n";
             source << "addl $0x1F800000, %edi\n";
-            source << "sub $8, %rsp\n";
             source << "call anyps1_host_loop_spu_read\n";
-            source << "add $8, %rsp\n";
             source << "movl %eax, %edx\n";
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_load_default_" << std::hex << address << std::dec << ": \n";
@@ -962,6 +966,27 @@ void MipsLinuxLowerer::lower(
             source << "leaq mmio_state(%rip), %rbx\n";
             source << "andl $0x1FFF, %ecx\n";
             source << "movl " << rt * 4 << "(%r12), %edx\n";
+            if (opcode == 0x2B) {
+                source << "cmpl $0x810, %ecx\n";
+                source << "jb mmio_native_spu_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $0x815, %ecx\n";
+                source << "jae mmio_native_spu_" << std::hex << address << std::dec << "\n";
+                source << "movl %ecx, %edi\n";
+                source << "addl $0x1F800000, %edi\n";
+                source << "movl %edx, %esi\n";
+                source << "call anyps1_host_loop_gpu_write\n";
+                source << "jmp mmio_native_done_" << std::hex << address << std::dec << "\n";
+                source << "mmio_native_spu_" << std::hex << address << std::dec << ": \n";
+                source << "cmpl $0xC00, %ecx\n";
+                source << "jb mmio_native_done_" << std::hex << address << std::dec << "\n";
+                source << "cmpl $0xD80, %ecx\n";
+                source << "jae mmio_native_done_" << std::hex << address << std::dec << "\n";
+                source << "movl %ecx, %edi\n";
+                source << "addl $0x1F800000, %edi\n";
+                source << "movl %edx, %esi\n";
+                source << "call anyps1_host_loop_spu_write\n";
+                source << "mmio_native_done_" << std::hex << address << std::dec << ": \n";
+            }
             if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
             else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
             else source << "movl %edx, (%rbx,%rcx)\n";
@@ -1273,6 +1298,16 @@ void MipsLinuxLowerer::lower(
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
         source << "p" << std::hex << address << std::dec << ":\n";
+        if (native_host_loop_required) {
+            source << "incl host_frame_counter(%rip)\n";
+            source << "cmpl $1024, host_frame_counter(%rip)\n";
+            source << "jb host_frame_tick_done_" << std::hex << address << std::dec << "\n";
+            source << "movl $0, host_frame_counter(%rip)\n";
+            source << "call anyps1_host_loop_poll\n";
+            source << "testl %eax, %eax\n";
+            source << "jne host_shutdown_exit\n";
+            source << "host_frame_tick_done_" << std::hex << address << std::dec << ":\n";
+        }
 
         if (delay_slots.find(address) != delay_slots.end() &&
             emitted_delay_slots.find(address) == emitted_delay_slots.end()) {

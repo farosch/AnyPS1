@@ -38,13 +38,32 @@ int ElfWriter::link(
         std::vector<const char*> linker_args = {
             "gcc",
             "-nostdlib",
-            "-static",
             "-no-pie",
             "-Wl,-e,_start,-z,noexecstack,-z,relro,-z,now,-z,notext,--build-id=none",
         };
         linker_args.push_back("-o");
         linker_args.push_back(output.c_str());
         linker_args.push_back(assembly.c_str());
+        const std::string build_dir = ANYPS1_BUILD_DIR;
+        const std::string host_library = build_dir + "/src/libanyps1_host.a";
+        const std::string input_library = build_dir + "/src/libanyps1_input.a";
+        const std::string gpu_library = build_dir + "/src/libanyps1_gpu.a";
+        linker_args.push_back(host_library.c_str());
+        linker_args.push_back(input_library.c_str());
+        linker_args.push_back(gpu_library.c_str());
+        linker_args.push_back("-lstdc++");
+        const std::string sdl_library =
+            build_dir + "/3rdparty/SDL/libSDL3.so.0.5.0";
+        linker_args.push_back(sdl_library.c_str());
+        const std::string sdl_rpath =
+            "-Wl,-rpath," + build_dir + "/3rdparty/SDL";
+        linker_args.push_back(sdl_rpath.c_str());
+        linker_args.push_back("-lc");
+        linker_args.push_back("-lgcc_s");
+        linker_args.push_back("-lgcc");
+        linker_args.push_back("-lm");
+        linker_args.push_back("-ldl");
+        linker_args.push_back("-lpthread");
         linker_args.push_back(nullptr);
         execvp(linker_args[0], const_cast<char* const*>(linker_args.data()));
         _exit(127);
