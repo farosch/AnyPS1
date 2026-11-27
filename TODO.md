@@ -9,7 +9,7 @@
 - [x] Improve CFG discovery beyond static leaders. Resolve JALR targets when
   they are statically provable, preserve indirect-call edges, and emit explicit
   unsupported exits for unresolved indirect control flow.
-- [ ] Distinguish executable code from embedded data, tables, padding,
+- [x] Distinguish executable code from embedded data, tables, padding,
   `.rodata`, and payload regions when counting unsupported instructions.
 - [x] Report exact supported/reachable word counts, unsupported word counts,
   leader counts, call-edge counts, unresolved-indirect counts, and the first

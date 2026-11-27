@@ -82,3 +82,9 @@ add_test(NAME relinker_static_jalr
     COMMAND anyps1_relinker_test
         ${FIXTURE_OUTPUT_DIR}/mips/native-static-jalr.ps-exe)
 
+add_executable(anyps1_payload_region_test PayloadRegionTest.cpp)
+target_include_directories(anyps1_payload_region_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(anyps1_payload_region_test PRIVATE anyps1_lowering)
+add_test(NAME payload_region_classifier
+    COMMAND anyps1_payload_region_test)
+

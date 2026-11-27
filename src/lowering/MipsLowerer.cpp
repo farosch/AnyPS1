@@ -2,6 +2,7 @@
 #include "relinker/Relinker.h"
 #include "format/PsExe.h"
 #include "UnsupportedInstructions.h"
+#include "PayloadRegion.h"
 
 #include <algorithm>
 #include <array>
@@ -180,6 +181,8 @@ void write_linux_native_cfg(
     std::uint32_t unsupported_count = 0;
     std::uint32_t reachable_count = 0;
     std::uint32_t supported_count = 0;
+    std::uint32_t embedded_data_count = 0;
+    std::uint32_t unknown_region_count = 0;
     std::uint32_t first_unsupported_address = 0;
     std::uint32_t first_unsupported_word = 0;
     std::string first_unsupported_name;
@@ -276,6 +279,15 @@ void write_linux_native_cfg(
         const std::uint32_t offset = address - load_address;
         if (offset + 4 > file_size) continue;
         const std::uint32_t instruction = read_psx32(data, PSX_HEADER_SIZE + offset);
+        const PayloadRegionKind region =
+            classify_payload_region(address, instruction, true);
+        if (region == PayloadRegionKind::EmbeddedData) {
+            ++embedded_data_count;
+            continue;
+        }
+        if (region == PayloadRegionKind::Unknown) {
+            ++unknown_region_count;
+        }
         ++reachable_count;
         if (is_supported_mips_instruction(instruction)) {
             ++supported_count;
@@ -326,6 +338,10 @@ void write_linux_native_cfg(
         "reachable_words=" + std::to_string(reachable_count) + "\n";
     const std::string supported =
         "supported_reachable_words=" + std::to_string(supported_count) + "\n";
+    const std::string embedded =
+        "embedded_data_words=" + std::to_string(embedded_data_count) + "\n";
+    const std::string unknown =
+        "unknown_region_words=" + std::to_string(unknown_region_count) + "\n";
     const std::string unsupported =
         "unsupported_instructions=" + std::to_string(unsupported_count) + "\n";
     const std::string first_gap =
@@ -352,6 +368,8 @@ void write_linux_native_cfg(
     source << "diag_unresolved:.asciz \"" << escape_assembly_string(unresolved) << "\"\n";
     source << "diag_reachable:.asciz \"" << escape_assembly_string(reachable) << "\"\n";
     source << "diag_supported:.asciz \"" << escape_assembly_string(supported) << "\"\n";
+    source << "diag_embedded:.asciz \"" << escape_assembly_string(embedded) << "\"\n";
+    source << "diag_unknown:.asciz \"" << escape_assembly_string(unknown) << "\"\n";
     source << "diag_unsupported:.asciz \"" << escape_assembly_string(unsupported) << "\"\n";
     source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
@@ -369,6 +387,8 @@ void write_linux_native_cfg(
     source << "leaq diag_unresolved(%rip), %rsi\nmov $" << unresolved.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_reachable(%rip), %rsi\nmov $" << reachable.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_supported(%rip), %rsi\nmov $" << supported.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_embedded(%rip), %rsi\nmov $" << embedded.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_unknown(%rip), %rsi\nmov $" << unknown.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_unsupported(%rip), %rsi\nmov $" << unsupported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";

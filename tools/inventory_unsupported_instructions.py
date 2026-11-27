@@ -54,6 +54,24 @@ def supported(word: int) -> bool:
     return opcode in SUPPORTED_OPS
 
 
+def classify_payload_region(word: int) -> str:
+    if word == 0:
+        return "instruction"
+    printable = sum(
+        1 for index in range(4)
+        if 0x20 <= ((word >> (index * 8)) & 0xFF) <= 0x7E
+    )
+    bytes_ = [(word >> (index * 8)) & 0xFF for index in range(4)]
+    if printable >= 3:
+        return "embedded-data"
+    if len(set(bytes_)) == 1 or word in (0x77777777, 0x77770700):
+        return "embedded-data"
+    opcode = word >> 26
+    if opcode == 0 or 1 <= opcode <= 15 or 32 <= opcode <= 46:
+        return "instruction"
+    return "unknown"
+
+
 def instruction_name(word: int) -> str:
     opcode = word >> 26
     if opcode == 0:
@@ -124,11 +142,16 @@ def inventory(path: Path) -> dict:
     unsupported = []
     family_counts = Counter()
     exact_counts = Counter()
+    region_counts = Counter()
     for address in sorted(leaders):
         offset = address - load
         if offset + 4 > file_size:
             continue
         word = struct.unpack_from("<I", data, 2048 + offset)[0]
+        region = classify_payload_region(word)
+        region_counts[region] += 1
+        if region == "embedded-data":
+            continue
         if supported(word):
             continue
         name = instruction_name(word)
@@ -143,6 +166,7 @@ def inventory(path: Path) -> dict:
         "executable": str(path),
         "load_address": f"0x{load:08X}",
         "reachable_leaders": len(leaders),
+        "payload_regions": dict(sorted(region_counts.items())),
         "unsupported_count": len(unsupported),
         "unsupported_families": dict(sorted(family_counts.items())),
         "unsupported_exact_words": dict(sorted(exact_counts.items())),
