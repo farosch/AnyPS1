@@ -48,11 +48,11 @@
 
 ## System calls and host integration
 
-- [ ] Replace PS1 BIOS-vector assumptions with native host services or explicit
-  unsupported conversion results.
-- [ ] Document native equivalents for file, input, audio, video, and console APIs.
+- [x] Replace PS1 BIOS-vector assumptions with explicit unsupported conversion
+  results or native host services.
+- [x] Document native equivalents for file, input, audio, video, and console APIs.
 - [x] Add direct native I/O/exit handling.
-- [ ] Do not require BIOS images or external PS-X state.
+- [x] Do not require BIOS images or external PS-X state.
 
 ## Windows executable conversion
 

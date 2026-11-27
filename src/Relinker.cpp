@@ -89,6 +89,13 @@ void write_linux_native_cfg(
         } else if (jump) {
             const std::uint32_t target =
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
+            if ((target & 0xFF000000u) == 0xA0000000u
+                || (target & 0xFF000000u) == 0xB0000000u
+                || (target & 0xFF000000u) == 0xC0000000u) {
+                throw std::runtime_error(
+                    "unsupported PS1 BIOS-vector transition at " + hex32(address)
+                    + " to " + hex32(target));
+            }
             leaders.insert(target);
             work.push(target);
             if (opcode == 0x03) {
@@ -233,8 +240,10 @@ void write_linux_native_cfg(
                 source << "movl " << rs * 4 << "(%r12), %eax\nmovl %eax, 128(%r12)\n";
             } else if (special == 0x08 || special == 0x09) {
                 throw std::runtime_error("control instruction must be emitted by CFG lowering");
-            } else if (special == 0x0C || special == 0x0D) {
+            } else if (special == 0x0C) {
                 source << "xor %edi, %edi\nmov $60, %eax\nsyscall\n";
+            } else if (special == 0x0D) {
+                source << "mov $9, %edi\nmov $60, %eax\nsyscall\n";
             } else {
                 throw std::runtime_error("unsupported native MIPS instruction at " + hex32(address));
             }

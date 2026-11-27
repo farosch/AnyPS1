@@ -114,6 +114,16 @@ The relinker:
   as input;
 - reports unsupported executable layouts or instructions explicitly.
 
+Native host integration:
+
+- Console output maps to Linux `write(2)` and is emitted from `_start`.
+- Process exit maps to Linux `exit(2)`; BREAK uses exit status `9`.
+- SYSCALL is the native lowerer's stop point, not a PS1 BIOS call.
+- PS1 BIOS A0/B0/C0 vectors are rejected because they are not native host APIs.
+- File access must be converted to Linux `open/read/write/close` operations.
+- Input must be converted to Linux input APIs or explicit unsupported results.
+- Audio and video must use native host APIs, not PS1 controller/SPU/MMIO emulation.
+
 Do not pass `Game.cue`, `Game.bin`, or an arbitrary PS-X executable to the
 normal directory workflow. The helper and relinker accept different inputs.
 

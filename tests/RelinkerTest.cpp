@@ -34,6 +34,22 @@ int main(int argc, char** argv)
         system_cnf << "BOOT=cdrom:\\SCUS_941.63;1\n";
         system_cnf.close();
 
+        if (std::string(fixture_path).find("native-bios-vector.ps-exe") != std::string::npos) {
+            anyps1::RelinkOptions bios_options;
+            bios_options.input = game_root;
+            try {
+                anyps1::relink(bios_options);
+                throw std::runtime_error("PS1 BIOS-vector fixture unexpectedly relinked");
+            } catch (const std::exception& error) {
+                if (std::string(error.what()).find("BIOS-vector") == std::string::npos
+                    && std::string(error.what()).find("indirect JR") == std::string::npos) {
+                    throw;
+                }
+            }
+            std::filesystem::remove_all(game_root);
+            return 0;
+        }
+
         {
             std::ifstream candidate(input_path, std::ios::binary);
             std::vector<unsigned char> bytes{
