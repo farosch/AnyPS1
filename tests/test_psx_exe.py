@@ -86,6 +86,28 @@ class MipsDisassemblerTest(unittest.TestCase):
         cfg = control_flow_map(code, 0x80010000)
         self.assertGreaterEqual(len(cfg["blocks"]), 2)
 
+    def test_mips_i_coverage_fixture_contains_instruction_families(self):
+        description = json.loads(
+            (JSON_FIXTURES / "mips" / "mips-i-coverage.json").read_text())
+        words = description["instructions"]
+        opcodes = {(word >> 26) & 0x3F for word in words}
+        specials = {word & 0x3F for word in words if (word >> 26) == 0}
+        expected_opcodes = {
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+            0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+            0x20, 0x21, 0x23, 0x24, 0x25, 0x28, 0x29, 0x2B,
+        }
+        self.assertTrue(expected_opcodes.issubset(opcodes))
+        self.assertTrue({0x00, 0x02, 0x21, 0x23}.issubset(specials))
+
+    def test_coprocessor_coverage_fixture_contains_family_stubs(self):
+        description = json.loads(
+            (JSON_FIXTURES / "mips" / "coprocessor-coverage.json").read_text())
+        words = description["instructions"]
+        opcodes = {(word >> 26) & 0x3F for word in words}
+        self.assertTrue({0x10, 0x11, 0x12, 0x13, 0x30, 0x31, 0x32,
+                         0x33, 0x38, 0x39, 0x3A, 0x3B}.issubset(opcodes))
+
     def test_identifies_a0_bios_vector_and_gpu_reference(self):
         lui_t1 = (0x0F << 26) | (9 << 16) | 0xA000
         addiu_t1 = (0x09 << 26) | (9 << 21) | (9 << 16) | 0x40

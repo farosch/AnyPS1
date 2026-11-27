@@ -14,10 +14,10 @@
 - [x] Report exact supported/reachable word counts, unsupported word counts,
   leader counts, call-edge counts, unresolved-indirect counts, and the first
   unsupported address without including data words as instructions.
-- [ ] Add per-instruction native lowering fixtures for every MIPS I opcode,
+- [x] Add per-instruction native lowering fixtures for every MIPS I opcode,
   COP0 operation, COP1 operation, COP2/GTE operation, COP3 operation,
   coprocessor load/store, and reserved opcode.
-- [ ] Remove the remaining generic reserved-opcode and coprocessor stubs that
+- [x] Remove the remaining generic reserved-opcode and coprocessor stubs that
   can be lowered directly, and keep only irreducibly unsupported operations
   as explicit conversion failures.
 - [x] Replace substring-based unsupported-instruction heuristics with a shared

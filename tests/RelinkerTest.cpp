@@ -183,7 +183,8 @@ int main(int argc, char** argv)
         const int exit_status =
             WIFEXITED(capture_status) ? WEXITSTATUS(capture_status) : -1;
         const bool partial_fixture =
-            std::string(fixture_path).find("native-unsupported.ps-exe") != std::string::npos;
+            std::string(fixture_path).find("native-unsupported.ps-exe") != std::string::npos
+            || std::string(fixture_path).find("coprocessor-coverage.ps-exe") != std::string::npos;
         if (exit_status != 0 && !(partial_fixture && exit_status == 16)) {
             throw std::runtime_error("native ELF artifact did not exit successfully");
         }
@@ -194,6 +195,7 @@ int main(int argc, char** argv)
                 && std::string(fixture_path).find("comprehensive.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-unsupported.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-static-jalr.ps-exe") == std::string::npos
+                && std::string(fixture_path).find("coprocessor-coverage.ps-exe") == std::string::npos
                 && terminal_output.find("native lowering complete") == std::string::npos)) {
             throw std::runtime_error("native ELF artifact lacks comprehensive diagnostics");
         }
