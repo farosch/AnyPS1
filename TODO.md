@@ -1,5 +1,29 @@
 # TODO
 
+## Next relinker blockers
+
+- [ ] Remove the fixed 512-leader CFG limit and replace it with bounded CFG
+  expansion that can preserve every emitted branch, call, and fallthrough target.
+- [ ] Prevent undefined assembly labels or duplicate JALR labels at CFG bounds;
+  every out-of-range or unresolved transfer must emit an explicit
+  unsupported-execution exit.
+- [ ] Count unsupported instructions only in statically reachable executable
+  code, and distinguish those words from embedded data, tables, padding, or
+  non-code payload regions.
+- [ ] Report native lowering coverage as a percentage and as exact leader/block,
+  call-edge, and unresolved-indirect-transfer counts.
+- [ ] Replace the current real-executable smoke mechanism with an opt-in
+  format-generic fixture/report test that does not depend on game names,
+  directories, or assets.
+- [ ] Continue real executable relinking until the first reachable unsupported
+  MIPS instruction or host operation is resolved, then add a minimal fixture
+  that reproduces it without copyrighted assets.
+- [ ] Complete native host mappings for file, input, audio, video, and Vulkan
+  framebuffer operations; preserve unsupported MMIO as explicit conversion
+  failures.
+- [ ] Integrate native lowered executable launch, window creation, controller
+  polling, and GPU command lowering into one end-to-end Linux conversion path.
+
 ## Linux executable conversion
 
 - [ ] Complete native Linux ELF32/ELF64 executable generation with valid
