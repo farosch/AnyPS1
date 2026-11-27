@@ -195,17 +195,16 @@ int main()
                 runtime.mmio_read(0x1F801070u) != 0u) {
                 throw std::runtime_error("interrupt acknowledge did not clear status");
             }
-            runtime.set_controller_state(0x12ABu);
-            runtime.write(0x1F801040u, 0x01u);
-            if (runtime.read(0x1F801040u) != 0u ||
-                runtime.read(0x1F801040u) != 0x41u ||
-                runtime.read(0x1F801040u) != 0x5Au) {
+            if (runtime.mmio_write(0x1F801040u, 0x01u) != 0 ||
+                runtime.mmio_read(0x1F801040u) != 0u ||
+                runtime.mmio_read(0x1F801040u) != 0x41u ||
+                runtime.mmio_read(0x1F801040u) != 0x5Au) {
                 throw std::runtime_error("controller MMIO FIFO did not progress");
             }
-            runtime.write(0x1F801800u, 0u);
-            runtime.write(0x1F801801u, 0x01u);
-            runtime.write(0x1F801800u, 1u);
-            if (runtime.read(0x1F801801u) != 0x02u) {
+            if (runtime.mmio_write(0x1F801800u, 0u) != 0 ||
+                runtime.mmio_write(0x1F801801u, 0x01u) != 0 ||
+                runtime.mmio_write(0x1F801800u, 1u) != 0 ||
+                runtime.mmio_read(0x1F801801u) != 0x02u) {
                 throw std::runtime_error("CD-ROM MMIO response did not progress");
             }
             anyps1::Ps1InputState polled_input;
