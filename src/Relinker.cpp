@@ -119,9 +119,36 @@ void write_linux_native_cfg(
     }
 
     std::ofstream source(assembly, std::ios::trunc);
+    const std::string banner = "AnyPS1 native executable diagnostics\n";
+    const std::string target = "target=linux\n";
+    const std::string load = "load_address=" + hex32(load_address) + "\n";
+    const std::string entry = "entry_point=" + hex32(initial_pc) + "\n";
+    const std::string gp = "initial_gp=" + hex32(initial_gp) + "\n";
+    const std::string sp = "initial_sp=" + hex32(initial_sp) + "\n";
+    const std::string payload_size = "payload_size=" + std::to_string(file_size) + "\n";
+    const std::string lowered = "lowered_words=" + std::to_string(leaders.size()) + "\n";
+    const std::string completed = "native lowering complete\n";
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\n";
+    source << ".section .rodata\n";
+    source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
+    source << "diag_target:.asciz \"" << escape_assembly_string(target) << "\"\n";
+    source << "diag_load:.asciz \"" << escape_assembly_string(load) << "\"\n";
+    source << "diag_entry:.asciz \"" << escape_assembly_string(entry) << "\"\n";
+    source << "diag_gp:.asciz \"" << escape_assembly_string(gp) << "\"\n";
+    source << "diag_sp:.asciz \"" << escape_assembly_string(sp) << "\"\n";
+    source << "diag_payload:.asciz \"" << escape_assembly_string(payload_size) << "\"\n";
+    source << "diag_lowered:.asciz \"" << escape_assembly_string(lowered) << "\"\n";
+    source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
     source << ".text\n.globl _start\n_start:\n";
+    source << "leaq diag_banner(%rip), %rsi\nmov $" << banner.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_target(%rip), %rsi\nmov $" << target.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_load(%rip), %rsi\nmov $" << load.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_entry(%rip), %rsi\nmov $" << entry.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_gp(%rip), %rsi\nmov $" << gp.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_sp(%rip), %rsi\nmov $" << sp.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_payload(%rip), %rsi\nmov $" << payload_size.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_lowered(%rip), %rsi\nmov $" << lowered.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";
     source << "add $" << (load_address & 0x1FFFFFu) << ", %rdi\n";
     source << "leaq payload(%rip), %rsi\n";
@@ -136,8 +163,6 @@ void write_linux_native_cfg(
     source << ".text\n";
     source << "overflow_exit:\nmov $12, %edi\nmov $60, %eax\nsyscall\n";
     source << "divide_zero_exit:\nmov $11, %edi\nmov $60, %eax\nsyscall\n";
-    source << ".section .rodata\n";
-    source << "diag_completed:.asciz \"native lowering complete\\n\"\n";
     source << ".text\n";
     source << "print_diag:\n";
     source << "mov $1, %edi\n";
@@ -328,6 +353,9 @@ void write_linux_native_cfg(
 
     std::string command = "gcc -nostdlib -no-pie -Wl,-e,_start -o \"" +
         options.output + "\" \"" + assembly.string() + "\"";
+    // Flush the assembly before invoking the native assembler/linker.
+    source.flush();
+    source.close();
     const int status = std::system(command.c_str());
     std::filesystem::remove(payload);
     if (status != 0) throw std::runtime_error("native Linux lowering toolchain failed");
@@ -1180,7 +1208,7 @@ bool relink(const RelinkOptions& options)
     }
 
     try {
-        write_linux_native(resolved, data);
+        write_linux_native_cfg(resolved, data);
     } catch (...) {
         std::filesystem::remove(resolved.output + ".native.s");
         std::filesystem::remove(resolved.output + ".native.bin");

@@ -26,9 +26,9 @@
 - [ ] Add load-delay-slot behavior for LB/LH/LW/LBU/LHU loads.
 - [x] Implement arithmetic overflow and divide-by-zero exits in lowered ADD,
   ADDI, SUB, DIV, and DIVU paths.
-- [ ] Define native control-flow graph lowering for multiple functions and
-  indirect jumps instead of fixed-size entry/target blocks. Current work added
-  CFG discovery scaffolding; enablement remains under test.
+- [x] Add native control-flow graph discovery for entry blocks, static branch
+  targets, jump targets, delay slots, and fallthrough leaders.
+- [ ] Complete CFG lowering for indirect jumps/JALR and multiple functions.
 - [ ] Lower MIPS COP0 reads/writes where they correspond to host-platform state.
 - [ ] Replace unsupported COP0/COP2 behavior with explicit conversion errors.
 - [ ] Lower MIPS GTE/COP2 instructions directly or classify them as
