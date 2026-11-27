@@ -1,6 +1,6 @@
 #include "PeWriter.h"
-#include "relinker/Relinker.h"
 #include "format/PsExe.h"
+#include "relinker/Relinker.h"
 
 #include <cstring>
 #include <filesystem>
@@ -23,43 +23,35 @@ constexpr std::uint32_t SECTION_ALIGNMENT = 0x1000;
 constexpr std::uint32_t FILE_ALIGNMENT = 0x200;
 constexpr std::uint32_t TEXT_RVA = 0x1000;
 constexpr std::uint32_t RDATA_RVA = 0x2000;
-constexpr std::uint32_t BSS_RVA = 0x3000;
-constexpr std::uint32_t RELOC_RVA = 0x4000;
-constexpr std::uint32_t IMAGE_SIZE = 0x5000;
-constexpr std::uint64_t IMAGE_BASE = 0x140000000ull;
-
-void append_u16(std::vector<unsigned char>& output, std::uint16_t value)
-{
-    output.push_back(static_cast<unsigned char>(value & 0xFF));
-    output.push_back(static_cast<unsigned char>((value >> 8) & 0xFF));
-}
+constexpr std::uint32_t IMAGE_SIZE = 0x3000;
+constexpr std::uint64_t IMAGE_BASE = 0x140000000u;
 
 void append_u32(std::vector<unsigned char>& output, std::uint32_t value)
 {
-    output.push_back(static_cast<unsigned char>(value & 0xFF));
-    output.push_back(static_cast<unsigned char>((value >> 8) & 0xFF));
-    output.push_back(static_cast<unsigned char>((value >> 16) & 0xFF));
-    output.push_back(static_cast<unsigned char>((value >> 24) & 0xFF));
+    output.push_back(static_cast<unsigned char>(value));
+    output.push_back(static_cast<unsigned char>(value >> 8));
+    output.push_back(static_cast<unsigned char>(value >> 16));
+    output.push_back(static_cast<unsigned char>(value >> 24));
 }
 
 void write_u16(std::vector<unsigned char>& output, std::size_t offset, std::uint16_t value)
 {
-    output[offset] = static_cast<unsigned char>(value & 0xFF);
-    output[offset + 1] = static_cast<unsigned char>((value >> 8) & 0xFF);
+    output[offset] = static_cast<unsigned char>(value);
+    output[offset + 1] = static_cast<unsigned char>(value >> 8);
 }
 
 void write_u32(std::vector<unsigned char>& output, std::size_t offset, std::uint32_t value)
 {
-    output[offset] = static_cast<unsigned char>(value & 0xFF);
-    output[offset + 1] = static_cast<unsigned char>((value >> 8) & 0xFF);
-    output[offset + 2] = static_cast<unsigned char>((value >> 16) & 0xFF);
-    output[offset + 3] = static_cast<unsigned char>((value >> 24) & 0xFF);
+    output[offset] = static_cast<unsigned char>(value);
+    output[offset + 1] = static_cast<unsigned char>(value >> 8);
+    output[offset + 2] = static_cast<unsigned char>(value >> 16);
+    output[offset + 3] = static_cast<unsigned char>(value >> 24);
 }
 
 void write_u64(std::vector<unsigned char>& output, std::size_t offset, std::uint64_t value)
 {
-    write_u32(output, offset, static_cast<std::uint32_t>(value & 0xFFFFFFFFu));
-    write_u32(output, offset + 4, static_cast<std::uint32_t>((value >> 32) & 0xFFFFFFFFu));
+    write_u32(output, offset, static_cast<std::uint32_t>(value));
+    write_u32(output, offset + 4, static_cast<std::uint32_t>(value >> 32));
 }
 
 void append_rip_relative(std::vector<unsigned char>& code,
@@ -67,10 +59,8 @@ void append_rip_relative(std::vector<unsigned char>& code,
                          std::uint32_t instruction_length,
                          std::uint32_t target_rva)
 {
-    const std::uint64_t instruction_address =
-        IMAGE_BASE + TEXT_RVA + instruction_offset;
-    const std::uint64_t target_address =
-        IMAGE_BASE + target_rva;
+    const std::uint64_t instruction_address = IMAGE_BASE + TEXT_RVA + instruction_offset;
+    const std::uint64_t target_address = IMAGE_BASE + target_rva;
     const std::int64_t displacement =
         static_cast<std::int64_t>(target_address - instruction_address - instruction_length);
     if (displacement < INT32_MIN || displacement > INT32_MAX) {
@@ -90,8 +80,8 @@ void write_pe_layout(const RelinkOptions& options,
     if (file_size == 0) {
         throw std::runtime_error("unsupported Windows lowering: executable payload is empty");
     }
-    if (file_size > 0x01000000u) {
-        throw std::runtime_error("unsupported Windows lowering: executable payload is too large");
+    if (data.size() < PSX_HEADER_SIZE + file_size) {
+        throw std::runtime_error("truncated PS-X EXE payload");
     }
 
     const std::uint32_t initial_pc = read_psx32(data, 0x10);
@@ -116,12 +106,7 @@ void write_pe_layout(const RelinkOptions& options,
         diagnostics.resize(128u);
     }
 
-    if (data.size() < PSX_HEADER_SIZE + file_size) {
-        throw std::runtime_error("truncated PS-X EXE payload");
-    }
-
     std::vector<unsigned char> pe(RAW_HEADERS_SIZE, 0);
-
     pe[0] = 'M';
     pe[1] = 'Z';
     write_u32(pe, 0x3C, PE_SIGNATURE_OFFSET);
@@ -132,175 +117,135 @@ void write_pe_layout(const RelinkOptions& options,
     pe[PE_SIGNATURE_OFFSET + 3] = '\0';
 
     write_u16(pe, COFF_OFFSET, 0x8664);
-    write_u16(pe, COFF_OFFSET + 2, 4);
+    write_u16(pe, COFF_OFFSET + 2, 2);
+    write_u32(pe, COFF_OFFSET + 4, 0);
     write_u32(pe, COFF_OFFSET + 8, SECTION_TABLE_OFFSET);
     write_u16(pe, COFF_OFFSET + 16, 240);
-    write_u16(pe, COFF_OFFSET + 18, 0x0002 | 0x0020 | 0x0100);
+    write_u16(pe, COFF_OFFSET + 18, 0x0222);
 
     write_u16(pe, OPTIONAL_OFFSET, 0x020B);
     pe[OPTIONAL_OFFSET + 2] = 14;
     pe[OPTIONAL_OFFSET + 3] = 0;
-    write_u32(pe, OPTIONAL_OFFSET + 4, 0);
-    write_u32(pe, OPTIONAL_OFFSET + 8, 0);
-    write_u32(pe, OPTIONAL_OFFSET + 12, 0);
     write_u32(pe, OPTIONAL_OFFSET + 16, TEXT_RVA);
     write_u32(pe, OPTIONAL_OFFSET + 20, TEXT_RVA);
     write_u64(pe, OPTIONAL_OFFSET + 24, IMAGE_BASE);
     write_u32(pe, OPTIONAL_OFFSET + 32, SECTION_ALIGNMENT);
     write_u32(pe, OPTIONAL_OFFSET + 36, FILE_ALIGNMENT);
     write_u16(pe, OPTIONAL_OFFSET + 40, 6);
-    write_u16(pe, OPTIONAL_OFFSET + 42, 0);
-    write_u16(pe, OPTIONAL_OFFSET + 44, 0);
-    write_u16(pe, OPTIONAL_OFFSET + 46, 0);
     write_u16(pe, OPTIONAL_OFFSET + 48, 6);
-    write_u16(pe, OPTIONAL_OFFSET + 50, 0);
     write_u16(pe, OPTIONAL_OFFSET + 56, 0);
     write_u32(pe, OPTIONAL_OFFSET + 60, IMAGE_SIZE);
     write_u32(pe, OPTIONAL_OFFSET + 64, RAW_HEADERS_SIZE);
-    write_u32(pe, OPTIONAL_OFFSET + 68, 0);
-    write_u16(pe, OPTIONAL_OFFSET + 72, 3);
-    write_u16(pe, OPTIONAL_OFFSET + 74, 0);
-    write_u64(pe, OPTIONAL_OFFSET + 76, 0x100000u);
-    write_u64(pe, OPTIONAL_OFFSET + 84, 0x1000u);
-    write_u64(pe, OPTIONAL_OFFSET + 92, 0x100000u);
-    write_u64(pe, OPTIONAL_OFFSET + 100, 0x1000u);
-    write_u32(pe, OPTIONAL_OFFSET + 108, 0);
-    write_u32(pe, OPTIONAL_OFFSET + 112, 16);
+    write_u16(pe, OPTIONAL_OFFSET + 68, 3);
+    write_u16(pe, OPTIONAL_OFFSET + 70, 0);
+    write_u64(pe, OPTIONAL_OFFSET + 72, 0x100000u);
+    write_u64(pe, OPTIONAL_OFFSET + 80, 0x1000u);
+    write_u64(pe, OPTIONAL_OFFSET + 88, 0x100000u);
+    write_u64(pe, OPTIONAL_OFFSET + 96, 0x1000u);
+    write_u32(pe, OPTIONAL_OFFSET + 104, 0);
+    write_u32(pe, OPTIONAL_OFFSET + 108, 16);
+    write_u32(pe, OPTIONAL_OFFSET + 120, RDATA_RVA + 0x40);
+    write_u32(pe, OPTIONAL_OFFSET + 124, 20);
 
-    write_u32(pe, OPTIONAL_OFFSET + 120, RDATA_RVA);
-    write_u32(pe, OPTIONAL_OFFSET + 124, 0x200);
-    write_u32(pe, OPTIONAL_OFFSET + 152, RELOC_RVA);
-    write_u32(pe, OPTIONAL_OFFSET + 156, 8);
+    std::memcpy(pe.data() + SECTION_TABLE_OFFSET, ".text", 5);
+    write_u32(pe, SECTION_TABLE_OFFSET + 8, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 12, TEXT_RVA);
+    write_u32(pe, SECTION_TABLE_OFFSET + 16, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 20, RAW_HEADERS_SIZE);
+    write_u32(pe, SECTION_TABLE_OFFSET + 36, 0x60000020);
 
-    const std::uint32_t section_offset = SECTION_TABLE_OFFSET;
-    std::memcpy(pe.data() + section_offset, ".text", 5);
-    write_u32(pe, section_offset + 8, 0x200);
-    write_u32(pe, section_offset + 12, TEXT_RVA);
-    write_u32(pe, section_offset + 16, 0x200);
-    write_u32(pe, section_offset + 20, RAW_HEADERS_SIZE);
-    write_u16(pe, section_offset + 32, 0);
-    write_u16(pe, section_offset + 34, 0);
-    write_u32(pe, section_offset + 36, 0x60000020);
-
-    const std::size_t rdata_section = section_offset + 40;
-    std::memcpy(pe.data() + rdata_section, ".rdata", 6);
-    write_u32(pe, rdata_section + 8, 0x200);
-    write_u32(pe, rdata_section + 12, RDATA_RVA);
-    write_u32(pe, rdata_section + 16, 0x200);
-    write_u32(pe, rdata_section + 20, RAW_HEADERS_SIZE + 0x200);
-    write_u32(pe, rdata_section + 36, 0x40000040);
-
-    const std::size_t bss_section = section_offset + 80;
-    std::memcpy(pe.data() + bss_section, ".bss", 4);
-    write_u32(pe, bss_section + 8, 2097152u);
-    write_u32(pe, bss_section + 12, BSS_RVA);
-    write_u32(pe, bss_section + 16, 0);
-    write_u32(pe, bss_section + 20, 0);
-    write_u32(pe, bss_section + 36, 0xC8000080);
-
-    const std::size_t reloc_section = section_offset + 120;
-    std::memcpy(pe.data() + reloc_section, ".reloc", 6);
-    write_u32(pe, reloc_section + 8, 0x200);
-    write_u32(pe, reloc_section + 12, RELOC_RVA);
-    write_u32(pe, reloc_section + 16, 0x200);
-    write_u32(pe, reloc_section + 20, RAW_HEADERS_SIZE + 0x400);
-    write_u32(pe, reloc_section + 36, 0x42000040);
+    std::memcpy(pe.data() + SECTION_TABLE_OFFSET + 40, ".rdata", 6);
+    write_u32(pe, SECTION_TABLE_OFFSET + 48, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 52, RDATA_RVA);
+    write_u32(pe, SECTION_TABLE_OFFSET + 56, 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 60, RAW_HEADERS_SIZE + 0x200);
+    write_u32(pe, SECTION_TABLE_OFFSET + 76, 0x40000040);
 
     pe.resize(RAW_HEADERS_SIZE);
     pe.resize(RAW_HEADERS_SIZE + 0x200, 0);
     pe.resize(RAW_HEADERS_SIZE + 0x400, 0);
-    pe.resize(RAW_HEADERS_SIZE + 0x600, 0);
+
+    constexpr std::uint32_t import_descriptor_rva = RDATA_RVA + 0x40;
+    constexpr std::uint32_t dll_name_rva = RDATA_RVA + 0xC0;
+    constexpr std::uint32_t int_rva = RDATA_RVA + 0x80;
+    constexpr std::uint32_t iat_rva = RDATA_RVA + 0xA0;
+    constexpr std::uint32_t diagnostic_rva = RDATA_RVA + 0x180;
+    constexpr std::uint32_t written_rva = RDATA_RVA + 0x160;
+    constexpr std::uint32_t get_std_handle_rva = RDATA_RVA + 0x100;
+    constexpr std::uint32_t write_file_rva = RDATA_RVA + 0x110;
+    constexpr std::uint32_t exit_process_rva = RDATA_RVA + 0x120;
 
     std::vector<unsigned char> code;
-    const std::uint32_t iat_rva = RDATA_RVA + 0x120;
-    const std::uint32_t diagnostic_rva = RDATA_RVA + 0x180;
-    const std::uint32_t written_rva = RDATA_RVA + 0x160;
+    code.push_back(0x48); code.push_back(0x83); code.push_back(0xEC); code.push_back(0x28);
 
     code.push_back(0xB9);
     append_u32(code, 0xFFFFFFF5u);
-
     std::size_t call_offset = code.size();
     code.push_back(0x48); code.push_back(0x8B); code.push_back(0x05);
     append_u32(code, 0);
-    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7,
-                        iat_rva);
+    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, iat_rva);
     code.push_back(0xFF); code.push_back(0xD0);
 
     code.push_back(0x48); code.push_back(0x89); code.push_back(0xC1);
-
     call_offset = code.size();
     code.push_back(0x48); code.push_back(0x8D); code.push_back(0x15);
     append_u32(code, 0);
-    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7,
-                        diagnostic_rva);
-
+    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, diagnostic_rva);
     code.push_back(0x41); code.push_back(0xB8);
     append_u32(code, static_cast<std::uint32_t>(diagnostics.size()));
-
     code.push_back(0x45); code.push_back(0x31); code.push_back(0xC9);
-    code.push_back(0x48); code.push_back(0x83); code.push_back(0xEC); code.push_back(0x28);
 
     call_offset = code.size();
     code.push_back(0x48); code.push_back(0x8D); code.push_back(0x05);
     append_u32(code, 0);
-    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7,
-                        written_rva);
+    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, written_rva);
     code.push_back(0x48); code.push_back(0x89); code.push_back(0x44); code.push_back(0x24);
     code.push_back(0x20);
 
     call_offset = code.size();
     code.push_back(0x48); code.push_back(0x8B); code.push_back(0x05);
     append_u32(code, 0);
-    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7,
-                        iat_rva + 8);
+    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, iat_rva + 8);
     code.push_back(0xFF); code.push_back(0xD0);
-    code.push_back(0x48); code.push_back(0x83); code.push_back(0xC4); code.push_back(0x28);
 
     code.push_back(0xB9);
     append_u32(code, 16);
     call_offset = code.size();
     code.push_back(0x48); code.push_back(0x8B); code.push_back(0x05);
     append_u32(code, 0);
-    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7,
-                        iat_rva + 16);
+    append_rip_relative(code, static_cast<std::uint32_t>(call_offset), 7, iat_rva + 16);
     code.push_back(0xFF); code.push_back(0xD0);
+    code.push_back(0x48); code.push_back(0x83); code.push_back(0xC4); code.push_back(0x28);
+    code.push_back(0xC3);
 
     while (code.size() < 0x200) code.push_back(0xCC);
     std::memcpy(pe.data() + RAW_HEADERS_SIZE, code.data(), code.size());
 
     std::vector<unsigned char> rdata(0x200, 0);
-    write_u32(rdata, 0x00, RDATA_RVA + 0x100);
-    write_u32(rdata, 0x0C, RDATA_RVA + 0x170);
-    write_u32(rdata, 0x10, RDATA_RVA + 0x120);
+    write_u32(rdata, 0x40, int_rva);
+    write_u32(rdata, 0x4C, dll_name_rva);
+    write_u32(rdata, 0x50, iat_rva);
+    std::memcpy(rdata.data() + 0xC0, "KERNEL32.dll", 13);
 
-    rdata[0x128] = 0;
-    rdata[0x129] = 0;
-    std::memcpy(rdata.data() + 0x12A, "GetStdHandle", 13);
-    rdata[0x140] = 0;
-    rdata[0x141] = 0;
-    std::memcpy(rdata.data() + 0x142, "WriteFile", 9);
-    rdata[0x150] = 0;
-    rdata[0x151] = 0;
-    std::memcpy(rdata.data() + 0x152, "ExitProcess", 11);
-    std::memcpy(rdata.data() + 0x170, "KERNEL32.dll", 12);
+    write_u64(rdata, 0x80, get_std_handle_rva);
+    write_u64(rdata, 0x88, write_file_rva);
+    write_u64(rdata, 0x90, exit_process_rva);
 
-    write_u64(rdata, 0x100, RDATA_RVA + 0x128);
-    write_u64(rdata, 0x108, RDATA_RVA + 0x140);
-    write_u64(rdata, 0x110, RDATA_RVA + 0x150);
-    write_u64(rdata, 0x118, 0);
+    write_u64(rdata, 0xA0, get_std_handle_rva);
+    write_u64(rdata, 0xA8, write_file_rva);
+    write_u64(rdata, 0xB0, exit_process_rva);
 
-    write_u64(rdata, 0x120, RDATA_RVA + 0x128);
-    write_u64(rdata, 0x128, RDATA_RVA + 0x140);
-    write_u64(rdata, 0x130, RDATA_RVA + 0x150);
-    write_u64(rdata, 0x138, 0);
-
+    rdata[0x100] = 0;
+    rdata[0x101] = 0;
+    std::memcpy(rdata.data() + 0x102, "GetStdHandle", 13);
+    rdata[0x110] = 0;
+    rdata[0x111] = 0;
+    std::memcpy(rdata.data() + 0x112, "WriteFile", 10);
+    rdata[0x120] = 0;
+    rdata[0x121] = 0;
+    std::memcpy(rdata.data() + 0x122, "ExitProcess", 12);
     std::memcpy(rdata.data() + 0x180, diagnostics.data(), diagnostics.size());
     std::memcpy(pe.data() + RAW_HEADERS_SIZE + 0x200, rdata.data(), rdata.size());
-
-    std::vector<unsigned char> reloc(0x200, 0);
-    write_u32(reloc, 0, TEXT_RVA);
-    write_u32(reloc, 4, 8);
-    std::memcpy(pe.data() + RAW_HEADERS_SIZE + 0x400, reloc.data(), reloc.size());
 
     const std::filesystem::path output_path(options.output);
     std::ofstream output(output_path, std::ios::binary | std::ios::trunc);
@@ -309,4 +254,5 @@ void write_pe_layout(const RelinkOptions& options,
                  static_cast<std::streamsize>(pe.size()));
     if (!output) throw std::runtime_error("cannot write Windows PE output: " + options.output);
 }
+
 }
