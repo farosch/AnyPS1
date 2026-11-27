@@ -1,5 +1,4 @@
 #include "relinker/Relinker.h"
-#include "runtime/Runtime.h"
 
 #include <array>
 #include <cstdint>

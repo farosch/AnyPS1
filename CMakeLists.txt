@@ -8,22 +8,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
-set(SDL_TESTS OFF CACHE BOOL "Build SDL tests")
-set(SDL_TEST_LIBRARY OFF CACHE BOOL "Build SDL test library")
-set(SDL_EXAMPLES OFF CACHE BOOL "Build SDL examples")
-set(SDL_INSTALL OFF CACHE BOOL "Install SDL")
-add_subdirectory(3rdparty/SDL)
-
 add_subdirectory(core/relinker)
-add_subdirectory(core/host)
-add_subdirectory(core/runtime)
 
 add_executable(anyps1
     core/anyps1.cpp
 )
 
 target_include_directories(anyps1 PRIVATE core)
-target_link_libraries(anyps1 PRIVATE anyps1_relinker anyps1_runtime anyps1_host)
+target_link_libraries(anyps1 PRIVATE anyps1_relinker)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)

@@ -7,17 +7,17 @@ native Linux or Windows artifacts.
 
 ## Architecture
 
-AnyPS1 is organized around executable conversion, PS1 runtime emulation, host
-integration, command-line tools, and target-platform output.
+AnyPS1 is organized around executable conversion, direct MIPS lowering,
+command-line tools, and target-platform output.
 
-The implementation decodes PS-X EXE structures, analyzes references and entry points, and will produce native Linux or Windows artifacts through direct MIPS lowering. Emulator-style launcher artifacts are not supported.
+The implementation decodes PS-X EXE structures, analyzes references and entry
+points, and produces native Linux or Windows artifacts through direct MIPS
+instruction lowering. It does not execute or interpret PS-X behavior.
 
 ## Layout
 
 - `core/relinker`: executable decoding and relinking implementation
-- `core/runtime`: PS1 CPU and system-runtime implementation
-- `core/host`: SDL host video, audio, and controller integration
-- `core/anyps1.cpp`: main command-line and runtime application
+- `core/anyps1.cpp`: main command-line relinker application
 - `tools`: command-line and analysis utilities
 - `TODO.md`: known implementation gaps and validation work
 - `tests`: integration and unit tests
@@ -54,22 +54,8 @@ anyps1 --target windows "/path/to/extracted/game"
 The relinker accepts an extracted game directory or disc directory. It locates
 the boot executable from `SYSTEM.CNF` (or, as a fallback, a PS-X executable
 header), lowers supported MIPS instructions directly into native Linux code,
-and rejects unsupported instructions explicitly. It must not wrap or emulate PS-X behavior.
-
-## Run an extracted PS-X executable in the first runtime
-
-```sh
-anyps1 --run "/path/to/PS-X.EXE" 1000000
-anyps1 --run-video "/path/to/PS-X.EXE" 1000000
-```
-
-The video mode opens an SDL host window and presents the generic PS1 frame
-surface. PS1 GPU rasterization is implemented separately from the SDL host layer.
-
-This generic interpreter provides 2 MiB main RAM, scratchpad and MMIO handling,
-BIOS-vector returns, and MIPS I startup instructions. It is not yet a complete
-game runtime and may stop at unsupported graphics, CD-ROM, controller, SPU, or
-GTE behavior.
+and rejects unsupported instructions explicitly. It does not execute or interpret
+PS-X behavior.
 
 The resulting layout is:
 

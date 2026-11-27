@@ -2,7 +2,7 @@
 
 AnyPS1 converts PlayStation 1 executable images into native Linux or Windows programs.
 
-- Keep the relinker focused on executable conversion and avoid emulator runtime work.
+- Keep the relinker focused on executable conversion and direct native lowering.
 - Unsupported executable formats and relinking states must fail explicitly.
 - Store executable test fixtures as JSON descriptions under `tests/fixtures/json/`;
   materialize `.ps-exe` binaries only in the build tree for test execution.

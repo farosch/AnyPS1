@@ -1,5 +1,4 @@
 #include "relinker/Relinker.h"
-#include "runtime/Runtime.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -7,61 +6,6 @@
 
 int main(int argc, char** argv)
 {
-    if (argc == 5 && std::string(argv[1]) == "--run-card") {
-        anyps1::RunOptions options;
-        options.input = argv[2];
-        options.memory_card = argv[3];
-        options.max_instructions = std::stoull(argv[4]);
-        try {
-            if (!anyps1::run_psx(options)) return 1;
-            return 0;
-        } catch (const std::exception& error) {
-            std::cerr << "Error: " << error.what() << "\n";
-            return 1;
-        }
-    }
-    if (argc == 5 && std::string(argv[1]) == "--run-disc") {
-        anyps1::RunOptions options;
-        options.input = argv[2];
-        options.cdrom_bin = argv[3];
-        options.max_instructions = std::stoull(argv[4]);
-        try {
-            if (!anyps1::run_psx(options)) return 1;
-            return 0;
-        } catch (const std::exception& error) {
-            std::cerr << "Error: " << error.what() << "\n";
-            return 1;
-        }
-    }
-    if (argc == 4 && std::string(argv[1]) == "--run-video") {
-        anyps1::RunOptions options;
-        options.input = argv[2];
-        options.max_instructions = std::stoull(argv[3]);
-        options.video = true;
-        try {
-            if (!anyps1::run_psx(options)) {
-                return 1;
-            }
-            return 0;
-        } catch (const std::exception& error) {
-            std::cerr << "Error: " << error.what() << "\n";
-            return 1;
-        }
-    }
-    if (argc == 4 && std::string(argv[1]) == "--run") {
-        anyps1::RunOptions options;
-        options.input = argv[2];
-        options.max_instructions = std::stoull(argv[3]);
-        try {
-            if (!anyps1::run_psx(options)) {
-                return 1;
-            }
-            return 0;
-        } catch (const std::exception& error) {
-            std::cerr << "Error: " << error.what() << "\n";
-            return 1;
-        }
-    }
     if (argc == 4 && std::string(argv[1]) == "--target") {
         anyps1::TargetPlatform target;
         const std::string target_name = argv[2];
@@ -80,7 +24,7 @@ int main(int argc, char** argv)
             if (!anyps1::relink(options)) {
                 return 1;
             }
-            std::cout << "Native PS-X launcher written to " << options.output << "\n";
+            std::cout << "Native executable written to " << options.output << "\n";
         } catch (const std::exception& error) {
             std::cerr << "Error: " << error.what() << "\n";
             return 1;
@@ -105,10 +49,7 @@ int main(int argc, char** argv)
             << "Usage:\n"
             << "  anyps1 <extracted-game-root>\n"
             << "  anyps1 --target linux <extracted-game-root>\n"
-            << "  anyps1 --target windows <extracted-game-root>\n"
-            << "  anyps1 --run <input.ps-exe> <instruction-limit>\n"
-            << "  anyps1 --run-card <input.ps-exe> <memory-card.bin> <instruction-limit>\n"
-            << "  anyps1 --run-video <input.ps-exe> <instruction-limit>\n";
+            << "  anyps1 --target windows <extracted-game-root>\n";
         return 2;
     }
 

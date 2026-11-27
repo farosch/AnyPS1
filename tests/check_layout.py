@@ -4,8 +4,6 @@ from pathlib import Path
 def required_directories(root: Path) -> tuple[Path, ...]:
     return (
         root / "core" / "relinker",
-        root / "core" / "runtime",
-        root / "core" / "host",
         root / "tools",
         root / "tests",
         root / "3rdparty",
@@ -15,8 +13,6 @@ def required_directories(root: Path) -> tuple[Path, ...]:
 def required_files(root: Path) -> tuple[Path, ...]:
     return (
         root / "core" / "anyps1.cpp",
-        root / "core" / "runtime" / "Runtime.h",
-        root / "core" / "host" / "HostVideo.h",
     )
 
 

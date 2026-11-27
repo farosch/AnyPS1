@@ -171,7 +171,7 @@ void write_pe_layout(
 )
 {
     throw std::runtime_error(
-        "native Windows MIPS lowering is not implemented; refusing emulator-style relinking");
+        "native Windows MIPS lowering is not implemented");
 }
 
 void write_linux_native(
@@ -353,7 +353,7 @@ void write_linux_native(
                             std::snprintf(output, sizeof(output), "%02X", static_cast<unsigned>(value));
                             return std::string(output);
                         }(special)
-                        + "; emulator-style relinking is forbidden");
+                        + "; native lowering is unsupported");
                 }
             } else if (opcode == 0x0F) {
                 source << "    movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
@@ -533,7 +533,7 @@ void write_linux_native(
                         std::snprintf(output, sizeof(output), "%02X", static_cast<unsigned>(value));
                         return std::string(output);
                     }(opcode)
-                    + "; emulator-style relinking is forbidden");
+                    + "; native lowering is unsupported");
             }
         }
         if (first_external_jal_target != 0) {
