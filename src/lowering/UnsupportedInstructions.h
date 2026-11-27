@@ -35,6 +35,7 @@ struct MipsInstructionOperands {
 };
 
 MipsInstructionOperands decode_mips_operands(std::uint32_t instruction);
+std::string instruction_family_source_name(const std::string& family);
 
 UnsupportedInstruction classify_unsupported_instruction(
     std::uint32_t instruction);

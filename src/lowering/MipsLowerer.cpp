@@ -197,6 +197,7 @@ void write_linux_native_cfg(
     std::string first_unsupported_name;
     std::uint32_t call_edges = 0;
     std::uint32_t unresolved_indirect_transfers = 0;
+    std::set<std::string> unsupported_family_names;
     leaders.insert(initial_pc);
     work.push(initial_pc);
     while (!work.empty()) {
@@ -304,6 +305,8 @@ void write_linux_native_cfg(
         }
         if (!is_supported_mips_instruction(instruction)) {
             ++unsupported_count;
+            unsupported_family_names.insert(
+                classify_unsupported_instruction(instruction).name);
             if (first_unsupported_address == 0) {
                 first_unsupported_address = address;
                 first_unsupported_word = instruction;
@@ -424,13 +427,10 @@ void write_linux_native_cfg(
     source << "mov $" << first_gap.size() << ", %rdx\n";
     source << "call print_diag\n";
     source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
-    source << "unsupported_special_stub:\njmp unsupported_instruction_exit\n";
-    source << "unsupported_cop0_stub:\njmp unsupported_instruction_exit\n";
-    source << "unsupported_cop1_stub:\njmp unsupported_instruction_exit\n";
-    source << "unsupported_cop2_stub:\njmp unsupported_instruction_exit\n";
-    source << "unsupported_cop3_stub:\njmp unsupported_instruction_exit\n";
-    source << "unsupported_load_store_stub:\njmp unsupported_instruction_exit\n";
-    source << "unsupported_reserved_stub:\njmp unsupported_instruction_exit\n";
+    for (const std::string& family : unsupported_family_names) {
+        source << instruction_family_source_name(family)
+               << ":\njmp unsupported_instruction_exit\n";
+    }
     source << ".text\n";
     source << "print_diag:\n";
     source << "mov $1, %edi\n";
@@ -441,29 +441,9 @@ void write_linux_native_cfg(
     auto emit_unsupported_stub = [&](std::uint32_t instruction) {
         const UnsupportedInstruction unsupported =
             classify_unsupported_instruction(instruction);
-        switch (unsupported.kind) {
-        case UnsupportedInstructionKind::Special:
-            source << "jmp unsupported_special_stub\n";
-            break;
-        case UnsupportedInstructionKind::Cop0:
-            source << "jmp unsupported_cop0_stub\n";
-            break;
-        case UnsupportedInstructionKind::Cop1:
-            source << "jmp unsupported_cop1_stub\n";
-            break;
-        case UnsupportedInstructionKind::Cop2:
-            source << "jmp unsupported_cop2_stub\n";
-            break;
-        case UnsupportedInstructionKind::Cop3:
-            source << "jmp unsupported_cop3_stub\n";
-            break;
-        case UnsupportedInstructionKind::LoadStore:
-            source << "jmp unsupported_load_store_stub\n";
-            break;
-        case UnsupportedInstructionKind::ReservedOpcode:
-            source << "jmp unsupported_reserved_stub\n";
-            break;
-        }
+        source << "jmp "
+               << instruction_family_source_name(unsupported.name)
+               << "\n";
     };
 
     auto emit_normal = [&](std::uint32_t address, std::uint32_t instruction) {

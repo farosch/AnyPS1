@@ -40,6 +40,22 @@ MipsInstructionOperands decode_mips_operands(std::uint32_t instruction)
     return result;
 }
 
+std::string instruction_family_source_name(const std::string& family)
+{
+    std::string result = "unsupported_";
+    for (char character : family) {
+        if ((character >= 'a' && character <= 'z') ||
+            (character >= 'A' && character <= 'Z') ||
+            (character >= '0' && character <= '9')) {
+            result += character;
+        } else {
+            result += '_';
+        }
+    }
+    result += "_stub";
+    return result;
+}
+
 UnsupportedInstruction classify_unsupported_instruction(
     std::uint32_t instruction)
 {

@@ -19,6 +19,15 @@ int main()
                 throw std::runtime_error(
                     "SPECIAL operand decoding is incomplete");
             }
+
+            if (anyps1::instruction_family_source_name("sdc2") !=
+                "unsupported_sdc2_stub") {
+                throw std::runtime_error("source-fix stub name is incorrect");
+            }
+            if (anyps1::instruction_family_source_name("reserved_special_05") !=
+                "unsupported_reserved_special_05_stub") {
+                throw std::runtime_error("reserved source-fix stub name is incorrect");
+            }
         }
 
         const anyps1::MipsInstructionOperands reserved_operands =

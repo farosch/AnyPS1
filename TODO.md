@@ -232,11 +232,11 @@
   shared canonical opcode registry.
 - [x] Add exact MIPS function names and operand decoding for every reserved
   SPECIAL function.
-- [ ] Add exact disassembly for every inventory entry.
-- [ ] Add source-fix stubs for instruction-family implementation functions.
-- [ ] Track newly resolved instruction families and remove their unsupported
+- [x] Add exact disassembly for every inventory entry.
+- [x] Add source-fix stubs for instruction-family implementation functions.
+- [x] Track newly resolved instruction families and remove their unsupported
   stubs automatically.
-- [ ] Ensure inventory counts exclude embedded data and unreachable code.
+- [x] Ensure inventory counts exclude embedded data and unreachable code.
 
 ## Validation and quality
 
