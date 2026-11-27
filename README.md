@@ -27,6 +27,27 @@ artifacts automatically.
 
 ## Relinking
 
+### Building the relinker
+
+Clone the repository with all dependencies, or initialize every submodule in an
+existing checkout:
+
+```sh
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+Configure and build the project with CMake and Ninja:
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+On Windows, open a Visual Studio Developer Command Prompt and run the same
+commands. CMake builds `anyps1.exe` for the Windows target and the test binaries
+under `build/tests`.
+
 Prepare an extracted disc in this layout:
 
 ```text
@@ -47,13 +68,6 @@ prepare one or more CUE/BIN discs:
 
 ```sh
 python3 tools/extract_psx_game.py "/path/to/Game.cue"
-```
-
-Build the project:
-
-```sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
 ```
 
 Relink a Linux executable:
