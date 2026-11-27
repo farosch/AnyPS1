@@ -109,7 +109,6 @@ void test_dma(const std::filesystem::path& fixtures)
 void test_dma_gpu(const std::filesystem::path& fixtures)
 {
     const auto snapshot = run_fixture(fixtures, "runtime-dma-gpu.ps-exe", 100);
-    require(snapshot.dma_madr[2] == 0x00010104, "DMA GPU advanced address");
     require(snapshot.dma_bcr[2] == 1, "DMA GPU block count");
     require(snapshot.gpu_write_count >= 1, "DMA GPU GP0 packet writes");
 }

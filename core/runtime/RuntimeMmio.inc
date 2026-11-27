@@ -122,7 +122,14 @@
             dma_bcr[channel] = value;
         } else if (offset == 8) {
             dma_chcr[channel] = value;
-            if ((value & 0x01000000u) != 0) {
+            const bool busy_start = (value & 0x01000000u) != 0;
+            const bool explicit_block_start =
+                channel == 2 && (value & 1u) != 0
+                && ((value >> 9) & 3u) == 1;
+            const bool explicit_linked_start =
+                channel == 2 && (value & 1u) != 0
+                && ((value >> 9) & 3u) == 2;
+            if (busy_start || explicit_block_start || explicit_linked_start) {
                 dma_pending |= 1u << channel;
                 dma_dispatch_pending();
             }
@@ -142,12 +149,12 @@
                 dma_pending &= ~(1u << channel);
                 const std::uint32_t value = dma_chcr[channel];
                 if (channel == 2
-                    && ((value >> 8) & 3u) == 2
-                    && (value & 0x01000000u) != 0) {
+                    && ((value >> 9) & 3u) == 2
+                    && (value & 1u) != 0) {
                     dma_gpu_linked(dma_madr[channel]);
                 } else if (channel == 2
-                    && ((value >> 8) & 3u) == 1
-                    && (value & 0x01000000u) != 0) {
+                    && ((value >> 9) & 3u) == 1
+                    && (value & 1u) != 0) {
                     dma_block(channel);
                 } else if (channel == 6
                     && (value & 0x01000201u) == 0x01000201u) {
@@ -168,6 +175,17 @@
             ? (block_count == 0 ? 1u : block_count)
             : (block_count == 0 ? word_count : word_count * block_count);
         std::uint32_t address = dma_madr[channel];
+        if (std::getenv("ANYPS1_DMA_TRACE") != nullptr) {
+            std::fprintf(stderr,
+                "DMA-BLOCK channel=%u madr=0x%08X bcr=0x%08X count=%u first=0x%08X pc=0x%08X\n",
+                static_cast<unsigned>(channel),
+                static_cast<unsigned>(dma_madr[channel]),
+                static_cast<unsigned>(dma_bcr[channel]),
+                static_cast<unsigned>(count),
+                static_cast<unsigned>(count != 0 && address < ram_.size()
+                    ? read_ram32(address | 0x80000000) : 0),
+                static_cast<unsigned>(pc_));
+        }
         for (std::uint32_t index = 0; index < count && address < ram_.size(); ++index) {
             if (channel == 2) {
                 gp0_store(read_ram32(address | 0x80000000));
@@ -201,6 +219,14 @@
     void dma_gpu_linked(std::uint32_t address)
     {
         std::uint32_t visited = 0;
+        if (std::getenv("ANYPS1_DMA_TRACE") != nullptr) {
+            std::fprintf(stderr,
+                "DMA-LINK madr=0x%08X header=0x%08X pc=0x%08X\n",
+                static_cast<unsigned>(address),
+                static_cast<unsigned>(address < ram_.size()
+                    ? read_ram32(address | 0x80000000) : 0),
+                static_cast<unsigned>(pc_));
+        }
         for (; visited++ < 4096;) {
             address &= 0x00FFFFFF;
             if (address >= ram_.size()) {

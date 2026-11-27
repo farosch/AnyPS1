@@ -3,6 +3,8 @@
 
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <stdexcept>
 #include <vector>
 
@@ -161,12 +163,20 @@ void HostVideo::present_vram(
 {
     static std::vector<std::uint32_t> frame(1024 * 512);
     std::fill(frame.begin(), frame.end(), 0xFF000000);
-    bool has_vram_content = false;
+    std::uint64_t nonzero = 0;
+    std::uint32_t first_pixel = 0;
+    std::uint32_t first_x = 0;
+    std::uint32_t first_y = 0;
     for (std::uint32_t y = 0; y < display_height && display_y + y < 512; ++y) {
         for (std::uint32_t x = 0; x < display_width && display_x + x < 1024; ++x) {
             const std::uint16_t pixel = vram[(display_y + y) * 1024 + display_x + x];
             if (pixel != 0) {
-                has_vram_content = true;
+                ++nonzero;
+                if (first_pixel == 0) {
+                    first_pixel = pixel;
+                    first_x = display_x + x;
+                    first_y = display_y + y;
+                }
             }
             const std::uint32_t r = (pixel & 0x1F) << 3;
             const std::uint32_t g = ((pixel >> 5) & 0x1F) << 3;
@@ -174,17 +184,17 @@ void HostVideo::present_vram(
             frame[y * 1024 + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
         }
     }
-    if (!has_vram_content) {
-        for (std::uint32_t y = 0; y < 512; ++y) {
-            for (std::uint32_t x = 0; x < 1024; ++x) {
-                const bool border = x < 8 || y < 8 || x >= 1016 || y >= 504;
-                const bool grid = (x % 64 == 0) || (y % 64 == 0);
-                frame[y * 1024 + x] =
-                    border ? 0xFF00A0FF :
-                    grid ? 0xFF244878 :
-                    0xFF102038;
-            }
-        }
+    if (std::getenv("ANYPS1_GPU_TRACE") != nullptr) {
+        std::fprintf(stderr,
+            "HOST-VRAM display=%ux%u+%u,%u nonzero=%llu first=0x%04X@%u,%u\n",
+            static_cast<unsigned>(display_width),
+            static_cast<unsigned>(display_height),
+            static_cast<unsigned>(display_x),
+            static_cast<unsigned>(display_y),
+            static_cast<unsigned long long>(nonzero),
+            static_cast<unsigned>(first_pixel),
+            static_cast<unsigned>(first_x),
+            static_cast<unsigned>(first_y));
     }
     SDL_UpdateTexture(texture, nullptr, frame.data(), 1024 * sizeof(std::uint32_t));
     SDL_RenderClear(renderer);
