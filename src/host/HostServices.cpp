@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -76,8 +77,54 @@ Ps1BiosCallPlan map_ps1_bios_call(
     std::uint32_t vector,
     std::uint32_t function)
 {
-    if (vector == 0xA0u && function == 0x39u) {
+    std::uint32_t vector_id = vector;
+    if ((vector & 0xFF000000u) == 0xA0000000u ||
+        (vector & 0xFF000000u) == 0xB0000000u ||
+        (vector & 0xFF000000u) == 0xC0000000u) {
+        vector_id = vector >> 24;
+    }
+    if (vector_id == 0xA0u && function == 0x39u) {
         return {Ps1BiosCallKind::Memcpy, vector, function};
+    }
+    if (vector_id == 0xB0u) {
+        switch (function) {
+        case 0x00u: return {Ps1BiosCallKind::B0Alloc, vector, function};
+        case 0x01u: return {Ps1BiosCallKind::B0Free, vector, function};
+        case 0x02u: return {Ps1BiosCallKind::B0InitHeap, vector, function};
+        case 0x07u: return {Ps1BiosCallKind::B0DeliverEvent, vector, function};
+        case 0x08u: return {Ps1BiosCallKind::B0OpenEvent, vector, function};
+        case 0x09u: return {Ps1BiosCallKind::B0CloseEvent, vector, function};
+        case 0x0Au: return {Ps1BiosCallKind::B0WaitEvent, vector, function};
+        case 0x0Bu: return {Ps1BiosCallKind::B0TestEvent, vector, function};
+        case 0x0Cu: return {Ps1BiosCallKind::B0EnableEvent, vector, function};
+        case 0x0Du: return {Ps1BiosCallKind::B0DisableEvent, vector, function};
+        case 0x12u: return {Ps1BiosCallKind::B0InitPad, vector, function};
+        case 0x13u: return {Ps1BiosCallKind::B0StartPad, vector, function};
+        case 0x14u: return {Ps1BiosCallKind::B0StopPad, vector, function};
+        case 0x15u: return {Ps1BiosCallKind::B0PadInitDirect, vector, function};
+        case 0x16u: return {Ps1BiosCallKind::B0PadReceive, vector, function};
+        case 0x17u: return {Ps1BiosCallKind::B0ReturnFromException, vector, function};
+        case 0x18u: return {Ps1BiosCallKind::B0ResetEntryInt, vector, function};
+        case 0x32u: return {Ps1BiosCallKind::B0InitCard, vector, function};
+        case 0x33u: return {Ps1BiosCallKind::B0StartCard, vector, function};
+        case 0x35u: return {Ps1BiosCallKind::B0StopCard, vector, function};
+        default: break;
+        }
+    }
+    if (vector_id == 0xC0u) {
+        switch (function) {
+        case 0x00u: return {Ps1BiosCallKind::C0SysEnqIntRP, vector, function};
+        case 0x01u: return {Ps1BiosCallKind::C0SysDeqIntRP, vector, function};
+        case 0x02u: return {Ps1BiosCallKind::C0SysEnqSyscall, vector, function};
+        case 0x03u: return {Ps1BiosCallKind::C0SysDeqSyscall, vector, function};
+        case 0x08u: return {Ps1BiosCallKind::C0CardInfo, vector, function};
+        case 0x09u: return {Ps1BiosCallKind::C0CardLoad, vector, function};
+        case 0x0Au: return {Ps1BiosCallKind::C0CardAuto, vector, function};
+        case 0x0Bu: return {Ps1BiosCallKind::C0NewCard, vector, function};
+        case 0x10u: return {Ps1BiosCallKind::C0FlushCache, vector, function};
+        case 0x13u: return {Ps1BiosCallKind::C0ChangeClearRCnt, vector, function};
+        default: break;
+        }
     }
     return {Ps1BiosCallKind::Unsupported, vector, function};
 }
@@ -472,15 +519,31 @@ struct NativeHostLoopRuntime::Impl {
     std::map<std::uint32_t, std::uint32_t> spu_registers;
     std::vector<std::int16_t> spu_output;
     std::vector<std::uint32_t> gpu_vram;
-    std::map<std::uint32_t, std::uint32_t> mmio;
-    std::uint32_t timer_cycles = 0;
-    std::uint32_t interrupt_status = 0;
-    std::uint32_t interrupt_mask = 0;
+    Ps1DeviceRuntime devices;
     Ps1InputState input_state;
+    std::vector<std::uint8_t> controller_rx;
+    std::size_t controller_rx_read = 0;
+    std::uint32_t joy_mode = 0;
+    std::uint16_t joy_control = 0;
+    std::uint16_t joy_baud = 0;
+    std::uint8_t cd_status_index = 0;
+    std::uint8_t cd_irq = 0;
+    std::uint8_t cd_mode = 0;
+    std::uint32_t cd_lba = 0;
+    std::uint8_t cd_parameter_fifo[16]{};
+    std::size_t cd_parameter_count = 0;
+    std::vector<std::uint8_t> cd_response;
+    std::size_t cd_response_read = 0;
+    bool cd_read_active = false;
     bool initialized = false;
     bool headless = false;
     bool headless_closed = false;
     std::uint32_t headless_frames = 0;
+    std::uint32_t frame_count = 0;
+    std::uint32_t presented_frames = 0;
+    std::uint32_t vblank_count = 0;
+    std::uint64_t queued_audio_samples = 0;
+    std::chrono::steady_clock::time_point last_frame_time{};
 };
 
 NativeHostLoopRuntime::NativeHostLoopRuntime()
@@ -509,6 +572,7 @@ bool NativeHostLoopRuntime::initialize(
         impl_->headless = true;
         impl_->initialized = true;
         impl_->gpu_vram.assign(1024u * 512u, 0u);
+        impl_->last_frame_time = std::chrono::steady_clock::now();
         error.clear();
         return true;
     }
@@ -517,6 +581,7 @@ bool NativeHostLoopRuntime::initialize(
         impl_->headless = true;
         impl_->initialized = true;
         impl_->gpu_vram.assign(1024u * 512u, 0u);
+        impl_->last_frame_time = std::chrono::steady_clock::now();
         error.clear();
         return true;
     }
@@ -546,6 +611,7 @@ bool NativeHostLoopRuntime::initialize(
     }
     impl_->gpu_vram.assign(1024u * 512u, 0u);
     impl_->initialized = true;
+    impl_->last_frame_time = std::chrono::steady_clock::now();
     error.clear();
     return true;
 }
@@ -559,6 +625,8 @@ bool NativeHostLoopRuntime::poll(Ps1InputState& input, std::string& error)
     if (impl_->headless) {
         impl_->input_state = input;
         ++impl_->headless_frames;
+        ++impl_->frame_count;
+        ++impl_->presented_frames;
         if (impl_->headless_frames >= 1u) {
             impl_->headless_closed = true;
         }
@@ -572,14 +640,23 @@ bool NativeHostLoopRuntime::poll(Ps1InputState& input, std::string& error)
     }
     if (!impl_->input.poll(input, error)) return false;
     impl_->input_state = input;
-    std::string presentation_error;
-    if (!impl_->host.present_framebuffer(
-            impl_->gpu_vram.data(),
-            1024u,
-            512u,
-            presentation_error)) {
-        error = presentation_error;
-        return false;
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - impl_->last_frame_time);
+    if (elapsed.count() >= 16) {
+        std::string presentation_error;
+        if (!impl_->host.present_framebuffer(
+                impl_->gpu_vram.data(),
+                1024u,
+                512u,
+                presentation_error)) {
+            error = presentation_error;
+            return false;
+        }
+        ++impl_->frame_count;
+        ++impl_->presented_frames;
+        impl_->last_frame_time = now;
     }
     return true;
 }
@@ -594,7 +671,23 @@ bool NativeHostLoopRuntime::present_framebuffer(
         error = "native host loop runtime is not initialized";
         return false;
     }
-    return impl_->host.present_framebuffer(pixels, width, height, error);
+    if (impl_->headless) {
+        if (pixels == nullptr) {
+            error = "SDL framebuffer pixels are null";
+            return false;
+        }
+        ++impl_->presented_frames;
+        ++impl_->frame_count;
+        error.clear();
+        return true;
+    }
+    if (!impl_->host.present_framebuffer(
+            pixels, width, height, error)) {
+        return false;
+    }
+    ++impl_->presented_frames;
+    ++impl_->frame_count;
+    return true;
 }
 
 bool NativeHostLoopRuntime::queue_audio(
@@ -606,7 +699,20 @@ bool NativeHostLoopRuntime::queue_audio(
         error = "native host loop runtime is not initialized";
         return false;
     }
-    return impl_->host.queue_audio(samples, sample_count, error);
+    if (impl_->headless) {
+        if (samples == nullptr && sample_count != 0) {
+            error = "SDL audio samples are null";
+            return false;
+        }
+        impl_->queued_audio_samples += sample_count;
+        error.clear();
+        return true;
+    }
+    if (!impl_->host.queue_audio(samples, sample_count, error)) {
+        return false;
+    }
+    impl_->queued_audio_samples += sample_count;
+    return true;
 }
 
 bool NativeHostLoopRuntime::should_close() const
@@ -683,6 +789,28 @@ std::uint32_t NativeHostLoopRuntime::controller_state() const
         : 0xFFFFu;
 }
 
+void NativeHostLoopRuntime::attach_ram(std::uint32_t* ram)
+{
+    impl_->devices.attach_ram(ram);
+}
+
+void NativeHostLoopRuntime::set_controller_state(std::uint32_t buttons)
+{
+    impl_->devices.set_controller_state(buttons);
+    impl_->input_state.buttons =
+        static_cast<std::uint16_t>(buttons);
+}
+
+std::uint32_t NativeHostLoopRuntime::read(std::uint32_t address)
+{
+    return impl_->devices.read(address);
+}
+
+int NativeHostLoopRuntime::write(std::uint32_t address, std::uint32_t value)
+{
+    return impl_->devices.write(address, value);
+}
+
 int NativeHostLoopRuntime::spu_write(
     std::uint32_t address,
     std::uint32_t value)
@@ -699,7 +827,7 @@ int NativeHostLoopRuntime::spu_write(
             impl_->spu_output[index + 1u] = sample;
         }
         std::string error;
-        if (!impl_->host.queue_audio(
+        if (!queue_audio(
                 impl_->spu_output.data(),
                 impl_->spu_output.size(),
                 error)) {
@@ -732,57 +860,44 @@ int NativeHostLoopRuntime::gpu_write(
 
 std::uint32_t NativeHostLoopRuntime::mmio_read(std::uint32_t address)
 {
-    const std::uint32_t normalized = address & 0x1FFFFFFFu;
-    if (normalized == 0x1F801070u) return impl_->interrupt_status;
-    if (normalized == 0x1F801074u) return impl_->interrupt_mask;
-    if (normalized >= 0x1F801100u && normalized < 0x1F801130u) {
-        const std::uint32_t timer = (normalized - 0x1F801100u) / 16u;
-        const std::uint32_t offset = (normalized - 0x1F801100u) % 16u;
-        if (offset == 0u) return impl_->timer_cycles + timer * 0x400u;
-    }
-    const auto found = impl_->mmio.find(normalized);
-    return found == impl_->mmio.end() ? 0u : found->second;
+    return impl_->devices.read(address);
 }
 
 int NativeHostLoopRuntime::mmio_write(
     std::uint32_t address,
     std::uint32_t value)
 {
-    const std::uint32_t normalized = address & 0x1FFFFFFFu;
-    if (normalized == 0x1F801070u) {
-        impl_->interrupt_status &= ~value;
-        return 0;
-    }
-    if (normalized == 0x1F801074u) {
-        impl_->interrupt_mask = value;
-        return 0;
-    }
-    if (normalized >= 0x1F801080u && normalized < 0x1F801100u) {
-        impl_->mmio[normalized] = value;
-        if ((normalized & 15u) == 12u && (value & 0x1000000u) != 0) {
-            impl_->mmio[normalized] = value & ~0x1000000u;
-        }
-        return 0;
-    }
-    if (normalized >= 0x1F801100u && normalized < 0x1F801130u) {
-        impl_->mmio[normalized] = value;
-        return 0;
-    }
-    impl_->mmio[normalized] = value;
-    return 0;
+    return impl_->devices.write(address, value);
 }
 
 int NativeHostLoopRuntime::tick(std::uint32_t cycles)
 {
     if (!impl_->initialized) return 18;
-    impl_->timer_cycles += cycles;
-    if ((impl_->timer_cycles / 1024u) != 0u) {
-        impl_->interrupt_status |= 0x4u;
-    }
-    std::string error;
-    anyps1::Ps1InputState input;
-    if (!poll(input, error)) return 18;
+    impl_->devices.set_controller_state(
+        static_cast<std::uint32_t>(impl_->input_state.buttons));
+    impl_->devices.tick(cycles);
+    impl_->vblank_count += cycles / 1024u;
     return should_close() ? 1 : 0;
+}
+
+std::uint32_t NativeHostLoopRuntime::frame_count() const
+{
+    return impl_->frame_count;
+}
+
+std::uint32_t NativeHostLoopRuntime::presented_frame_count() const
+{
+    return impl_->presented_frames;
+}
+
+std::uint32_t NativeHostLoopRuntime::vblank_count() const
+{
+    return impl_->vblank_count;
+}
+
+std::uint64_t NativeHostLoopRuntime::queued_audio_samples() const
+{
+    return impl_->queued_audio_samples;
 }
 
 int NativeHostLoopRuntime::vulkan_init(
@@ -970,13 +1085,22 @@ HostLoopPlan plan_native_host_loop()
         true,
         true,
         true,
+        true,
         true
     };
 }
 
 bool is_supported_bios_vector(std::uint32_t vector)
 {
-    (void)vector;
-    return false;
+    const std::uint32_t function =
+        (vector & 0xFF000000u) == 0xA0000000u ||
+        (vector & 0xFF000000u) == 0xB0000000u ||
+        (vector & 0xFF000000u) == 0xC0000000u
+            ? vector & 0xFFu
+            : 0u;
+    const std::uint32_t vector_id =
+        (vector >> 24) & 0xFFu;
+    return map_ps1_bios_call(vector_id, function).kind !=
+        Ps1BiosCallKind::Unsupported;
 }
 }

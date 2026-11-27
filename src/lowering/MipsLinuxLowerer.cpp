@@ -398,6 +398,10 @@ void MipsLinuxLowerer::lower(
         source << "call anyps1_host_loop_init\n";
         source << "testl %eax, %eax\n";
         source << "jne host_runtime_exit\n";
+        source << "leaq ram(%rip), %rdi\n";
+        source << "call anyps1_host_loop_attach_ram\n";
+        source << "testl %eax, %eax\n";
+        source << "jne host_runtime_exit\n";
         source << "movl $0, host_frame_counter(%rip)\n";
     }
     if (emittable_leaders.find(initial_pc) != emittable_leaders.end()) {
@@ -485,6 +489,44 @@ void MipsLinuxLowerer::lower(
     source << "bios_memcpy_return:\n";
     source << "movl 124(%r12), %eax\n";
     source << "jmp indirect_jump\n";
+    const std::uint32_t bios_vectors[] = {
+        0xB0u, 0xC0u
+    };
+    const std::uint32_t b0_functions[] = {
+        0x00u, 0x01u, 0x02u, 0x07u, 0x08u, 0x09u,
+        0x0Au, 0x0Bu, 0x0Cu, 0x0Du, 0x12u, 0x13u,
+        0x14u, 0x15u, 0x16u, 0x17u, 0x18u, 0x32u,
+        0x33u, 0x35u
+    };
+    const std::uint32_t c0_functions[] = {
+        0x00u, 0x01u, 0x02u, 0x03u, 0x08u, 0x09u, 0x0Au, 0x0Bu,
+        0x10u, 0x13u
+    };
+    for (std::uint32_t vector : bios_vectors) {
+        const std::uint32_t* functions =
+            vector == 0xB0u ? b0_functions : c0_functions;
+        const std::size_t function_count =
+            vector == 0xB0u ? sizeof(b0_functions) / sizeof(b0_functions[0])
+                             : sizeof(c0_functions) / sizeof(c0_functions[0]);
+        for (std::size_t index = 0; index < function_count; ++index) {
+            const std::uint32_t function = functions[index];
+            const std::string label =
+                "bios_" + (vector == 0xB0u ? std::string("b0") : std::string("c0")) +
+                "_" + std::to_string(function);
+            source << "cmpl $" << (vector << 24) << ", %eax\n";
+            source << "jne " << label << "_next_vector\n";
+            source << "cmpl $" << function << ", 36(%r12)\n";
+            source << "jne " << label << "_next_vector\n";
+            if (vector == 0xB0u && function == 0x00u) {
+                source << "movl $0x80100000, 8(%r12)\n";
+            } else {
+                source << "movl $1, 8(%r12)\n";
+            }
+            source << "movl 124(%r12), %eax\n";
+            source << "jmp indirect_jump\n";
+            source << label << "_next_vector:\n";
+        }
+    }
     source << "indirect_leader_dispatch:\n";
     for (std::uint32_t indirect_target : emittable_leaders) {
         source << "cmpl $" << indirect_target << ", %eax\n";
@@ -1005,34 +1047,6 @@ void MipsLinuxLowerer::lower(
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "leaq mmio_state(%rip), %rbx\n";
             source << "andl $0x1FFF, %ecx\n";
-            source << "cmpl $0x1050, %ecx\n";
-            source << "jb mmio_load_controller_" << std::hex << address << std::dec << "\n";
-            source << "cmpl $0x1070, %ecx\n";
-            source << "jae mmio_load_cd_" << std::hex << address << std::dec << "\n";
-            source << "movl %ecx, %edi\n";
-            source << "shrl $4, %edi\n";
-            source << "andl $1, %edi\n";
-            source << "movl %ecx, %esi\n";
-            source << "shrl $4, %esi\n";
-            source << "andl $1023, %esi\n";
-            source << "movl %ecx, %edx\n";
-            source << "andl $15, %edx\n";
-            source << "shll $2, %edx\n";
-            source << "call anyps1_host_loop_memory_card_read\n";
-            source << "movl %eax, %edx\n";
-            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
-            source << "mmio_load_cd_" << std::hex << address << std::dec << ": \n";
-            source << "cmpl $0x1800, %ecx\n";
-            source << "jb mmio_load_default_" << std::hex << address << std::dec << "\n";
-            source << "cmpl $0x1820, %ecx\n";
-            source << "jae mmio_load_default_" << std::hex << address << std::dec << "\n";
-            source << "movl %ecx, %esi\n";
-            source << "andl $2047, %esi\n";
-            source << "movl %esi, %edi\n";
-            source << "movl $0, %esi\n";
-            source << "call anyps1_host_loop_disc_read\n";
-            source << "movl %eax, %edx\n";
-            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_load_controller_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x1040, %ecx\n";
             source << "jb mmio_load_default_" << std::hex << address << std::dec << "\n";
@@ -1456,9 +1470,6 @@ void MipsLinuxLowerer::lower(
             source << "cmpl $1024, host_frame_counter(%rip)\n";
             source << "jb host_frame_tick_done_" << std::hex << address << std::dec << "\n";
             source << "movl $0, host_frame_counter(%rip)\n";
-            source << "call anyps1_host_loop_poll\n";
-            source << "testl %eax, %eax\n";
-            source << "jne host_shutdown_exit\n";
             source << "movl $1024, %edi\n";
             source << "call anyps1_host_loop_tick\n";
             source << "testl %eax, %eax\n";

@@ -46,11 +46,14 @@ int ElfWriter::link(
         linker_args.push_back(assembly.c_str());
         const std::string build_dir = ANYPS1_BUILD_DIR;
         const std::string gte_library = build_dir + "/src/libanyps1_gte.a";
+        const std::string device_library =
+            build_dir + "/src/libanyps1_device.a";
         const std::string host_library = build_dir + "/src/libanyps1_host.a";
         const std::string input_library = build_dir + "/src/libanyps1_input.a";
         const std::string gpu_library = build_dir + "/src/libanyps1_gpu.a";
         linker_args.push_back(gte_library.c_str());
         linker_args.push_back(host_library.c_str());
+        linker_args.push_back(device_library.c_str());
         linker_args.push_back(input_library.c_str());
         linker_args.push_back(gpu_library.c_str());
         linker_args.push_back("-lstdc++");

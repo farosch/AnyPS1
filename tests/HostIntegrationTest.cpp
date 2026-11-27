@@ -35,6 +35,16 @@ int main()
         if (memcpy_call.kind != anyps1::Ps1BiosCallKind::Memcpy) {
             throw std::runtime_error("A0 memcpy BIOS call mapping failed");
         }
+        const anyps1::Ps1BiosCallPlan b0_event =
+            anyps1::map_ps1_bios_call(0xB0u, 0x07u);
+        if (b0_event.kind != anyps1::Ps1BiosCallKind::B0DeliverEvent) {
+            throw std::runtime_error("B0 event BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan c0_timer =
+            anyps1::map_ps1_bios_call(0xC0u, 0x00u);
+        if (c0_timer.kind != anyps1::Ps1BiosCallKind::C0SysEnqIntRP) {
+            throw std::runtime_error("C0 interrupt BIOS call mapping failed");
+        }
         anyps1::NativeFileRuntime files;
         std::string host_error;
         const std::filesystem::path temp =
@@ -91,7 +101,8 @@ int main()
             !host_loop.framebuffer ||
             !host_loop.vulkan ||
             !host_loop.memory_card ||
-            !host_loop.disc) {
+            !host_loop.disc ||
+            !host_loop.vblank_scheduling) {
             throw std::runtime_error("native host loop plan is incomplete");
         }
 
@@ -106,6 +117,39 @@ int main()
         }
         if (anyps1::anyps1_host_loop_controller_state() != 0xFFFFu) {
             throw std::runtime_error("uninitialized controller state is invalid");
+        }
+        {
+            anyps1::Ps1DeviceRuntime devices;
+            devices.set_controller_state(0x5F7Fu);
+            if (devices.write(0x1F801040u, 0x01u) != 0 ||
+                devices.read(0x1F801040u) != 0x00u ||
+                devices.read(0x1F801040u) != 0x41u ||
+                devices.read(0x1F801040u) != 0x5Au ||
+                static_cast<std::uint8_t>(
+                    devices.read(0x1F801040u)) != 0x7Fu ||
+                static_cast<std::uint8_t>(
+                    devices.read(0x1F801040u)) != 0x5Fu) {
+                throw std::runtime_error("controller protocol FIFO failed");
+            }
+            devices.write(0x1F801040u, 0x81u);
+            if (devices.read(0x1F801040u) != 0xFFu ||
+                devices.read(0x1F801040u) != 0xFFu ||
+                devices.read(0x1F801040u) != 0x5Au ||
+                devices.read(0x1F801040u) != 0x5Du) {
+                throw std::runtime_error("memory-card JOY protocol failed");
+            }
+            devices.write(0x1F801800u, 0u);
+            if (devices.write(0x1F801801u, 0x01u) != 0 ||
+                devices.write(0x1F801800u, 1u) != 0 ||
+                devices.read(0x1F801801u) != 0x02u) {
+                throw std::runtime_error("CD-ROM Getstat protocol failed");
+            }
+            devices.write(0x1F801800u, 0u);
+            if (devices.write(0x1F801801u, 0x06u) != 0 ||
+                devices.write(0x1F801800u, 3u) != 0 ||
+                devices.read(0x1F801803u) != 0x11u) {
+                throw std::runtime_error("CD-ROM Read protocol failed");
+            }
         }
         if (anyps1::anyps1_host_loop_spu_read(0x1F801C00u) != 0u) {
             throw std::runtime_error("uninitialized SPU state is invalid");
@@ -143,13 +187,93 @@ int main()
                 runtime.mmio_read(0x1F801074u) != 0x4u) {
                 throw std::runtime_error("interrupt mask MMIO round trip failed");
             }
-            if (runtime.tick(1024u) != 1 ||
+            if (runtime.tick(1024u) != 0 ||
                 runtime.mmio_read(0x1F801070u) != 0x4u) {
                 throw std::runtime_error("timer tick did not assert VBlank status");
             }
             if (runtime.mmio_write(0x1F801070u, 0x4u) != 0 ||
                 runtime.mmio_read(0x1F801070u) != 0u) {
                 throw std::runtime_error("interrupt acknowledge did not clear status");
+            }
+            runtime.set_controller_state(0x12ABu);
+            runtime.write(0x1F801040u, 0x01u);
+            if (runtime.read(0x1F801040u) != 0u ||
+                runtime.read(0x1F801040u) != 0x41u ||
+                runtime.read(0x1F801040u) != 0x5Au) {
+                throw std::runtime_error("controller MMIO FIFO did not progress");
+            }
+            runtime.write(0x1F801800u, 0u);
+            runtime.write(0x1F801801u, 0x01u);
+            runtime.write(0x1F801800u, 1u);
+            if (runtime.read(0x1F801801u) != 0x02u) {
+                throw std::runtime_error("CD-ROM MMIO response did not progress");
+            }
+            anyps1::Ps1InputState polled_input;
+            if (!runtime.poll(polled_input, host_error) ||
+                runtime.frame_count() == 0 ||
+                runtime.presented_frame_count() == 0 ||
+                runtime.vblank_count() != 1) {
+                throw std::runtime_error(
+                    "host frame polling, presentation, or VBlank progression failed");
+            }
+            std::vector<std::uint32_t> framebuffer(
+                1024u * 512u, 0u);
+            if (!runtime.present_framebuffer(
+                    framebuffer.data(), 1024u, 512u, host_error) ||
+                runtime.presented_frame_count() < 2) {
+                throw std::runtime_error(host_error);
+            }
+            const std::int16_t audio[32]{};
+            if (!runtime.queue_audio(audio, 32u, host_error) ||
+                runtime.queued_audio_samples() != 32u) {
+                throw std::runtime_error(host_error);
+            }
+        }
+        {
+            anyps1::Ps1DeviceRuntime devices;
+            std::uint32_t ram[2]{};
+            devices.attach_ram(ram, 2u);
+            devices.set_controller_state(0x1234u);
+            devices.write(0x1F801048u, 1u);
+            if (devices.read(0x1F801040u) != 0u ||
+                devices.read(0x1F801040u) != 0x41u ||
+                devices.read(0x1F801040u) != 0x5Au ||
+                devices.read(0x1F801040u) != 0x34u) {
+                throw std::runtime_error(
+                    "controller state did not progress through serial data");
+            }
+            devices.write(0x1F801800u, 0u);
+            devices.write(0x1F801801u, 0x01u);
+            devices.tick(1u);
+            devices.write(0x1F801800u, 1u);
+            if ((devices.read(0x1F801070u) & 0x4u) == 0u ||
+                devices.read(0x1F801801u) != 0x02u) {
+                throw std::runtime_error(
+                    "CD-ROM command did not produce response and interrupt");
+            }
+            devices.write(0x1F801C00u, 0x4567u);
+            devices.tick(1u);
+            if (devices.read(0x1F801C00u) != 0x4567u) {
+                throw std::runtime_error("SPU register did not persist across ticks");
+            }
+            ram[0] = 0x20FFFFFFu;
+            devices.write(0x1F8010A0u, 0u);
+            devices.write(0x1F8010A4u, 1u);
+            devices.write(0x1F8010A8u, 0x01000001u);
+            if ((devices.read(0x1F801814u) & (1u << 26u)) == 0u) {
+                throw std::runtime_error(
+                    "GPU DMA did not queue native graphics work");
+            }
+            devices.tick(1u);
+            if ((devices.read(0x1F801070u) & 0x8u) == 0u) {
+                throw std::runtime_error(
+                    "GPU DMA progression did not complete");
+            }
+            devices.write(0x1F801104u, 1u);
+            devices.write(0x1F801108u, 1u);
+            devices.tick(1024u);
+            if ((devices.read(0x1F801070u) & 0x1u) == 0u) {
+                throw std::runtime_error("device tick did not assert VBlank");
             }
         }
         const anyps1::HostServiceMapping audio =

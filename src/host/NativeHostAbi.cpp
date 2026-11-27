@@ -116,9 +116,36 @@ int anyps1_host_loop_mmio_write(
 
 int anyps1_host_loop_tick(std::uint32_t cycles)
 {
+    if (native_host_loop == nullptr) return host_runtime_error();
+    return native_host_loop->tick(cycles);
+}
+
+std::uint32_t anyps1_host_loop_frame_count()
+{
     return native_host_loop == nullptr
-        ? host_runtime_error()
-        : native_host_loop->tick(cycles);
+        ? 0u
+        : native_host_loop->frame_count();
+}
+
+std::uint32_t anyps1_host_loop_presented_frame_count()
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->presented_frame_count();
+}
+
+std::uint32_t anyps1_host_loop_vblank_count()
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->vblank_count();
+}
+
+std::uint64_t anyps1_host_loop_queued_audio_samples()
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->queued_audio_samples();
 }
 
 int anyps1_host_loop_vulkan_init(

@@ -58,6 +58,16 @@ add_library(anyps1_host
     host/NativeHostAbi.cpp
 )
 
+add_library(anyps1_device
+    host/Ps1DeviceRuntime.cpp
+)
+target_include_directories(anyps1_device PUBLIC ${CMAKE_SOURCE_DIR}/src)
+if(MSVC)
+    target_compile_options(anyps1_device PRIVATE /GS- /RTC- /Zl /EHs-c- /GR-)
+    set_property(TARGET anyps1_device PROPERTY
+        VS_GLOBAL_BasicRuntimeChecks "Default")
+endif()
+
 add_library(anyps1_memory
     memory/MemoryMap.cpp
 )
@@ -66,14 +76,14 @@ add_library(anyps1_relinker
     relinker/Relinker.cpp
 )
 
-foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1_input anyps1_host anyps1_memory anyps1_relinker)
+foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory anyps1_relinker)
     target_include_directories(${target} PUBLIC ${CMAKE_SOURCE_DIR}/src)
 endforeach()
 
 if(ANYPS1_STRICT_WARNINGS)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gte
-                        anyps1_gpu anyps1_input anyps1_host anyps1_memory
+                        anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory
                         anyps1_relinker anyps1)
             if(TARGET ${target})
                 target_compile_options(${target} PRIVATE
@@ -82,7 +92,7 @@ if(ANYPS1_STRICT_WARNINGS)
         endforeach()
     elseif(MSVC)
         foreach(target anyps1_format anyps1_executable anyps1_lowering
-                        anyps1_gpu anyps1_input anyps1_host anyps1_memory
+                        anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory
                         anyps1_relinker anyps1)
             if(TARGET ${target})
                 target_compile_options(${target} PRIVATE /W4 /WX)
@@ -101,6 +111,7 @@ target_link_libraries(anyps1_lowering PUBLIC anyps1_memory)
 target_link_libraries(anyps1_host PUBLIC SDL3::SDL3)
 target_link_libraries(anyps1_host PUBLIC anyps1_input)
 target_link_libraries(anyps1_host PUBLIC anyps1_gpu)
+target_link_libraries(anyps1_host PUBLIC anyps1_device)
 target_include_directories(anyps1_gpu PUBLIC
     ${CMAKE_SOURCE_DIR}/3rdparty/Vulkan-Headers/include)
 target_link_libraries(anyps1_gpu PUBLIC SDL3::SDL3)

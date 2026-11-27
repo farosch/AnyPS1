@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include "host/Ps1DeviceRuntime.h"
 #include "input/Input.h"
 
 namespace anyps1 {
@@ -63,7 +64,42 @@ Ps1FileCallPlan map_ps1_file_call(std::uint32_t vector);
 
 enum class Ps1BiosCallKind {
     Unsupported,
-    Memcpy
+    Memcpy,
+    B0Alloc,
+    B0Free,
+    B0InitHeap,
+    B0DeliverEvent,
+    B0OpenEvent,
+    B0CloseEvent,
+    B0WaitEvent,
+    B0TestEvent,
+    B0EnableEvent,
+    B0DisableEvent,
+    B0InitPad,
+    B0StartPad,
+    B0StopPad,
+    B0PadInitDirect,
+    B0PadReceive,
+    B0ReturnFromException,
+    B0ResetEntryInt,
+    B0InitCard,
+    B0StartCard,
+    B0StopCard,
+    C0InitRCnt,
+    C0InitException,
+    C0SysEnqIntRP,
+    C0SysDeqIntRP,
+    C0SysEnqSyscall,
+    C0SysDeqSyscall,
+    C0SetConfig,
+    C0SetLang,
+    C0InitHeap,
+    C0ChangeClearRCnt,
+    C0FlushCache,
+    C0CardInfo,
+    C0CardLoad,
+    C0CardAuto,
+    C0NewCard
 };
 
 struct Ps1BiosCallPlan {
@@ -148,6 +184,7 @@ struct HostLoopPlan {
     bool vulkan = true;
     bool memory_card = true;
     bool disc = true;
+    bool vblank_scheduling = true;
 };
 
 HostLoopPlan plan_native_host_loop();
@@ -234,12 +271,20 @@ public:
     void close_disc();
     std::string structured_exit_log(HostExitCode code) const;
     std::uint32_t controller_state() const;
+    void attach_ram(std::uint32_t* ram);
+    void set_controller_state(std::uint32_t buttons);
+    std::uint32_t read(std::uint32_t address);
+    int write(std::uint32_t address, std::uint32_t value);
     int spu_write(std::uint32_t address, std::uint32_t value);
     std::uint32_t spu_read(std::uint32_t address) const;
     int gpu_write(std::uint32_t address, std::uint32_t value);
     std::uint32_t mmio_read(std::uint32_t address);
     int mmio_write(std::uint32_t address, std::uint32_t value);
     int tick(std::uint32_t cycles);
+    std::uint32_t frame_count() const;
+    std::uint32_t presented_frame_count() const;
+    std::uint32_t vblank_count() const;
+    std::uint64_t queued_audio_samples() const;
     int vulkan_init(
         const std::string& title,
         std::uint32_t width,
@@ -276,6 +321,11 @@ int anyps1_host_loop_mmio_write(
     std::uint32_t address,
     std::uint32_t value);
 int anyps1_host_loop_tick(std::uint32_t cycles);
+int anyps1_host_loop_attach_ram(std::uint32_t* ram);
+std::uint32_t anyps1_host_loop_frame_count();
+std::uint32_t anyps1_host_loop_presented_frame_count();
+std::uint32_t anyps1_host_loop_vblank_count();
+std::uint64_t anyps1_host_loop_queued_audio_samples();
 int anyps1_host_loop_memory_card_open(
     int slot,
     const char* path);

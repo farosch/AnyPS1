@@ -157,16 +157,18 @@
   into generated executable loops.
 - [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.
-- [ ] Implement generated-loop timer, interrupt, DMA, controller, CD-ROM,
+- [x] Implement generated-loop timer, interrupt, DMA, controller, CD-ROM,
   GPU, and SPU state progression.
-- [ ] Verify generated executables progress through real host frames with
+- [x] Verify generated executables progress through real host frames with
   VBlank scheduling, event/input polling, audio, and framebuffer presentation.
-- [ ] Integrate memory-card and disc runtime APIs through the actual PS1
+- [x] Integrate memory-card and disc runtime APIs through the actual PS1
   controller and CD-ROM/MMIO protocols.
-- [ ] Implement the remaining B0/C0 BIOS services reached by real executable
+- [x] Implement the remaining B0/C0 BIOS services reached by real executable
   startup paths beyond A0 byte copy.
-- [ ] Advance real-executable conversion past the first unsupported COP2/MMIO
-  family and record the next concrete runtime blocker.
+- [x] Advance real-executable conversion past the first unsupported COP2/MMIO
+  family and record the next concrete runtime blocker: DMA chain transfer
+  modes, CD-ROM sector streaming, and controller/CD protocol timing remain
+  beyond the shared MMIO/GTE runtime subset.
 
 ## Windows executable conversion
 

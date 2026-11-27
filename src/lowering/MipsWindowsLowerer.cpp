@@ -533,6 +533,10 @@ void MipsWindowsLowerer::lower(
 
     source << "INCLUDELIB kernel32.lib\n";
     source << "EXTERN anyps1_gte_execute:PROC\n";
+    source << "EXTERN anyps1_host_loop_attach_ram:PROC\n";
+    source << "EXTERN anyps1_host_loop_device_tick:PROC\n";
+    source << "EXTERN anyps1_device_mmio_read:PROC\n";
+    source << "EXTERN anyps1_device_mmio_write:PROC\n";
     source << "EXTERN GetStdHandle:PROC\n";
     source << "EXTERN WriteFile:PROC\n";
     source << "EXTERN ExitProcess:PROC\n";
@@ -602,6 +606,41 @@ void MipsWindowsLowerer::lower(
     source << "bios_memcpy_return:\n";
     source << "mov eax,dword ptr regs+124\n";
     source << "jmp indirect_jump\n";
+    const std::uint32_t b0_functions[] = {
+        0x00u, 0x01u, 0x02u, 0x07u, 0x08u, 0x09u,
+        0x0Au, 0x0Bu, 0x0Cu, 0x0Du, 0x12u, 0x13u,
+        0x14u, 0x15u, 0x16u, 0x17u, 0x18u, 0x32u,
+        0x33u, 0x35u
+    };
+    const std::uint32_t c0_functions[] = {
+        0x00u, 0x01u, 0x02u, 0x03u, 0x08u, 0x09u, 0x0Au, 0x0Bu,
+        0x10u, 0x13u
+    };
+    for (std::uint32_t vector : {0xB0u, 0xC0u}) {
+        const std::uint32_t* functions =
+            vector == 0xB0u ? b0_functions : c0_functions;
+        const std::size_t function_count =
+            vector == 0xB0u ? sizeof(b0_functions) / sizeof(b0_functions[0])
+                             : sizeof(c0_functions) / sizeof(c0_functions[0]);
+        for (std::size_t index = 0; index < function_count; ++index) {
+            const std::uint32_t function = functions[index];
+            const std::string label =
+                "bios_" + (vector == 0xB0u ? std::string("b0") : std::string("c0")) +
+                "_" + std::to_string(function);
+            source << "cmp eax," << (vector << 24) << "\n";
+            source << "jne " << label << "_next_vector\n";
+            source << "cmp dword ptr regs+36," << function << "\n";
+            source << "jne " << label << "_next_vector\n";
+            if (vector == 0xB0u && function == 0x00u) {
+                source << "mov dword ptr regs+8,80100000h\n";
+            } else {
+                source << "mov dword ptr regs+8,1\n";
+            }
+            source << "mov eax,dword ptr regs+124\n";
+            source << "jmp indirect_jump\n";
+            source << label << "_next_vector:\n";
+        }
+    }
     source << "indirect_leader_dispatch:\n";
     for (std::uint32_t target : emittable_leaders) {
         if (target >= load_address &&
@@ -647,6 +686,8 @@ void MipsWindowsLowerer::lower(
     source << "add rdi," << payload_ram_offset << "\n";
     source << "mov ecx," << file_size << "\n";
     source << "rep movsb\n";
+    source << "lea rcx,ram\n";
+    source << "call anyps1_host_loop_attach_ram\n";
     source << "mov dword ptr regs+116," << initial_sp << "\n";
     source << "mov dword ptr regs+112," << initial_gp << "\n";
     source << "lea r12,regs\n";
@@ -685,7 +726,10 @@ void MipsWindowsLowerer::lower(
         source << "cmp dword ptr host_cycles,1024\n";
         source << "jb host_tick_done_" << std::hex << address << std::dec << "\n";
         source << "mov dword ptr host_cycles,0\n";
-        source << "or dword ptr mmio_state+070h,4\n";
+        source << "mov ecx,1024\n";
+        source << "call anyps1_host_loop_device_tick\n";
+        source << "test eax,eax\n";
+        source << "jne unsupported_host_exit\n";
         source << "host_tick_done_" << std::hex << address << std::dec << ":\n";
         source << "mov al,byte ptr pending_load_valid\n";
         source << "mov byte ptr previous_load_valid,al\n";
@@ -1263,13 +1307,13 @@ void MipsWindowsLowerer::lower(
             source << "jb host_address_continue_" << std::hex << address << std::dec << "\n";
             source << "cmp eax,1F802000h\n";
             source << "jae host_address_continue_" << std::hex << address << std::dec << "\n";
-            source << "sub eax,1F801000h\n";
-            source << "lea rbx,mmio_state\n";
-            if (opcode == 0x20) source << "movsx edx,byte ptr [rbx+rax]\n";
-            else if (opcode == 0x21) source << "movsx edx,word ptr [rbx+rax]\n";
-            else if (opcode == 0x23) source << "mov edx,dword ptr [rbx+rax]\n";
-            else if (opcode == 0x24) source << "movzx edx,byte ptr [rbx+rax]\n";
-            else source << "movzx edx,word ptr [rbx+rax]\n";
+            source << "mov ecx,eax\n";
+            source << "call anyps1_device_mmio_read\n";
+            if (opcode == 0x20) source << "movsx edx,al\n";
+            else if (opcode == 0x21) source << "movsx edx,ax\n";
+            else if (opcode == 0x23) source << "mov edx,eax\n";
+            else if (opcode == 0x24) source << "movzx edx,al\n";
+            else source << "movzx edx,ax\n";
             source << "mov dword ptr pending_load_value,edx\n";
             source << "mov byte ptr pending_load_register," << rt << "\n";
             source << "mov byte ptr pending_load_valid,1\n";
@@ -1345,12 +1389,13 @@ void MipsWindowsLowerer::lower(
             source << "jb host_store_continue_" << std::hex << address << std::dec << "\n";
             source << "cmp eax,1F802000h\n";
             source << "jae host_store_continue_" << std::hex << address << std::dec << "\n";
-            source << "sub eax,1F801000h\n";
-            source << "lea rbx,mmio_state\n";
             source << "mov edx,dword ptr [r12+" << rt * 4 << "]\n";
-            if (opcode == 0x28) source << "mov byte ptr [rbx+rax],dl\n";
-            else if (opcode == 0x29) source << "mov word ptr [rbx+rax],dx\n";
-            else source << "mov dword ptr [rbx+rax],edx\n";
+            source << "mov ecx,eax\n";
+            if (opcode == 0x28) source << "and edx,0FFh\n";
+            else if (opcode == 0x29) source << "and edx,0FFFFh\n";
+            source << "call anyps1_device_mmio_write\n";
+            source << "test eax,eax\n";
+            source << "jne unsupported_host_exit\n";
             source << "jmp mmio_store_complete_" << std::hex << address << std::dec << "\n";
             source << "host_store_continue_" << std::hex << address << std::dec << ":\n";
             source << "cmp eax,1F800000h\n";
@@ -1542,6 +1587,14 @@ void MipsWindowsLowerer::lower(
             "cannot locate native Windows GTE runtime library");
     }
     link_arguments += " \"" + gte_library.string() + "\"";
+    const std::filesystem::path device_library =
+        std::filesystem::path(ANYPS1_BUILD_DIR) / "src" /
+        "Debug" / "anyps1_device.lib";
+    if (!std::filesystem::is_regular_file(device_library)) {
+        throw std::runtime_error(
+            "cannot locate native device runtime library");
+    }
+    link_arguments += " \"" + device_library.string() + "\"";
     for (const std::filesystem::path& library_dir :
          find_windows_library_dirs()) {
         link_arguments += " /LIBPATH:\"" + library_dir.string() + "\"";
