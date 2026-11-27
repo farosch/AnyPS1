@@ -10,7 +10,16 @@ enum class HostServiceKind {
     Input,
     Audio,
     Video,
-    VulkanFramebuffer
+    VulkanFramebuffer,
+    CdRom,
+    Timers,
+    Controllers,
+    MemoryCard,
+    Spu,
+    Dma,
+    Interrupt,
+    Cache,
+    Peripheral
 };
 
 struct HostServiceMapping {

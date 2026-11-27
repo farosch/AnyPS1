@@ -119,3 +119,9 @@ target_link_libraries(anyps1_payload_region_test PRIVATE anyps1_lowering)
 add_test(NAME payload_region_classifier
     COMMAND anyps1_payload_region_test)
 
+add_executable(anyps1_memory_map_test MemoryMapTest.cpp)
+target_include_directories(anyps1_memory_map_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(anyps1_memory_map_test PRIVATE anyps1_memory)
+add_test(NAME memory_map_mmio_dma
+    COMMAND anyps1_memory_map_test)
+

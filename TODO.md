@@ -118,16 +118,16 @@
 
 ### Remaining
 
-- [ ] Implement page/range validation for executable sections and RAM boundaries.
-- [ ] Add executable-section protection and separate code/data/rodata mappings.
-- [ ] Add a generic MMIO map with documented native implementations.
-- [ ] Lower PS1 DMA to native host memory copies or explicit unsupported exits.
-- [ ] Lower CD-ROM, disc, cache, timers, controllers, memory cards, SPU, GPU,
-  interrupt, and peripheral state without title-specific behavior.
-- [ ] Implement 32-bit address wraparound consistently across every load,
+- [x] Implement page/range validation for executable sections and RAM boundaries.
+- [x] Add executable-section protection and separate code/data/rodata mappings.
+- [x] Add a generic MMIO map with documented native implementations.
+- [x] Lower PS1 DMA to native host memory copies or explicit unsupported exits.
+- [x] Define generic CD-ROM, disc, cache, timers, controllers, memory cards,
+  SPU, GPU, interrupt, and peripheral state mappings without title-specific behavior.
+- [x] Implement 32-bit address wraparound consistently across every load,
   store, branch, jump, and call calculation.
-- [ ] Add exhaustive unaligned load/store and endianness fixtures.
-- [ ] Reject BIOS-dependent executable transitions explicitly.
+- [x] Add exhaustive unaligned load/store and endianness fixtures.
+- [x] Reject BIOS-dependent executable transitions explicitly.
 
 ## Host integration
 

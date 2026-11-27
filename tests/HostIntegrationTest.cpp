@@ -44,6 +44,17 @@ int main()
         if (plan.pipeline_primitives.empty()) {
             throw std::runtime_error("host graphics lowering produced no pipeline");
         }
+        const anyps1::HostServiceMapping dma =
+            anyps1::map_host_service(anyps1::HostServiceKind::Dma);
+        const anyps1::HostServiceMapping cdrom =
+            anyps1::map_host_service(anyps1::HostServiceKind::CdRom);
+        const anyps1::HostServiceMapping spu =
+            anyps1::map_host_service(anyps1::HostServiceKind::Spu);
+        if (dma.kind != anyps1::HostServiceKind::Dma ||
+            cdrom.kind != anyps1::HostServiceKind::CdRom ||
+            spu.kind != anyps1::HostServiceKind::Spu) {
+            throw std::runtime_error("peripheral host mappings are incomplete");
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Host integration test failed: " << error.what() << "\n";

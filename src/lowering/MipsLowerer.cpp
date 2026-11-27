@@ -3,6 +3,7 @@
 #include "format/PsExe.h"
 #include "UnsupportedInstructions.h"
 #include "PayloadRegion.h"
+#include "memory/MemoryMap.h"
 
 #include <algorithm>
 #include <array>
@@ -28,6 +29,14 @@
 namespace anyps1 {
 
 namespace {
+
+constexpr std::uint32_t PS1_RAM_BASE = 0x00000000u;
+constexpr std::uint32_t PS1_RAM_SIZE = 0x00200000u;
+constexpr std::uint32_t PS1_SCRATCHPAD_BASE = 0x1F800000u;
+constexpr std::uint32_t PS1_SCRATCHPAD_SIZE = 0x400u;
+constexpr std::uint32_t PS1_MMIO_BASE = 0x1F801000u;
+constexpr std::uint32_t PS1_BIOS_BASE = 0x1FC00000u;
+constexpr std::uint32_t PS1_BIOS_SIZE = 0x00080000u;
 
 int execute_linker(const std::filesystem::path& assembly,
                    const std::filesystem::path& output)
@@ -355,6 +364,13 @@ void write_linux_native_cfg(
         "embedded_data_words=" + std::to_string(embedded_data_count) + "\n";
     const std::string unknown =
         "unknown_region_words=" + std::to_string(unknown_region_count) + "\n";
+    const std::string executable_range =
+        "executable_range=" + hex32(load_address) + "-" +
+        hex32(static_cast<std::uint32_t>(load_address + file_size)) + "\n";
+    const std::string ram_range =
+        "ram_range=0x00000000-0x00200000\n";
+    const std::string scratchpad_range =
+        "scratchpad_range=0x1F800000-0x1F800400\n";
     const std::string unsupported =
         "unsupported_instructions=" + std::to_string(unsupported_count) + "\n";
     const std::string first_gap =
@@ -384,6 +400,9 @@ void write_linux_native_cfg(
     source << "diag_supported:.asciz \"" << escape_assembly_string(supported) << "\"\n";
     source << "diag_embedded:.asciz \"" << escape_assembly_string(embedded) << "\"\n";
     source << "diag_unknown:.asciz \"" << escape_assembly_string(unknown) << "\"\n";
+    source << "diag_executable_range:.asciz \"" << escape_assembly_string(executable_range) << "\"\n";
+    source << "diag_ram_range:.asciz \"" << escape_assembly_string(ram_range) << "\"\n";
+    source << "diag_scratchpad_range:.asciz \"" << escape_assembly_string(scratchpad_range) << "\"\n";
     source << "diag_unsupported:.asciz \"" << escape_assembly_string(unsupported) << "\"\n";
     source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
@@ -403,6 +422,9 @@ void write_linux_native_cfg(
     source << "leaq diag_supported(%rip), %rsi\nmov $" << supported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_embedded(%rip), %rsi\nmov $" << embedded.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_unknown(%rip), %rsi\nmov $" << unknown.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_executable_range(%rip), %rsi\nmov $" << executable_range.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_ram_range(%rip), %rsi\nmov $" << ram_range.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_scratchpad_range(%rip), %rsi\nmov $" << scratchpad_range.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_unsupported(%rip), %rsi\nmov $" << unsupported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";
