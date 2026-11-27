@@ -7,14 +7,16 @@
   host linking.
 - [ ] Link each lowered executable with only host-native code and host-native
   data.
-- [ ] Add real Linux launch fixtures and verify them with `file`, `readelf`,
+- [x] Add real Linux launch fixtures and verify them with `file`, `readelf`,
   execution, and exit status.
-- [ ] Expand native executable terminal diagnostics with register, memory,
-  lowering, instruction, and exit-status details.
+- [x] Add native executable terminal diagnostics with target, addresses, GP/SP,
+  payload size, lowering size, and completion status.
 
 ## MIPS instruction lowering
 
 - [x] Add a direct lowering path for NOP and a tested arithmetic/control subset.
+- [x] Lower variable SLLV/SRLV/SRAV shifts and MTHI/MTLO in native entry and
+  JAL target blocks.
 - [ ] Lower every MIPS I instruction used by PS-X executables:
   ADD/ADDU/SUB/SUBU, AND/OR/XOR/NOR, SLT/SLTU, shifts, variable shifts,
   ADDI/ADDIU/ANDI/ORI/XORI/LUI, SLTI/SLTIU, load/store byte/half/word,
@@ -46,7 +48,7 @@
 - [ ] Replace PS1 BIOS-vector assumptions with native host services or explicit
   unsupported conversion results.
 - [ ] Document native equivalents for file, input, audio, video, and console APIs.
-- [ ] Add direct native I/O/exit handling.
+- [x] Add direct native I/O/exit handling.
 - [ ] Do not require BIOS images or external PS-X state.
 
 ## Windows executable conversion
@@ -60,10 +62,10 @@
 
 - [ ] Replace synthetic-only lowerer tests with minimal executable fixtures
   covering arithmetic, load/store, branches, calls, delay slots, and entrypoints.
-- [ ] Add negative fixtures for unsupported instructions and malformed headers.
+- [x] Add negative fixtures for malformed and truncated PS-X headers.
 - [ ] Relink all available reference games and report the exact first native
   lowering gap for each executable.
-- [ ] Add end-to-end tests that run a lowered executable and verify native exit
+- [x] Add end-to-end tests that run a lowered executable and verify native exit
   status and observable host output.
 - [ ] Add all conversion results to TODO/dev docs without recording interpretation
   behavior as a relinker requirement.

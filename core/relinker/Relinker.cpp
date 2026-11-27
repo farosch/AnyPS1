@@ -321,6 +321,21 @@ void write_linux_native(
                     source << "    movl " << rt * 4 << "(%r12), %eax\n";
                     source << "    shll $" << shamt << ", %eax\n";
                     source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x04) {
+                    source << "    movl " << rs * 4 << "(%r12), %ecx\n";
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    shll %cl, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x06) {
+                    source << "    movl " << rs * 4 << "(%r12), %ecx\n";
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    shrl %cl, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x07) {
+                    source << "    movl " << rs * 4 << "(%r12), %ecx\n";
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    sarl %cl, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
                 } else if (special == 0x02) {
                     source << "    movl " << rt * 4 << "(%r12), %eax\n";
                     source << "    shrl $" << shamt << ", %eax\n";
@@ -403,6 +418,12 @@ void write_linux_native(
                 } else if (special == 0x10) {
                     source << "    movl 132(%r12), %eax\n";
                     source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (special == 0x11) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, 132(%r12)\n";
+                } else if (special == 0x13) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, 128(%r12)\n";
                 } else if (special == 0x0D || special == 0x0C) {
                     source << "    xor %edi, %edi\n";
                     source << "    mov $60, %eax\n";
@@ -625,6 +646,21 @@ void write_linux_native(
                     source << "    movl " << rt * 4 << "(%r12), %eax\n";
                     source << "    shll $" << shamt << ", %eax\n";
                     source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x04) {
+                    source << "    movl " << rs * 4 << "(%r12), %ecx\n";
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    shll %cl, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x06) {
+                    source << "    movl " << rs * 4 << "(%r12), %ecx\n";
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    shrl %cl, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
+                } else if (opcode == 0 && special == 0x07) {
+                    source << "    movl " << rs * 4 << "(%r12), %ecx\n";
+                    source << "    movl " << rt * 4 << "(%r12), %eax\n";
+                    source << "    sarl %cl, %eax\n";
+                    source << "    movl %eax, " << rd * 4 << "(%r12)\n";
                 } else if (opcode == 0 && special == 0x21) {
                     source << "    movl " << rs * 4 << "(%r12), %eax\n";
                     source << "    addl " << rt * 4 << "(%r12), %eax\n";
@@ -665,6 +701,12 @@ void write_linux_native(
                     source << "    imull %ecx\n";
                     source << "    movl %eax, 128(%r12)\n";
                     source << "    movl %edx, 132(%r12)\n";
+                } else if (opcode == 0 && special == 0x11) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, 132(%r12)\n";
+                } else if (opcode == 0 && special == 0x13) {
+                    source << "    movl " << rs * 4 << "(%r12), %eax\n";
+                    source << "    movl %eax, 128(%r12)\n";
                 } else if (opcode == 0 && (special == 0x1A || special == 0x1B)) {
                     source << "    movl " << rs * 4 << "(%r12), %eax\n";
                     source << "    movl " << rt * 4 << "(%r12), %ecx\n";
@@ -829,7 +871,13 @@ bool relink(const RelinkOptions& options)
         return true;
     }
 
-    write_linux_native(resolved, data);
+    try {
+        write_linux_native(resolved, data);
+    } catch (...) {
+        std::filesystem::remove(resolved.output + ".native.s");
+        std::filesystem::remove(resolved.output + ".native.bin");
+        throw;
+    }
     return true;
 }
 

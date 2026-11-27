@@ -1,0 +1,21 @@
+{
+  "kind": "psx_exe",
+  "header": {
+    "initial_pc": 2147549192,
+    "initial_gp": 0,
+    "load_address": 2147549184,
+    "file_size": 32,
+    "initial_sp_base": 0,
+    "initial_sp_offset": 0
+  },
+  "instructions": [
+    2227204,
+    2227206,
+    2227207,
+    0,
+    2097169,
+    2097171,
+    0,
+    0
+  ]
+}

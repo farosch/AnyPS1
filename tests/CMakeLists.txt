@@ -25,4 +25,7 @@ target_include_directories(anyps1_relinker_test PRIVATE ${CMAKE_SOURCE_DIR}/core
 target_link_libraries(anyps1_relinker_test PRIVATE anyps1_relinker)
 add_dependencies(anyps1_relinker_test generate_test_fixtures)
 add_test(NAME relinker_artifact COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/valid.ps-exe)
+add_test(NAME relinker_native_subset COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-subset.ps-exe)
+add_test(NAME relinker_invalid_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/invalid.ps-exe)
+add_test(NAME relinker_truncated_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/truncated.ps-exe)
 

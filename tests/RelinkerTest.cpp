@@ -9,6 +9,8 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <iterator>
+#include <vector>
 
 int main(int argc, char** argv)
 {
@@ -31,6 +33,42 @@ int main(int argc, char** argv)
         std::ofstream system_cnf(std::filesystem::path(game_root) / "SYSTEM.CNF");
         system_cnf << "BOOT=cdrom:\\SCUS_941.63;1\n";
         system_cnf.close();
+
+        {
+            std::ifstream candidate(input_path, std::ios::binary);
+            std::vector<unsigned char> bytes{
+                std::istreambuf_iterator<char>(candidate),
+                std::istreambuf_iterator<char>()
+            };
+            bool malformed = bytes.size() < 2048
+                || std::memcmp(bytes.data(), "PS-X EXE", 8) != 0;
+            if (!malformed && bytes.size() >= 0x20) {
+                const std::uint32_t declared =
+                    static_cast<std::uint32_t>(bytes[0x1C])
+                    | (static_cast<std::uint32_t>(bytes[0x1D]) << 8)
+                    | (static_cast<std::uint32_t>(bytes[0x1E]) << 16)
+                    | (static_cast<std::uint32_t>(bytes[0x1F]) << 24);
+                malformed = 2048ULL + declared > bytes.size();
+            }
+            if (malformed) {
+                anyps1::RelinkOptions malformed_options;
+                malformed_options.input = game_root;
+                try {
+                    anyps1::relink(malformed_options);
+                    throw std::runtime_error("malformed fixture unexpectedly relinked");
+                } catch (const std::exception& error) {
+                    if (std::string(error.what()).find("unsupported") == std::string::npos
+                        && std::string(error.what()).find("truncated") == std::string::npos
+                        && std::string(error.what()).find("invalid") == std::string::npos
+                        && std::string(error.what()).find("shorter") == std::string::npos
+                        && std::string(error.what()).find("declared size") == std::string::npos) {
+                        throw;
+                    }
+                }
+                std::filesystem::remove_all(game_root);
+                return 0;
+            }
+        }
 
         anyps1::RelinkOptions options;
         options.input = game_root;
