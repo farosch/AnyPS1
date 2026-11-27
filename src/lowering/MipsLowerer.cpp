@@ -217,7 +217,7 @@ void write_linux_native_cfg(
         const std::uint32_t special = instruction & 63u;
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
             || opcode == 0x06 || opcode == 0x07
-            || (opcode == 0x11 && rs == 8);
+            || (opcode == 0x11 && (rs == 8 || rs == 12));
         const bool jump = opcode == 0x02 || opcode == 0x03;
         const bool jr = opcode == 0 && special == 0x08;
         const bool jalr = opcode == 0 && special == 0x09;
@@ -593,6 +593,31 @@ void write_linux_native_cfg(
                 } else if (special == 4) {
                     source << "sqrtss fregs+" << fs * 4 << "(%rip), %xmm0\n";
                     source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 0x20) {
+                    source << "cvttss2si fregs+" << fs * 4 << "(%rip), %eax\n";
+                    source << "movl %eax, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 0x24) {
+                    source << "movl fregs+" << fs * 4 << "(%rip), %eax\n";
+                    source << "cvtsi2ss %eax, %xmm0\n";
+                    source << "movss %xmm0, fregs+" << fd * 4 << "(%rip)\n";
+                } else if (special == 0x32) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "comiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "setb %dl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
+                } else if (special == 0x36) {
+                    source << "movss fregs+" << fs * 4 << "(%rip), %xmm0\n";
+                    source << "comiss fregs+" << ft * 4 << "(%rip), %xmm0\n";
+                    source << "movl fpcsr(%rip), %eax\n";
+                    source << "andl $~1, %eax\n";
+                    source << "setbe %dl\n";
+                    source << "movzbl %dl, %edx\n";
+                    source << "orl %edx, %eax\n";
+                    source << "movl %eax, fpcsr(%rip)\n";
                 } else {
                     emit_unsupported_stub(instruction);
                 }
@@ -894,10 +919,10 @@ void write_linux_native_cfg(
             if (target < load_address || target >= load_address + file_size ||
                 leaders.find(target) == leaders.end()) {
                 source << "jmp unsupported_jump_exit\n";
-            } else if (opcode == 0x11 && rs == 8) {
+            } else if (opcode == 0x11 && (rs == 8 || rs == 12)) {
                 source << "movl fpcsr(%rip), %eax\n";
                 source << "testl $1, %eax\n";
-                if (rt == 0) {
+                if (rt == 0 || rt == 2) {
                     source << "jz p" << std::hex << target << std::dec << "\n";
                 } else {
                     source << "jnz p" << std::hex << target << std::dec << "\n";
