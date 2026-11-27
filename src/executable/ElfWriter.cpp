@@ -44,6 +44,7 @@ int ElfWriter::link(
         linker_args.push_back("-o");
         linker_args.push_back(output.c_str());
         linker_args.push_back(assembly.c_str());
+        linker_args.push_back("-lanyps1_gte");
         const std::string build_dir = ANYPS1_BUILD_DIR;
         const std::string host_library = build_dir + "/src/libanyps1_host.a";
         const std::string input_library = build_dir + "/src/libanyps1_input.a";

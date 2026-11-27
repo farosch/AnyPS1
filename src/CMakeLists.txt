@@ -32,6 +32,18 @@ add_library(anyps1_lowering
     lowering/UnsupportedInstructions.cpp
     lowering/PayloadRegion.cpp
 )
+target_compile_definitions(anyps1_lowering PRIVATE
+    ANYPS1_BUILD_DIR="${CMAKE_BINARY_DIR}")
+add_library(anyps1_gte
+    lowering/GteRuntime.cpp
+)
+target_include_directories(anyps1_gte PUBLIC ${CMAKE_SOURCE_DIR}/src)
+if(MSVC)
+    target_compile_options(anyps1_gte PRIVATE /GS- /Zl /EHs-c- /GR-)
+    set_property(TARGET anyps1_gte PROPERTY
+        VS_GLOBAL_BasicRuntimeChecks "Default")
+endif()
+add_dependencies(anyps1_lowering anyps1_gte)
 
 add_library(anyps1_gpu
     gpu/Graphics.cpp
@@ -60,7 +72,7 @@ endforeach()
 
 if(ANYPS1_STRICT_WARNINGS)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        foreach(target anyps1_format anyps1_executable anyps1_lowering
+        foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gte
                         anyps1_gpu anyps1_input anyps1_host anyps1_memory
                         anyps1_relinker anyps1)
             if(TARGET ${target})

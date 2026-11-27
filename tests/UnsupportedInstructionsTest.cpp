@@ -67,9 +67,9 @@ int main()
             0x48C8F000u
         };
         for (const std::uint32_t operation : gte_operations) {
-            if (anyps1::is_supported_mips_instruction(operation)) {
+            if (!anyps1::is_supported_mips_instruction(operation)) {
                 throw std::runtime_error(
-                    "placeholder COP2/GTE operation was classified as supported");
+                    "shared COP2/GTE operation was classified as unsupported");
             }
         }
         if (!anyps1::is_supported_mips_instruction(0xC8200000u) ||

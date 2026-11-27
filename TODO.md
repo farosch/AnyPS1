@@ -48,10 +48,11 @@
   endianness, unaligned access, and HI/LO semantics with focused fixtures.
 - [x] Add support for sparse control-flow regions and discontinuous executable
   sections in CFG discovery.
-- [ ] Implement native PS1 COP2/GTE matrix, vector, color, perspective,
-  interpolation, saturation, and flag behavior on Linux and Windows.
-- [ ] Reconstruct bounded indirect jump-table targets and preserve explicit exits
-  for unresolved runtime control-flow destinations.
+- [ ] Complete PS1 COP2/GTE matrix, vector, color, perspective, interpolation,
+  saturation, and flag semantics beyond the shared runtime operation subset
+  currently reached by reference executables.
+- [ ] Extend indirect jump-table reconstruction to distinguish executable
+  destinations from embedded data reached by runtime control flow.
 - [ ] Add semantic fixtures for every COP2/GTE operation reached by real
   executable inventories.
 

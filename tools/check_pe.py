@@ -45,8 +45,8 @@ def main() -> int:
         optional_magic = struct.unpack_from("<H", pe, pe_offset + 24)[0]
         if machine != 0x8664:
             raise ValueError("PE machine is not AMD64")
-        if section_count != 4:
-            raise ValueError("PE section count is not 4")
+        if section_count not in (4, 5):
+            raise ValueError("PE section count is neither 4 nor 5")
         if coff_size != 240:
             raise ValueError("PE COFF optional header size is invalid")
         if optional_magic != 0x20B:
@@ -80,12 +80,13 @@ def main() -> int:
             raise ValueError("PE import directory is invalid")
 
         section_offset = optional_offset + coff_size
-        expected_sections = (
+        expected_sections = [
             (b".text", 0x1000, 0x400, 0x60000020),
-            (b".rdata", 0x2000, None, 0x40000040),
-            (b".data", 0x3000, None, 0xC0000040),
-            (b".reloc", 0x204000, None, 0x42000040),
-        )
+            (b".rdata", None, None, 0x40000040),
+            (b".data", None, None, 0xC0000040),
+            (b".reloc", None, None, 0x42000040),
+        ]
+        previous_rva = 0
         for index, expected in enumerate(expected_sections):
             offset = section_offset + index * 40
             name, rva, raw_offset, characteristics = expected
@@ -95,8 +96,12 @@ def main() -> int:
             raw_size = struct.unpack_from("<I", pe, offset + 16)[0]
             if virtual_size == 0 or raw_size == 0:
                 raise ValueError("unexpected PE section size")
-            if struct.unpack_from("<I", pe, offset + 12)[0] != rva:
+            actual_rva = struct.unpack_from("<I", pe, offset + 12)[0]
+            if rva is not None and actual_rva != rva:
                 raise ValueError("unexpected PE section RVA")
+            if actual_rva <= previous_rva or actual_rva % section_alignment != 0:
+                raise ValueError("PE section RVAs are not ordered and aligned")
+            previous_rva = actual_rva
             actual_raw_offset = struct.unpack_from("<I", pe, offset + 20)[0]
             if raw_offset is not None and actual_raw_offset != raw_offset:
                 raise ValueError("unexpected PE section raw offset")

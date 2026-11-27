@@ -323,7 +323,21 @@ void MipsWindowsLowerer::lower(
                 leaders.insert(resolved_target);
                 work.push(resolved_target);
             } else {
-                ++unresolved_indirect_transfers;
+                const std::vector<std::uint32_t> table_targets =
+                    discover_indirect_table_targets(
+                        data,
+                        load_address,
+                        file_size,
+                        address,
+                        rs);
+                if (table_targets.empty()) {
+                    ++unresolved_indirect_transfers;
+                } else {
+                    for (std::uint32_t target : table_targets) {
+                        leaders.insert(target);
+                        work.push(target);
+                    }
+                }
             }
         }
         if (branch || jump || jr || jalr) {
@@ -351,7 +365,10 @@ void MipsWindowsLowerer::lower(
             ++embedded_data_count;
             continue;
         }
-        emittable_leaders.insert(address);
+        if (region == PayloadRegionKind::Instruction ||
+            is_supported_mips_instruction(instruction)) {
+            emittable_leaders.insert(address);
+        }
         if (region == PayloadRegionKind::Unknown) ++unknown_region_count;
         ++reachable_count;
         if (!is_supported_mips_instruction(instruction)) {
@@ -470,6 +487,7 @@ void MipsWindowsLowerer::lower(
     source << "\n";
 
     source << "INCLUDELIB kernel32.lib\n";
+    source << "EXTERN anyps1_gte_execute:PROC\n";
     source << "EXTERN GetStdHandle:PROC\n";
     source << "EXTERN WriteFile:PROC\n";
     source << "EXTERN ExitProcess:PROC\n";
@@ -523,11 +541,6 @@ void MipsWindowsLowerer::lower(
         source << "call WriteFile\n";
     }
 
-    if (unsupported_count != 0) {
-        source << "mov ecx,16\n";
-        source << "call ExitProcess\n";
-    }
-
     source << "lea rsi,payload\n";
     source << "lea rdi,ram\n";
     source << "mov ecx," << file_size << "\n";
@@ -535,7 +548,11 @@ void MipsWindowsLowerer::lower(
     source << "mov dword ptr regs+116," << initial_sp << "\n";
     source << "mov dword ptr regs+112," << initial_gp << "\n";
     source << "lea r12,regs\n";
-    source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
+    if (emittable_leaders.find(initial_pc) != emittable_leaders.end()) {
+        source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
+    } else {
+        source << "jmp unsupported_exit\n";
+    }
 
     auto emit_label_jump = [&](std::uint32_t target) {
         if (emittable_leaders.find(target) != emittable_leaders.end()) {
@@ -546,6 +563,7 @@ void MipsWindowsLowerer::lower(
     };
 
     for (std::uint32_t address : leaders) {
+        if (emittable_leaders.find(address) == emittable_leaders.end()) continue;
         if (address < load_address ||
             address >= static_cast<std::uint64_t>(load_address) + file_size ||
             (address & 3u) != 0) continue;
@@ -933,6 +951,13 @@ void MipsWindowsLowerer::lower(
             } else if (rs == 6) {
                 source << "mov eax,dword ptr [r12+" << rt * 4 << "]\n";
                 source << "mov dword ptr gte_ctrl+" << gte_register * 4 << ",eax\n";
+            } else if (rs >= 16) {
+                source << "mov ecx," << instruction << "\n";
+                source << "lea rdx,gte_data\n";
+                source << "lea r8,gte_ctrl\n";
+                source << "call anyps1_gte_execute\n";
+                source << "test eax,eax\n";
+                source << "jz unsupported_exit\n";
             } else {
                 source << "jmp unsupported_exit\n";
             }
@@ -1317,8 +1342,13 @@ void MipsWindowsLowerer::lower(
                             static_cast<std::int64_t>(predecessor) +
                             4 + displacement);
                     source << "cmp byte ptr delay_redirect_valid,0\n";
-                    source << "je p"
-                           << std::hex << (address + 4) << std::dec << "\n";
+                    if (emittable_leaders.find(address + 4) !=
+                        emittable_leaders.end()) {
+                        source << "je p"
+                               << std::hex << (address + 4) << std::dec << "\n";
+                    } else {
+                        source << "je unsupported_exit\n";
+                    }
                     if (target >= load_address &&
                         target < static_cast<std::uint64_t>(load_address) + file_size &&
                         emittable_leaders.find(target) != emittable_leaders.end()) {
@@ -1370,8 +1400,16 @@ void MipsWindowsLowerer::lower(
     }
     std::string link_arguments =
         "/NOLOGO /ENTRY:main /SUBSYSTEM:CONSOLE "
-        "/INCREMENTAL:NO /OUT:\"" +
+        "/INCREMENTAL:NO /MERGE:.pdata=.rdata /OUT:\"" +
         options.output + "\" \"" + object.string() + "\"";
+    const std::filesystem::path gte_library =
+        std::filesystem::path(ANYPS1_BUILD_DIR) / "src" /
+        "Debug" / "anyps1_gte.lib";
+    if (!std::filesystem::is_regular_file(gte_library)) {
+        throw std::runtime_error(
+            "cannot locate native Windows GTE runtime library");
+    }
+    link_arguments += " \"" + gte_library.string() + "\"";
     for (const std::filesystem::path& library_dir :
          find_windows_library_dirs()) {
         link_arguments += " /LIBPATH:\"" + library_dir.string() + "\"";

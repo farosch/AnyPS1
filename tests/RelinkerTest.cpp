@@ -335,7 +335,7 @@ int main(int argc, char** argv)
         const std::uint16_t section_count =
             static_cast<std::uint16_t>(pe_bytes[pe_offset + 6])
             | (static_cast<std::uint16_t>(pe_bytes[pe_offset + 7]) << 8);
-        if (section_count != 4) {
+        if (section_count != 4 && section_count != 5) {
             throw std::runtime_error("Windows PE output has invalid section count");
         }
 

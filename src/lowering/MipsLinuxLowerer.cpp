@@ -157,7 +157,21 @@ void MipsLinuxLowerer::lower(
                 leaders.insert(resolved_target);
                 work.push(resolved_target);
             } else {
-                ++unresolved_indirect_transfers;
+                const std::vector<std::uint32_t> table_targets =
+                    discover_indirect_table_targets(
+                        data,
+                        load_address,
+                        file_size,
+                        address,
+                        rs);
+                if (table_targets.empty()) {
+                    ++unresolved_indirect_transfers;
+                } else {
+                    for (std::uint32_t target : table_targets) {
+                        leaders.insert(target);
+                        work.push(target);
+                    }
+                }
             }
         }
         if (branch || jump || jr || jalr) {
@@ -181,7 +195,10 @@ void MipsLinuxLowerer::lower(
             ++embedded_data_count;
             continue;
         }
-        emittable_leaders.insert(address);
+        if (region == PayloadRegionKind::Instruction ||
+            is_supported_mips_instruction(instruction)) {
+            emittable_leaders.insert(address);
+        }
         if (region == PayloadRegionKind::Unknown) {
             ++unknown_region_count;
         }
@@ -341,7 +358,11 @@ void MipsLinuxLowerer::lower(
         source << "jne host_runtime_exit\n";
         source << "movl $0, host_frame_counter(%rip)\n";
     }
-    source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
+    if (emittable_leaders.find(initial_pc) != emittable_leaders.end()) {
+        source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
+    } else {
+        source << "jmp unsupported_instruction_exit\n";
+    }
     source << ".section .rodata\npayload:\n.incbin \"" << payload.string() << "\"\n";
     source << ".text\n";
     source << "overflow_exit:\nmov $12, %edi\nmov $60, %eax\nsyscall\n";
@@ -373,6 +394,7 @@ void MipsLinuxLowerer::lower(
     source << "mov $1, %eax\n";
     source << "syscall\n";
     source << "ret\n";
+    source << ".extern anyps1_gte_execute\n";
     source << "indirect_jump:\n";
     for (std::uint32_t indirect_target : emittable_leaders) {
         source << "cmpl $" << indirect_target << ", %eax\n";
@@ -502,6 +524,13 @@ void MipsLinuxLowerer::lower(
             } else if (cop2_rs == 6) {
                 source << "movl " << rt * 4 << "(%r12), %eax\n";
                 source << "movl %eax, gte_ctrl+" << cop2_reg * 4 << "(%rip)\n";
+            } else if (cop2_rs >= 16) {
+                source << "movl $" << instruction << ", %edi\n";
+                source << "leaq gte_data(%rip), %rsi\n";
+                source << "leaq gte_ctrl(%rip), %rdx\n";
+                source << "call anyps1_gte_execute\n";
+                source << "testl %eax, %eax\n";
+                source << "je unsupported_instruction_exit\n";
             } else if (cop2_rs == 16) {
                 switch (instruction) {
                 case 0x48C0C000u: // NCLIP
@@ -1302,6 +1331,7 @@ void MipsLinuxLowerer::lower(
         }
     };
     for (std::uint32_t address : leaders) {
+        if (emittable_leaders.find(address) == emittable_leaders.end()) continue;
         if (address < load_address || address >= load_address + file_size) continue;
         const std::uint32_t offset = address - load_address;
         if (offset + 4 > file_size) continue;

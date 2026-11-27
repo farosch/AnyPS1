@@ -213,3 +213,8 @@ target_link_libraries(anyps1_memory_map_test PRIVATE anyps1_memory)
 add_test(NAME memory_map_mmio_dma
     COMMAND anyps1_memory_map_test)
 
+add_executable(anyps1_gte_runtime_test GteRuntimeTest.cpp)
+target_include_directories(anyps1_gte_runtime_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(anyps1_gte_runtime_test PRIVATE anyps1_gte)
+add_test(NAME gte_runtime COMMAND anyps1_gte_runtime_test)
+

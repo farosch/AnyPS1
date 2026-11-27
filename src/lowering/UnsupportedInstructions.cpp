@@ -143,22 +143,16 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
                rs == 0x06 || (rs == 0x10 && special == 0x10);
     }
     if (opcode == 0x12) {
-        switch (instruction) {
-        case 0x48C0C000u:
-        case 0x48C0C800u:
-        case 0x48C8D000u:
-        case 0x48C8D800u:
-        case 0x48C8E000u:
-        case 0x48C8E800u:
-        case 0x48C8F000u:
-            return false;
-        default:
-            break;
-        }
         if (rs == 0x00 || rs == 0x02 || rs == 0x04 || rs == 0x06) {
             return true;
         }
-        return false;
+        const std::uint32_t function = instruction & 63u;
+        return rs >= 16 &&
+            (function == 1 || function == 0x06 ||
+             function == 0x0C || function == 0x10 ||
+             function == 0x11 || function == 0x12 ||
+             function == 0x1C || function == 0x28 ||
+             function == 0x3D || function == 0x3E);
     }
     switch (opcode) {
     case 0x01: case 0x02: case 0x03: case 0x04:
