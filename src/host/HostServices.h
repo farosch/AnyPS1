@@ -225,4 +225,14 @@ private:
     Impl* impl_;
 };
 
+extern "C" {
+int anyps1_host_loop_init(const char* title);
+int anyps1_host_loop_poll();
+int anyps1_host_loop_present(
+    const std::uint32_t* pixels,
+    std::uint32_t width,
+    std::uint32_t height);
+void anyps1_host_loop_shutdown();
+}
+
 }

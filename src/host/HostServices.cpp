@@ -764,3 +764,58 @@ bool is_supported_bios_vector(std::uint32_t vector)
 }
 
 }
+
+extern "C" {
+
+static anyps1::NativeHostLoopRuntime* anyps1_native_host_loop = nullptr;
+
+int anyps1_host_loop_init(const char* title)
+{
+    if (anyps1_native_host_loop == nullptr) {
+        anyps1_native_host_loop = new anyps1::NativeHostLoopRuntime();
+    }
+    std::string error;
+    if (!anyps1_native_host_loop->initialize(
+            title == nullptr ? "AnyPS1" : title,
+            640,
+            480,
+            "",
+            error)) {
+        return 18;
+    }
+    return 0;
+}
+
+int anyps1_host_loop_poll()
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    anyps1::Ps1InputState input;
+    std::string error;
+    if (!anyps1_native_host_loop->poll(input, error)) return 18;
+    return anyps1_native_host_loop->should_close() ? 1 : 0;
+}
+
+int anyps1_host_loop_present(
+    const std::uint32_t* pixels,
+    std::uint32_t width,
+    std::uint32_t height)
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    std::string error;
+    if (!anyps1_native_host_loop->present_framebuffer(
+            pixels, width, height, error)) {
+        return 18;
+    }
+    return 0;
+}
+
+void anyps1_host_loop_shutdown()
+{
+    if (anyps1_native_host_loop != nullptr) {
+        anyps1_native_host_loop->shutdown();
+        delete anyps1_native_host_loop;
+        anyps1_native_host_loop = nullptr;
+    }
+}
+
+}

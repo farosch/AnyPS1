@@ -21,6 +21,9 @@ add_library(anyps1_executable
     executable/PeWriter.cpp
 )
 
+target_compile_definitions(anyps1_executable PRIVATE
+    ANYPS1_BUILD_DIR="${CMAKE_BINARY_DIR}")
+
 add_library(anyps1_lowering
     lowering/MipsLowerer.cpp
     lowering/MipsLinuxLowerer.cpp

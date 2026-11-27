@@ -77,7 +77,8 @@
 - [x] Generate ELF64 x86-64 executables with a native `_start` entrypoint.
 - [x] Emit valid ELF entry, program-header, section-header, text, rodata,
   and BSS metadata.
-- [x] Link with `gcc -nostdlib -static -no-pie`.
+- [x] Link with `gcc -nostdlib -no-pie`, including host SDL3/C++ runtime
+  dependencies required by generated executable host-loop calls.
 - [x] Add no-exec-stack, RELRO, now, notext, and build-ID linker options.
 - [x] Validate ELF signature, ELF64 class, little-endian encoding, x86-64
   machine type, ET_EXEC type, entrypoint, program headers, and section headers.

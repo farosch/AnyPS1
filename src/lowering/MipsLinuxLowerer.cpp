@@ -295,6 +295,7 @@ void MipsLinuxLowerer::lower(
         " memory_card=" + std::to_string(host_loop.memory_card) +
         " disc=" + std::to_string(host_loop.disc) + "\n";
     const std::string completed = "native lowering complete\n";
+    const std::string host_title = "AnyPS1";
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
     source << "cop0:\n.skip 128\n";
@@ -325,6 +326,7 @@ void MipsLinuxLowerer::lower(
     source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
     source << "diag_host_loop:.asciz \"" << escape_assembly_string(host_loop_diag) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
+    source << "diag_host_title:.asciz \"" << escape_assembly_string(host_title) << "\"\n";
     source << ".text\n.globl _start\n_start:\n";
     source << "leaq diag_banner(%rip), %rsi\nmov $" << banner.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_target(%rip), %rsi\nmov $" << target.size() << ", %rdx\ncall print_diag\n";
@@ -371,6 +373,13 @@ void MipsLinuxLowerer::lower(
     source << "leaq diag_host_loop(%rip), %rsi\n";
     source << "mov $" << host_loop_diag.size() << ", %rdx\n";
     source << "call print_diag\n";
+    source << "leaq diag_host_title(%rip), %rdi\n";
+    source << "call anyps1_host_loop_init\n";
+    source << "call anyps1_host_loop_poll\n";
+    source << "leaq ram(%rip), %rdi\n";
+    source << "mov $" << 640 << ", %esi\n";
+    source << "mov $" << 480 << ", %edx\n";
+    source << "call anyps1_host_loop_present\n";
     source << "mov $16, %edi\nmov $60, %eax\nsyscall\n";
     for (const std::string& family : unsupported_family_names) {
         source << instruction_family_source_name(family)
@@ -889,7 +898,6 @@ void MipsLinuxLowerer::lower(
             if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
             else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
             else source << "movl %edx, (%rbx,%rcx)\n";
-            source << "mmio_store_done_" << std::hex << address << std::dec << ": \n";
             source << "jmp mmio_store_done_" << std::hex << address << std::dec << "\n";
             source << "ram_store_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x200000, %ecx\n";
@@ -900,6 +908,7 @@ void MipsLinuxLowerer::lower(
             if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
             else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
             else source << "movl %edx, (%rbx,%rcx)\n";
+            source << "mmio_store_done_" << std::hex << address << std::dec << ": \n";
         } else if (opcode == 0x32 || opcode == 0x3A) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";

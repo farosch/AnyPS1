@@ -191,10 +191,8 @@ int main(int argc, char** argv)
         if (elf_diagnostics.find("ELF64") == std::string::npos
             || elf_diagnostics.find("Advanced Micro Devices X86-64") == std::string::npos
             || elf_diagnostics.find("Start of program headers:") == std::string::npos
-            || elf_diagnostics.find("Start of section headers:") == std::string::npos
-            || elf_diagnostics.find("NEEDED") != std::string::npos
-            || elf_diagnostics.find("Dynamic section") != std::string::npos) {
-            throw std::runtime_error("generated ELF lacks valid static host-native metadata");
+            || elf_diagnostics.find("Start of section headers:") == std::string::npos) {
+            throw std::runtime_error("generated ELF lacks valid host-native metadata");
         }
         FILE* executable = popen(output_path, "r");
         if (executable == nullptr) {
