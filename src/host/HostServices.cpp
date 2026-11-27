@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
 #include <map>
 #include <string>
 #include <vector>
@@ -413,6 +414,165 @@ void SdlHostRuntime::shutdown()
         SDL_Quit();
         impl_->initialized = false;
     }
+}
+
+bool MemoryCardRuntime::open_slot(
+    int slot,
+    const std::string& file_path,
+    std::string& error)
+{
+    if (slot < 0 || slot >= 2) {
+        error = "memory card slot is out of range";
+        return false;
+    }
+    slot_paths_[slot] = file_path;
+    std::fstream card(file_path,
+                      std::ios::in | std::ios::out | std::ios::binary);
+    if (!card) {
+        std::ofstream create(file_path,
+                             std::ios::binary | std::ios::trunc);
+        if (!create) {
+            error = "cannot create memory card file";
+            return false;
+        }
+        create.write(std::string(128 * 1024, '\0').c_str(), 128 * 1024);
+        if (!create) {
+            error = "cannot initialize memory card file";
+            return false;
+        }
+    }
+    error.clear();
+    return true;
+}
+
+bool MemoryCardRuntime::read_block(
+    int slot,
+    std::uint32_t block,
+    std::uint8_t* data,
+    std::size_t size,
+    std::string& error)
+{
+    if (slot < 0 || slot >= 2 ||
+        slot_paths_[slot].empty() ||
+        block >= 1024u ||
+        size != 128u ||
+        data == nullptr) {
+        error = "memory card read parameters are invalid";
+        return false;
+    }
+    std::fstream card(slot_paths_[slot],
+                      std::ios::in | std::ios::binary);
+    if (!card) {
+        error = "cannot open memory card file";
+        return false;
+    }
+    card.seekg(static_cast<std::streamoff>(block) * 128u);
+    card.read(reinterpret_cast<char*>(data), static_cast<std::streamsize>(size));
+    if (!card) {
+        error = "memory card read failed";
+        return false;
+    }
+    error.clear();
+    return true;
+}
+
+bool MemoryCardRuntime::write_block(
+    int slot,
+    std::uint32_t block,
+    const std::uint8_t* data,
+    std::size_t size,
+    std::string& error)
+{
+    if (slot < 0 || slot >= 2 ||
+        slot_paths_[slot].empty() ||
+        block >= 1024u ||
+        size != 128u ||
+        data == nullptr) {
+        error = "memory card write parameters are invalid";
+        return false;
+    }
+    std::fstream card(slot_paths_[slot],
+                      std::ios::in | std::ios::out | std::ios::binary);
+    if (!card) {
+        error = "cannot open memory card file";
+        return false;
+    }
+    card.seekp(static_cast<std::streamoff>(block) * 128u);
+    card.write(reinterpret_cast<const char*>(data),
+               static_cast<std::streamsize>(size));
+    if (!card) {
+        error = "memory card write failed";
+        return false;
+    }
+    error.clear();
+    return true;
+}
+
+void MemoryCardRuntime::close_slot(int slot)
+{
+    if (slot >= 0 && slot < 2) {
+        slot_paths_[slot].clear();
+    }
+}
+
+bool DiscImageRuntime::open_disc(
+    const std::string& bin_path,
+    bool mode2,
+    std::string& error)
+{
+    std::ifstream disc(bin_path, std::ios::binary);
+    if (!disc) {
+        error = "cannot open disc image";
+        return false;
+    }
+    bin_path_ = bin_path;
+    mode2_ = mode2;
+    error.clear();
+    return true;
+}
+
+bool DiscImageRuntime::read_sector(
+    std::uint32_t lba,
+    std::uint8_t* data,
+    std::size_t size,
+    std::string& error)
+{
+    if (bin_path_.empty() || data == nullptr || size == 0) {
+        error = "disc image read parameters are invalid";
+        return false;
+    }
+    const std::size_t sector_size =
+        mode2_ ? 2352u : 2048u;
+    if (size > sector_size) {
+        error = "disc sector buffer is too large";
+        return false;
+    }
+    std::ifstream disc(bin_path_, std::ios::binary);
+    if (!disc) {
+        error = "cannot reopen disc image";
+        return false;
+    }
+    disc.seekg(static_cast<std::streamoff>(lba) * sector_size);
+    disc.read(reinterpret_cast<char*>(data),
+              static_cast<std::streamsize>(size));
+    if (!disc) {
+        error = "disc sector read failed";
+        return false;
+    }
+    error.clear();
+    return true;
+}
+
+void DiscImageRuntime::close_disc()
+{
+    bin_path_.clear();
+    mode2_ = false;
+}
+
+bool is_supported_bios_vector(std::uint32_t vector)
+{
+    (void)vector;
+    return false;
 }
 
 }

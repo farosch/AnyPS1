@@ -62,6 +62,50 @@ private:
     Impl* impl_;
 };
 
+class MemoryCardRuntime {
+public:
+    bool open_slot(
+        int slot,
+        const std::string& file_path,
+        std::string& error);
+    bool read_block(
+        int slot,
+        std::uint32_t block,
+        std::uint8_t* data,
+        std::size_t size,
+        std::string& error);
+    bool write_block(
+        int slot,
+        std::uint32_t block,
+        const std::uint8_t* data,
+        std::size_t size,
+        std::string& error);
+    void close_slot(int slot);
+
+private:
+    std::string slot_paths_[2];
+};
+
+class DiscImageRuntime {
+public:
+    bool open_disc(
+        const std::string& bin_path,
+        bool mode2,
+        std::string& error);
+    bool read_sector(
+        std::uint32_t lba,
+        std::uint8_t* data,
+        std::size_t size,
+        std::string& error);
+    void close_disc();
+
+private:
+    std::string bin_path_;
+    bool mode2_ = false;
+};
+
+bool is_supported_bios_vector(std::uint32_t vector);
+
 class SdlHostRuntime {
 public:
     SdlHostRuntime();

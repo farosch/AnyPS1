@@ -7,6 +7,8 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <fstream>
+#include <filesystem>
 #include <vector>
 
 int main()
@@ -101,6 +103,59 @@ int main()
             cdrom.kind != anyps1::HostServiceKind::CdRom ||
             spu.kind != anyps1::HostServiceKind::Spu) {
             throw std::runtime_error("peripheral host mappings are incomplete");
+        }
+
+        const std::filesystem::path card =
+            std::filesystem::temp_directory_path() /
+            "anyps1-memory-card-test.bin";
+        std::remove(card.c_str());
+        anyps1::MemoryCardRuntime memory_card;
+        std::uint8_t write_block[128]{};
+        const char text[] = "memory-card";
+        for (std::size_t index = 0;
+             index < sizeof(text) - 1;
+             ++index) {
+            write_block[index] =
+                static_cast<std::uint8_t>(text[index]);
+        }
+        if (!memory_card.open_slot(0, card.string(), host_error) ||
+            !memory_card.write_block(
+                0,
+                0,
+                write_block,
+                128,
+                host_error)) {
+            throw std::runtime_error(host_error);
+        }
+        std::uint8_t block[128]{};
+        if (!memory_card.read_block(0, 0, block, 128, host_error) ||
+            block[0] != 'm') {
+            throw std::runtime_error("memory card runtime read/write failed");
+        }
+        memory_card.close_slot(0);
+        std::remove(card.c_str());
+
+        const std::filesystem::path disc =
+            std::filesystem::temp_directory_path() /
+            "anyps1-disc-test.bin";
+        {
+            std::ofstream output(disc, std::ios::binary);
+            output.write(std::string(2048, 'D').c_str(), 2048);
+        }
+        anyps1::DiscImageRuntime disc_runtime;
+        if (!disc_runtime.open_disc(disc.string(), false, host_error)) {
+            throw std::runtime_error(host_error);
+        }
+        std::uint8_t sector[2048]{};
+        if (!disc_runtime.read_sector(0, sector, sizeof(sector), host_error) ||
+            sector[0] != 'D') {
+            throw std::runtime_error("disc runtime sector read failed");
+        }
+        disc_runtime.close_disc();
+        std::remove(disc.c_str());
+
+        if (anyps1::is_supported_bios_vector(0xA0000040u)) {
+            throw std::runtime_error("unsupported BIOS vector was accepted");
         }
         return 0;
     } catch (const std::exception& error) {

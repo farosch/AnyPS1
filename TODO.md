@@ -134,9 +134,9 @@
 - [x] Implement native Vulkan swapchain, image, sampler, pipeline, and
   command-buffer resources.
 - [x] Expose host-native diagnostics through structured exit codes and logs.
-- [ ] Implement title-independent memory-card storage mapping.
-- [ ] Implement title-independent CD/disc filesystem and asset access mapping.
-- [ ] Add explicit unsupported exits for every unimplemented BIOS vector and
+- [x] Implement title-independent memory-card storage mapping.
+- [x] Implement title-independent CD/disc filesystem and asset access mapping.
+- [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.
 
 ## Windows executable conversion
