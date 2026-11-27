@@ -14,6 +14,32 @@ The implementation decodes PS-X EXE structures, analyzes references and entry
 points, and produces native Linux or Windows artifacts through direct MIPS
 instruction lowering. It does not execute or interpret PS-X behavior.
 
+## GPU lowering and Vulkan
+
+The PS1 GPU command stream is lowered into native host graphics operations.
+The lowering pipeline targets Vulkan rather than CUDA: Vulkan is available on
+Linux and Windows and exposes a portable SPIR-V shader interface. CUDA would be
+NVIDIA-only and would not provide a cross-platform PS1 host backend.
+
+The repository includes these graphics and shader submodules:
+
+- `3rdparty/Vulkan-Headers`: Vulkan API definitions and types.
+- `3rdparty/SPIRV-Headers`: SPIR-V definitions and grammar headers.
+- `3rdparty/SPIRV-Tools`: SPIR-V validation and optimization.
+- `3rdparty/glslang`: GLSL and SPIR-V shader tooling.
+
+SPIR-V support is built only when explicitly enabled:
+
+```sh
+cmake -S . -B build -G Ninja \
+  -DANYPS1_ENABLE_SPIRV_TOOLS=ON \
+  -DANYPS1_ENABLE_GLSLANG=ON
+```
+
+The initial implementation will lower PS1 GP0/GP1 commands and framebuffer
+operations into a generic host graphics IR. That IR will emit SPIR-V for Vulkan
+rendering; it is not an emulator process or a runtime instruction interpreter.
+
 ## Layout
 
 - `core/relinker`: executable decoding and relinking implementation

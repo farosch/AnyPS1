@@ -9,6 +9,8 @@ AnyPS1 converts PlayStation 1 executable images into native Linux or Windows pro
 - Functions must never fail silently; report or return errors through the
   appropriate exception, return value, log, or caller-visible result.
 - Put third-party code under `3rdparty/<name>` as a submodule.
+- Use Vulkan for cross-platform GPU lowering and SPIR-V shaders; do not add
+  NVIDIA/CUDA-only graphics dependencies.
 - Keep known format and platform gaps in `TODO.md`.
 - Use Conventional Commit subjects.
 - Build and test changes with CMake and CTest.
