@@ -8,6 +8,8 @@
 #include <iterator>
 #include <queue>
 #include <set>
+#include <queue>
+#include <set>
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
@@ -20,6 +22,10 @@ namespace {
 
 constexpr std::uint32_t PSX_HEADER_SIZE = 2048;
 
+std::uint32_t read32(const std::vector<unsigned char>& data, std::size_t offset);
+std::string hex32(std::uint32_t value);
+std::string escape_assembly_string(const std::string& value);
+
 void trim(std::string& value)
 {
     const auto first = value.find_first_not_of(" \t\r\n");
@@ -31,6 +37,307 @@ void trim(std::string& value)
     value = value.substr(first, last - first + 1);
 }
 
+void write_linux_native_cfg(
+    const RelinkOptions& options,
+    const std::vector<unsigned char>& data
+)
+{
+    const std::uint32_t file_size = read32(data, 0x1C);
+    const std::uint32_t load_address = read32(data, 0x18);
+    const std::uint32_t initial_pc = read32(data, 0x10);
+    const std::uint32_t initial_gp = read32(data, 0x14);
+    const std::uint32_t initial_sp = 0x801FF000u;
+    if (file_size == 0 || file_size % 4 != 0) {
+        throw std::runtime_error("unsupported native lowering: executable size is not a MIPS word sequence");
+    }
+    if (initial_pc < load_address || initial_pc >= load_address + file_size) {
+        throw std::runtime_error("unsupported native lowering: entry point outside executable payload");
+    }
+
+    std::set<std::uint32_t> leaders;
+    std::set<std::uint32_t> delay_slots;
+    std::queue<std::uint32_t> work;
+    leaders.insert(initial_pc);
+    work.push(initial_pc);
+    while (!work.empty()) {
+        const std::uint32_t address = work.front();
+        work.pop();
+        if (address < load_address || address >= load_address + file_size
+            || (address & 3u) != 0) {
+            continue;
+        }
+        const std::uint32_t offset = address - load_address;
+        if (offset + 4 > file_size) continue;
+        const std::uint32_t instruction = read32(data, 2048 + offset);
+        const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t immediate = instruction & 0xFFFFu;
+        const std::uint32_t special = instruction & 63u;
+        const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
+            || opcode == 0x06 || opcode == 0x07;
+        const bool jump = opcode == 0x02 || opcode == 0x03;
+        const bool jr = opcode == 0 && special == 0x08;
+        const bool stop = opcode == 0 && (special == 0x0C || special == 0x0D);
+        if (branch) {
+            const std::int32_t displacement =
+                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+            const std::uint32_t target =
+                static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+            leaders.insert(target);
+            leaders.insert(address + 8);
+            work.push(target);
+            work.push(address + 8);
+        } else if (jump) {
+            const std::uint32_t target =
+                ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
+            leaders.insert(target);
+            work.push(target);
+            if (opcode == 0x03) {
+                leaders.insert(address + 8);
+                work.push(address + 8);
+            }
+        } else if (!jr && !stop) {
+            leaders.insert(address + 4);
+            work.push(address + 4);
+        }
+        if (branch || jump || jr) {
+            const std::uint32_t delay_address = address + 4;
+            if (delay_address >= load_address && delay_address < load_address + file_size) {
+                delay_slots.insert(delay_address);
+                leaders.insert(delay_address);
+                work.push(delay_address);
+            }
+        }
+    }
+
+    const std::filesystem::path assembly = std::filesystem::path(options.output + ".native.s");
+    const std::filesystem::path payload = std::filesystem::path(options.output + ".native.bin");
+    {
+        std::ofstream output(payload, std::ios::binary | std::ios::trunc);
+        output.write(reinterpret_cast<const char*>(data.data() + 2048),
+            static_cast<std::streamsize>(file_size));
+        if (!output) throw std::runtime_error("cannot write native lowering payload");
+    }
+
+    std::ofstream source(assembly, std::ios::trunc);
+    source << ".text\n.section .bss\n.p2align 4\n";
+    source << "regs:\n.skip 136\nram:\n.skip 2097152\n";
+    source << ".text\n.globl _start\n_start:\n";
+    source << "leaq ram(%rip), %rdi\n";
+    source << "add $" << (load_address & 0x1FFFFFu) << ", %rdi\n";
+    source << "leaq payload(%rip), %rsi\n";
+    source << "mov $" << file_size << ", %ecx\n";
+    source << "rep movsb\n";
+    source << "leaq regs(%rip), %r12\n";
+    source << "movl $0, 0(%r12)\n";
+    source << "movl $0x" << std::hex << initial_sp << std::dec << ", 116(%r12)\n";
+    source << "movl $0x" << std::hex << initial_gp << std::dec << ", 112(%r12)\n";
+    source << "jmp p" << std::hex << initial_pc << std::dec << "\n";
+    source << ".section .rodata\npayload:\n.incbin \"" << payload.string() << "\"\n";
+    source << ".text\n";
+    source << "overflow_exit:\nmov $12, %edi\nmov $60, %eax\nsyscall\n";
+    source << "divide_zero_exit:\nmov $11, %edi\nmov $60, %eax\nsyscall\n";
+    source << ".section .rodata\n";
+    source << "diag_completed:.asciz \"native lowering complete\\n\"\n";
+    source << ".text\n";
+    source << "print_diag:\n";
+    source << "mov $1, %edi\n";
+    source << "mov $1, %eax\n";
+    source << "syscall\n";
+    source << "ret\n";
+
+    auto emit_normal = [&](std::uint32_t address, std::uint32_t instruction) {
+        const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t rs = (instruction >> 21) & 31u;
+        const std::uint32_t rt = (instruction >> 16) & 31u;
+        const std::uint32_t rd = (instruction >> 11) & 31u;
+        const std::uint32_t shamt = (instruction >> 6) & 31u;
+        const std::uint32_t immediate = instruction & 0xFFFFu;
+        const std::uint32_t special = instruction & 63u;
+        if (opcode == 0) {
+            if (instruction == 0) return;
+            if (special == 0x00) {
+                source << "movl " << rt * 4 << "(%r12), %eax\nshll $" << shamt << ", %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x02) {
+                source << "movl " << rt * 4 << "(%r12), %eax\nshrl $" << shamt << ", %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x03) {
+                source << "movl " << rt * 4 << "(%r12), %eax\nsarl $" << shamt << ", %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x04) {
+                source << "movl " << rs * 4 << "(%r12), %ecx\nmovl " << rt * 4 << "(%r12), %eax\nshll %cl, %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x06) {
+                source << "movl " << rs * 4 << "(%r12), %ecx\nmovl " << rt * 4 << "(%r12), %eax\nshrl %cl, %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x07) {
+                source << "movl " << rs * 4 << "(%r12), %ecx\nmovl " << rt * 4 << "(%r12), %eax\nsarl %cl, %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x20) {
+                source << "movl " << rs * 4 << "(%r12), %eax\naddl " << rt * 4 << "(%r12), %eax\njo overflow_exit\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x21) {
+                source << "movl " << rs * 4 << "(%r12), %eax\naddl " << rt * 4 << "(%r12), %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x22) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nsubl " << rt * 4 << "(%r12), %eax\njo overflow_exit\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x23) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nsubl " << rt * 4 << "(%r12), %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x24) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nandl " << rt * 4 << "(%r12), %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x25) {
+                source << "movl " << rs * 4 << "(%r12), %eax\norl " << rt * 4 << "(%r12), %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x26) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nxorl " << rt * 4 << "(%r12), %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x27) {
+                source << "movl " << rs * 4 << "(%r12), %eax\norl " << rt * 4 << "(%r12), %eax\nnotl %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x2A) {
+                source << "movl " << rs * 4 << "(%r12), %eax\ncmpl " << rt * 4 << "(%r12), %eax\nsetl %al\nmovzbl %al, %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x2B) {
+                source << "movl " << rs * 4 << "(%r12), %eax\ncmpl " << rt * 4 << "(%r12), %eax\nsetb %al\nmovzbl %al, %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x18) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nmovl " << rt * 4 << "(%r12), %ecx\ncltd\nimull %ecx\nmovl %eax, 128(%r12)\nmovl %edx, 132(%r12)\n";
+            } else if (special == 0x19) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nmovl " << rt * 4 << "(%r12), %ecx\nxorl %edx, %edx\nmull %ecx\nmovl %eax, 128(%r12)\nmovl %edx, 132(%r12)\n";
+            } else if (special == 0x1A || special == 0x1B) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nmovl " << rt * 4 << "(%r12), %ecx\ntestl %ecx, %ecx\nje divide_zero_exit\n";
+                if (special == 0x1B) source << "xorl %edx, %edx\ndivl %ecx\n";
+                else source << "cltd\nidivl %ecx\n";
+                source << "movl %eax, 128(%r12)\nmovl %edx, 132(%r12)\n";
+            } else if (special == 0x10) {
+                source << "movl 132(%r12), %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x11) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nmovl %eax, 132(%r12)\n";
+            } else if (special == 0x12) {
+                source << "movl 128(%r12), %eax\nmovl %eax, " << rd * 4 << "(%r12)\n";
+            } else if (special == 0x13) {
+                source << "movl " << rs * 4 << "(%r12), %eax\nmovl %eax, 128(%r12)\n";
+            } else if (special == 0x08 || special == 0x09) {
+                throw std::runtime_error("control instruction must be emitted by CFG lowering");
+            } else if (special == 0x0C || special == 0x0D) {
+                source << "xor %edi, %edi\nmov $60, %eax\nsyscall\n";
+            } else {
+                throw std::runtime_error("unsupported native MIPS instruction at " + hex32(address));
+            }
+        } else if (opcode == 0x0F) {
+            source << "movl $" << (immediate << 16) << ", " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x08) {
+            source << "movl " << rs * 4 << "(%r12), %eax\naddl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\njo overflow_exit\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x09) {
+            source << "movl " << rs * 4 << "(%r12), %eax\naddl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x0C) {
+            source << "movl " << rs * 4 << "(%r12), %eax\nandl $" << immediate << ", %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x0D) {
+            source << "movl " << rs * 4 << "(%r12), %eax\norl $" << immediate << ", %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x0E) {
+            source << "movl " << rs * 4 << "(%r12), %eax\nxorl $" << immediate << ", %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x0A) {
+            source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nsetl %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x0B) {
+            source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << immediate << ", %eax\nsetb %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 || opcode == 0x24 || opcode == 0x25) {
+            source << "movl " << rs * 4 << "(%r12), %eax\naddl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nandl $0x1FFFFF, %eax\nleaq ram(%rip), %rbx\n";
+            if (opcode == 0x20) source << "movsbl (%rbx,%rax), %edx\n";
+            else if (opcode == 0x21) source << "movswl (%rbx,%rax), %edx\n";
+            else if (opcode == 0x23) source << "movl (%rbx,%rax), %edx\n";
+            else if (opcode == 0x24) source << "movzbl (%rbx,%rax), %edx\n";
+            else source << "movzwl (%rbx,%rax), %edx\n";
+            source << "movl %edx, " << rt * 4 << "(%r12)\n";
+        } else if (opcode == 0x28 || opcode == 0x29 || opcode == 0x2B) {
+            source << "movl " << rs * 4 << "(%r12), %eax\naddl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nandl $0x1FFFFF, %eax\nmovl " << rt * 4 << "(%r12), %edx\nleaq ram(%rip), %rbx\n";
+            if (opcode == 0x28) source << "movb %dl, (%rbx,%rax)\n";
+            else if (opcode == 0x29) source << "movw %dx, (%rbx,%rax)\n";
+            else source << "movl %edx, (%rbx,%rax)\n";
+        } else if (opcode == 0x22 || opcode == 0x26 || opcode == 0x2A || opcode == 0x2E) {
+            throw std::runtime_error("unsupported native MIPS unaligned load/store at " + hex32(address));
+        } else {
+            throw std::runtime_error("unsupported native MIPS opcode at " + hex32(address));
+        }
+    };
+
+    std::set<std::uint32_t> emitted_delay_slots;
+    for (std::uint32_t address : leaders) {
+        if (address < load_address || address >= load_address + file_size) continue;
+        const std::uint32_t offset = address - load_address;
+        if (offset + 4 > file_size) continue;
+        const std::uint32_t instruction = read32(data, 2048 + offset);
+        const std::uint32_t opcode = instruction >> 26;
+        const std::uint32_t rs = (instruction >> 21) & 31u;
+        const std::uint32_t rt = (instruction >> 16) & 31u;
+        const std::uint32_t immediate = instruction & 0xFFFFu;
+        const std::uint32_t special = instruction & 63u;
+        source << "p" << std::hex << address << std::dec << ":\n";
+
+        if (delay_slots.find(address) != delay_slots.end() && emitted_delay_slots.find(address) == emitted_delay_slots.end()) {
+            emit_normal(address, instruction);
+            emitted_delay_slots.insert(address);
+            continue;
+        }
+        if (delay_slots.find(address) != delay_slots.end()) continue;
+
+        const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
+            || opcode == 0x06 || opcode == 0x07;
+        const bool jump = opcode == 0x02 || opcode == 0x03;
+        const bool jr = opcode == 0 && special == 0x08;
+        const bool jalr = opcode == 0 && special == 0x09;
+        if (branch || jump || jr || jalr) {
+            const std::uint32_t delay_address = address + 4;
+            if (delay_address >= load_address && delay_address < load_address + file_size) {
+                const std::uint32_t delay_offset = delay_address - load_address;
+                if (delay_offset + 4 <= file_size) {
+                    source << "p" << std::hex << delay_address << std::dec << ":\n";
+                    emit_normal(delay_address, read32(data, 2048 + delay_offset));
+                    emitted_delay_slots.insert(delay_address);
+                }
+            }
+        }
+        if (branch) {
+            const std::int32_t displacement =
+                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
+            const std::uint32_t target =
+                static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
+            if (opcode == 0x04) {
+                source << "cmpl " << rt * 4 << "(%r12), " << rs * 4 << "(%r12)\nje p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x05) {
+                source << "cmpl " << rt * 4 << "(%r12), " << rs * 4 << "(%r12)\njne p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x06) {
+                source << "cmpl $0, " << rs * 4 << "(%r12)\njle p" << std::hex << target << std::dec << "\n";
+            } else if (opcode == 0x07) {
+                source << "cmpl $0, " << rs * 4 << "(%r12)\njg p" << std::hex << target << std::dec << "\n";
+            } else {
+                source << "cmpl $0, " << rs * 4 << "(%r12)\n";
+                if ((instruction >> 16 & 31u) == 0) source << "jl p" << std::hex << target << std::dec << "\n";
+                else source << "jge p" << std::hex << target << std::dec << "\n";
+            }
+        } else if (jump) {
+            const std::uint32_t target =
+                ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
+            if (opcode == 0x03) {
+                source << "movl $" << address + 8 << ", " << 31 * 4 << "(%r12)\n";
+                source << "call p" << std::hex << target << std::dec << "\n";
+            } else {
+                source << "jmp p" << std::hex << target << std::dec << "\n";
+            }
+        } else if (jr) {
+            if (rs == 31) source << "ret\n";
+            else throw std::runtime_error("unsupported native indirect JR at " + hex32(address));
+        } else if (jalr) {
+            throw std::runtime_error("unsupported native JALR at " + hex32(address));
+        } else {
+            emit_normal(address, instruction);
+        }
+    }
+
+    source << "leaq diag_completed(%rip), %rsi\n";
+    source << "mov $25, %rdx\n";
+    source << "call print_diag\n";
+    source << "xor %edi, %edi\nmov $60, %eax\nsyscall\n";
+    if (!source) throw std::runtime_error("cannot create native lowering assembly");
+
+    std::string command = "gcc -nostdlib -no-pie -Wl,-e,_start -o \"" +
+        options.output + "\" \"" + assembly.string() + "\"";
+    const int status = std::system(command.c_str());
+    std::filesystem::remove(payload);
+    if (status != 0) throw std::runtime_error("native Linux lowering toolchain failed");
+    std::filesystem::permissions(
+        options.output,
+        std::filesystem::perms::owner_exec
+            | std::filesystem::perms::group_exec
+            | std::filesystem::perms::others_exec,
+        std::filesystem::perm_options::add);
+}
 std::string system_cnf_boot(const std::filesystem::path& system_cnf)
 {
     std::ifstream input(system_cnf);
@@ -798,7 +1105,6 @@ void write_linux_native(
     std::string command = "gcc -nostdlib -no-pie -Wl,-e,_start -o \""
         + options.output + "\" \"" + assembly.string() + "\"";
     const int status = std::system(command.c_str());
-    std::filesystem::remove(assembly);
     std::filesystem::remove(payload);
     if (status != 0) {
         throw std::runtime_error("native Linux lowering toolchain failed");
