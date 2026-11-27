@@ -4,14 +4,14 @@
 
 - [ ] Replace partial Linux lowering with complete native lowering for every
   statically reachable PS-X instruction and host operation.
-- [ ] Remove the legacy fixed-block `write_linux_native` path and make
+- [x] Remove the legacy fixed-block `write_linux_native` path and make
   `write_linux_native_cfg` the only Linux lowering implementation.
 - [ ] Improve CFG discovery beyond static leaders. Resolve JALR targets when
   they are statically provable, preserve indirect-call edges, and emit explicit
   unsupported exits for unresolved indirect control flow.
 - [ ] Distinguish executable code from embedded data, tables, padding,
   `.rodata`, and payload regions when counting unsupported instructions.
-- [ ] Report exact supported/reachable word counts, unsupported word counts,
+- [x] Report exact supported/reachable word counts, unsupported word counts,
   leader counts, call-edge counts, unresolved-indirect counts, and the first
   unsupported address without including data words as instructions.
 - [ ] Add per-instruction native lowering fixtures for every MIPS I opcode,
@@ -20,7 +20,7 @@
 - [ ] Remove the remaining generic reserved-opcode and coprocessor stubs that
   can be lowered directly, and keep only irreducibly unsupported operations
   as explicit conversion failures.
-- [ ] Replace substring-based unsupported-instruction heuristics with a shared
+- [x] Replace substring-based unsupported-instruction heuristics with a shared
   opcode/classification implementation used by lowering, disassembly,
   diagnostics, and inventory tools.
 

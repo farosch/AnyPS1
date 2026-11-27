@@ -169,7 +169,9 @@ int main(int argc, char** argv)
         }
         if (terminal_output.find("lowered_coverage_percent=") == std::string::npos ||
             terminal_output.find("call_edges=") == std::string::npos ||
-            terminal_output.find("unresolved_indirect_transfers=") == std::string::npos) {
+            terminal_output.find("unresolved_indirect_transfers=") == std::string::npos ||
+            terminal_output.find("reachable_words=") == std::string::npos ||
+            terminal_output.find("supported_reachable_words=") == std::string::npos) {
             throw std::runtime_error("native ELF lacks CFG coverage diagnostics");
         }
 #endif

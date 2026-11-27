@@ -16,9 +16,46 @@
 #include <string>
 #include <vector>
 
+#include <cerrno>
+#include <cstring>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 namespace anyps1 {
 
 namespace {
+
+int execute_linker(const std::filesystem::path& assembly,
+                   const std::filesystem::path& output)
+{
+    const pid_t child = fork();
+    if (child < 0) {
+        throw std::runtime_error(
+            "cannot start native Linux linker: " + std::string(std::strerror(errno)));
+    }
+    if (child == 0) {
+        execlp("gcc",
+               "gcc",
+               "-nostdlib",
+               "-static",
+               "-no-pie",
+               "-Wl,-e,_start,-z,noexecstack,-z,relro,-z,now,-z,notext,--build-id=none",
+               "-o",
+               output.c_str(),
+               assembly.c_str(),
+               static_cast<char*>(nullptr));
+        _exit(127);
+    }
+
+    int status = 0;
+    if (waitpid(child, &status, 0) < 0) {
+        throw std::runtime_error(
+            "cannot wait for native Linux linker: " + std::string(std::strerror(errno)));
+    }
+    if (!WIFEXITED(status)) return -1;
+    return WEXITSTATUS(status);
+}
 
 void validate_linux_elf64(const std::filesystem::path& path)
 {
@@ -99,6 +136,8 @@ void write_linux_native_cfg(
     std::set<std::uint32_t> processed;
     std::queue<std::uint32_t> work;
     std::uint32_t unsupported_count = 0;
+    std::uint32_t reachable_count = 0;
+    std::uint32_t supported_count = 0;
     std::uint32_t first_unsupported_address = 0;
     std::uint32_t first_unsupported_word = 0;
     std::string first_unsupported_name;
@@ -179,41 +218,11 @@ void write_linux_native_cfg(
         const std::uint32_t offset = address - load_address;
         if (offset + 4 > file_size) continue;
         const std::uint32_t instruction = read_psx32(data, PSX_HEADER_SIZE + offset);
-        const std::uint32_t opcode = instruction >> 26;
-        const std::uint32_t rs = (instruction >> 21) & 31u;
-        const std::uint32_t special = instruction & 63u;
-        bool supported = false;
-        if (instruction == 0) {
-            supported = true;
-        } else if (opcode == 0) {
-            supported =
-                special == 0x00 || special == 0x02 || special == 0x03 ||
-                special == 0x04 || special == 0x06 || special == 0x07 ||
-                special == 0x08 || special == 0x09 ||
-                special == 0x10 || special == 0x11 || special == 0x12 ||
-                special == 0x13 || special == 0x18 || special == 0x19 ||
-                special == 0x1A || special == 0x1B ||
-                special == 0x20 || special == 0x21 || special == 0x22 ||
-                special == 0x23 || special == 0x24 || special == 0x25 ||
-                special == 0x26 || special == 0x27 || special == 0x2A ||
-                special == 0x2B || special == 0x0C || special == 0x0D;
-        } else if (opcode == 0x10) {
-            supported =
-                rs == 0x00 || rs == 0x02 || rs == 0x04 ||
-                rs == 0x06 || (rs == 0x10 && special == 0x10);
-        } else {
-            supported =
-                opcode == 0x01 || opcode == 0x02 || opcode == 0x03 ||
-                opcode == 0x04 || opcode == 0x05 || opcode == 0x06 ||
-                opcode == 0x07 || opcode == 0x08 || opcode == 0x09 ||
-                opcode == 0x0A || opcode == 0x0B || opcode == 0x0C ||
-                opcode == 0x0D || opcode == 0x0E || opcode == 0x0F ||
-                opcode == 0x20 || opcode == 0x21 || opcode == 0x22 ||
-                opcode == 0x23 || opcode == 0x24 || opcode == 0x25 ||
-                opcode == 0x26 || opcode == 0x28 || opcode == 0x29 ||
-                opcode == 0x2A || opcode == 0x2B || opcode == 0x2E;
+        ++reachable_count;
+        if (is_supported_mips_instruction(instruction)) {
+            ++supported_count;
         }
-        if (!supported) {
+        if (!is_supported_mips_instruction(instruction)) {
             ++unsupported_count;
             if (first_unsupported_address == 0) {
                 first_unsupported_address = address;
@@ -255,6 +264,10 @@ void write_linux_native_cfg(
     const std::string unresolved =
         "unresolved_indirect_transfers=" +
         std::to_string(unresolved_indirect_transfers) + "\n";
+    const std::string reachable =
+        "reachable_words=" + std::to_string(reachable_count) + "\n";
+    const std::string supported =
+        "supported_reachable_words=" + std::to_string(supported_count) + "\n";
     const std::string unsupported =
         "unsupported_instructions=" + std::to_string(unsupported_count) + "\n";
     const std::string first_gap =
@@ -279,6 +292,8 @@ void write_linux_native_cfg(
     source << "diag_coverage:.asciz \"" << escape_assembly_string(coverage) << "\"\n";
     source << "diag_edges:.asciz \"" << escape_assembly_string(edges) << "\"\n";
     source << "diag_unresolved:.asciz \"" << escape_assembly_string(unresolved) << "\"\n";
+    source << "diag_reachable:.asciz \"" << escape_assembly_string(reachable) << "\"\n";
+    source << "diag_supported:.asciz \"" << escape_assembly_string(supported) << "\"\n";
     source << "diag_unsupported:.asciz \"" << escape_assembly_string(unsupported) << "\"\n";
     source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
@@ -294,6 +309,8 @@ void write_linux_native_cfg(
     source << "leaq diag_coverage(%rip), %rsi\nmov $" << coverage.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_edges(%rip), %rsi\nmov $" << edges.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_unresolved(%rip), %rsi\nmov $" << unresolved.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_reachable(%rip), %rsi\nmov $" << reachable.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_supported(%rip), %rsi\nmov $" << supported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_unsupported(%rip), %rsi\nmov $" << unsupported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";
@@ -813,14 +830,9 @@ void write_linux_native_cfg(
     source << "xor %edi, %edi\nmov $60, %eax\nsyscall\n";
     if (!source) throw std::runtime_error("cannot create native lowering assembly");
 
-    std::string command =
-        "gcc -nostdlib -static -no-pie -Wl,-e,_start,-z,noexecstack,"
-        "-z,relro,-z,now,-z,notext,--build-id=none -o \"" +
-        options.output + "\" \"" + assembly.string() + "\"";
-    // Flush the assembly before invoking the native assembler/linker.
     source.flush();
     source.close();
-    const int status = std::system(command.c_str());
+    const int status = execute_linker(assembly, options.output);
     std::filesystem::remove(payload);
     if (status != 0) throw std::runtime_error("native Linux lowering toolchain failed");
     validate_linux_elf64(options.output);
@@ -832,6 +844,7 @@ void write_linux_native_cfg(
         std::filesystem::perm_options::add);
 }
 
+#if 0
 void write_linux_native(
     const RelinkOptions& options,
     const std::vector<unsigned char>& data
@@ -1432,11 +1445,7 @@ void write_linux_native(
         }
     }
 
-    std::string command =
-        "gcc -nostdlib -static -no-pie -Wl,-e,_start,-z,noexecstack,"
-        "-z,relro,-z,now,-z,notext,--build-id=none -o \"" +
-        options.output + "\" \"" + assembly.string() + "\"";
-    const int status = std::system(command.c_str());
+    const int status = execute_linker(assembly, options.output);
     std::filesystem::remove(payload);
     if (status != 0) {
         throw std::runtime_error("native Linux lowering toolchain failed");
@@ -1450,5 +1459,6 @@ void write_linux_native(
         std::filesystem::perm_options::add
     );
 }
+#endif
 
 }

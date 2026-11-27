@@ -23,5 +23,6 @@ struct UnsupportedInstruction {
 
 UnsupportedInstruction classify_unsupported_instruction(
     std::uint32_t instruction);
+bool is_supported_mips_instruction(std::uint32_t instruction);
 
 }

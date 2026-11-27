@@ -92,4 +92,42 @@ UnsupportedInstruction classify_unsupported_instruction(
             OPCODE_NAMES[opcode]};
 }
 
+bool is_supported_mips_instruction(std::uint32_t instruction)
+{
+    const std::uint32_t opcode = instruction >> 26;
+    const std::uint32_t rs = (instruction >> 21) & 31u;
+    const std::uint32_t special = instruction & 63u;
+    if (instruction == 0) return true;
+    if (opcode == 0) {
+        switch (special) {
+        case 0x00: case 0x02: case 0x03: case 0x04:
+        case 0x06: case 0x07: case 0x08: case 0x09:
+        case 0x0C: case 0x0D: case 0x10: case 0x11:
+        case 0x12: case 0x13: case 0x18: case 0x19:
+        case 0x1A: case 0x1B: case 0x20: case 0x21:
+        case 0x22: case 0x23: case 0x24: case 0x25:
+        case 0x26: case 0x27: case 0x2A: case 0x2B:
+            return true;
+        default:
+            return false;
+        }
+    }
+    if (opcode == 0x10) {
+        return rs == 0x00 || rs == 0x02 || rs == 0x04 ||
+               rs == 0x06 || (rs == 0x10 && special == 0x10);
+    }
+    switch (opcode) {
+    case 0x01: case 0x02: case 0x03: case 0x04:
+    case 0x05: case 0x06: case 0x07: case 0x08:
+    case 0x09: case 0x0A: case 0x0B: case 0x0C:
+    case 0x0D: case 0x0E: case 0x0F: case 0x20:
+    case 0x21: case 0x22: case 0x23: case 0x24:
+    case 0x25: case 0x26: case 0x28: case 0x29:
+    case 0x2A: case 0x2B: case 0x2E:
+        return true;
+    default:
+        return false;
+    }
+}
+
 }
