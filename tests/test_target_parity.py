@@ -94,6 +94,9 @@ class TargetParityTest(unittest.TestCase):
             "anyps1_host_loop_spu_read",
             "anyps1_host_loop_gpu_write",
             "anyps1_host_loop_vulkan_present",
+            "anyps1_host_loop_memory_card_read",
+            "anyps1_host_loop_memory_card_write",
+            "anyps1_host_loop_disc_read",
         ):
             self.assertIn(
                 pattern,

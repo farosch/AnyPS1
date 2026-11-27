@@ -150,9 +150,9 @@
   command-buffer resources.
 - [x] Expose host-native diagnostics through generated executable structured
   exit codes and logs.
-- [ ] Integrate title-independent memory-card storage mapping into generated
+- [x] Integrate title-independent memory-card storage mapping into generated
   executable loops.
-- [ ] Integrate title-independent CD/disc filesystem and asset access mapping
+- [x] Integrate title-independent CD/disc filesystem and asset access mapping
   into generated executable loops.
 - [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.

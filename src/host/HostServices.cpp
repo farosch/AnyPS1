@@ -5,6 +5,8 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <string>
@@ -20,6 +22,23 @@
 #endif
 
 namespace anyps1 {
+
+std::string environment_value(const char* name)
+{
+#ifdef _WIN32
+    char* value = nullptr;
+    size_t length = 0;
+    if (_dupenv_s(&value, &length, name) != 0 || value == nullptr) {
+        return {};
+    }
+    std::string result(value);
+    std::free(value);
+    return result;
+#else
+    const char* value = std::getenv(name);
+    return value == nullptr ? std::string{} : std::string(value);
+#endif
+}
 
 std::string host_exit_log(HostExitCode code)
 {
@@ -444,6 +463,8 @@ struct NativeHostLoopRuntime::Impl {
     std::map<std::uint32_t, std::uint32_t> spu_registers;
     std::vector<std::int16_t> spu_output;
     std::vector<std::uint32_t> gpu_vram;
+    std::uint8_t memory_card_scratch_[128]{};
+    std::uint8_t disc_sector_[2352]{};
     Ps1InputState input_state;
     bool initialized = false;
 };
@@ -478,6 +499,21 @@ bool NativeHostLoopRuntime::initialize(
     if (!impl_->input.initialize(input_config, error)) {
         impl_->host.shutdown();
         return false;
+    }
+    std::string card1_path =
+        environment_value("ANYPS1_MEMORY_CARD_1");
+    std::string card2_path =
+        environment_value("ANYPS1_MEMORY_CARD_2");
+    if (card1_path.empty()) card1_path = "anyps1-card1.mcd";
+    if (card2_path.empty()) card2_path = "anyps1-card2.mcd";
+    std::string storage_error;
+    impl_->memory_card.open_slot(0, card1_path, storage_error);
+    impl_->memory_card.open_slot(1, card2_path, storage_error);
+    std::string disc_path = environment_value("ANYPS1_DISC_IMAGE");
+    if (!disc_path.empty()) {
+        impl_->disc.open_disc(disc_path, false, storage_error);
+    } else if (std::filesystem::exists("disc.bin")) {
+        impl_->disc.open_disc("disc.bin", false, storage_error);
     }
     impl_->gpu_vram.assign(1024u * 512u, 0u);
     impl_->initialized = true;
@@ -940,6 +976,133 @@ int anyps1_host_loop_vulkan_present()
     if (anyps1_native_host_loop == nullptr) return 18;
     std::string error;
     return anyps1_native_host_loop->vulkan_present(error);
+}
+
+int anyps1_host_loop_memory_card_open(
+    int slot,
+    const char* path)
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    std::string error;
+    return anyps1_native_host_loop->open_memory_card(
+        slot,
+        path == nullptr ? "" : path,
+        error) ? 0 : 18;
+}
+
+int anyps1_host_loop_memory_card_read(
+    int slot,
+    std::uint32_t block,
+    std::uint32_t offset)
+{
+    static std::uint8_t scratch[2][128]{};
+    if (anyps1_native_host_loop == nullptr ||
+        slot < 0 || slot >= 2 ||
+        block >= 1024u ||
+        offset > 124u) {
+        return -1;
+    }
+    std::string error;
+    if (!anyps1_native_host_loop->read_memory_card(
+            slot,
+            block,
+            scratch[slot],
+            128u,
+            error)) {
+        return -1;
+    }
+    std::uint32_t value =
+        static_cast<std::uint32_t>(scratch[slot][offset])
+        | (static_cast<std::uint32_t>(scratch[slot][offset + 1u]) << 8)
+        | (static_cast<std::uint32_t>(scratch[slot][offset + 2u]) << 16)
+        | (static_cast<std::uint32_t>(scratch[slot][offset + 3u]) << 24);
+    return static_cast<int>(value);
+}
+
+int anyps1_host_loop_memory_card_write(
+    int slot,
+    std::uint32_t block,
+    std::uint32_t offset,
+    std::uint32_t value)
+{
+    static std::uint8_t scratch[2][128]{};
+    if (anyps1_native_host_loop == nullptr ||
+        slot < 0 || slot >= 2 ||
+        block >= 1024u ||
+        offset > 124u) {
+        return 18;
+    }
+    std::string error;
+    if (!anyps1_native_host_loop->read_memory_card(
+            slot,
+            block,
+            scratch[slot],
+            128u,
+            error)) {
+        return 18;
+    }
+    scratch[slot][offset] =
+        static_cast<std::uint8_t>(value & 0xFFu);
+    scratch[slot][offset + 1u] =
+        static_cast<std::uint8_t>((value >> 8) & 0xFFu);
+    scratch[slot][offset + 2u] =
+        static_cast<std::uint8_t>((value >> 16) & 0xFFu);
+    scratch[slot][offset + 3u] =
+        static_cast<std::uint8_t>((value >> 24) & 0xFFu);
+    return anyps1_native_host_loop->write_memory_card(
+        slot,
+        block,
+        scratch[slot],
+        128u,
+        error) ? 0 : 18;
+}
+
+void anyps1_host_loop_memory_card_close(int slot)
+{
+    if (anyps1_native_host_loop != nullptr) {
+        anyps1_native_host_loop->close_memory_card(slot);
+    }
+}
+
+int anyps1_host_loop_disc_open(
+    const char* path,
+    int mode2)
+{
+    if (anyps1_native_host_loop == nullptr) return 18;
+    std::string error;
+    return anyps1_native_host_loop->open_disc(
+        path == nullptr ? "" : path,
+        mode2 != 0,
+        error) ? 0 : 18;
+}
+
+std::uint32_t anyps1_host_loop_disc_read(
+    std::uint32_t lba,
+    std::uint32_t offset)
+{
+    static std::uint8_t sector[2048]{};
+    if (anyps1_native_host_loop == nullptr || offset > 2044u) {
+        return 0u;
+    }
+    std::string error;
+    if (!anyps1_native_host_loop->read_disc(
+            lba,
+            sector,
+            2048u,
+            error)) {
+        return 0u;
+    }
+    return static_cast<std::uint32_t>(sector[offset])
+        | (static_cast<std::uint32_t>(sector[offset + 1u]) << 8)
+        | (static_cast<std::uint32_t>(sector[offset + 2u]) << 16)
+        | (static_cast<std::uint32_t>(sector[offset + 3u]) << 24);
+}
+
+void anyps1_host_loop_disc_close()
+{
+    if (anyps1_native_host_loop != nullptr) {
+        anyps1_native_host_loop->close_disc();
+    }
 }
 
 void anyps1_host_loop_shutdown()

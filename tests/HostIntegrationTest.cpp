@@ -111,6 +111,16 @@ int main()
         if (anyps1::anyps1_host_loop_gpu_write(0x1F801810u, 0u) != 18) {
             throw std::runtime_error("uninitialized GPU write did not report host runtime error");
         }
+        if (anyps1::anyps1_host_loop_memory_card_open(
+                0,
+                "card-test.mcd") != 18) {
+            throw std::runtime_error("uninitialized memory-card open did not report host runtime error");
+        }
+        if (anyps1::anyps1_host_loop_disc_open(
+                "disc-test.bin",
+                0) != 18) {
+            throw std::runtime_error("uninitialized disc open did not report host runtime error");
+        }
         const anyps1::HostServiceMapping audio =
             anyps1::map_host_service(anyps1::HostServiceKind::Audio);
         const anyps1::HostServiceMapping video =

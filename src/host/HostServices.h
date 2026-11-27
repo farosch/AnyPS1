@@ -253,6 +253,26 @@ int anyps1_host_loop_audio_queue(
 int anyps1_host_loop_gpu_write(
     std::uint32_t address,
     std::uint32_t value);
+int anyps1_host_loop_memory_card_open(
+    int slot,
+    const char* path);
+int anyps1_host_loop_memory_card_read(
+    int slot,
+    std::uint32_t block,
+    std::uint32_t offset);
+int anyps1_host_loop_memory_card_write(
+    int slot,
+    std::uint32_t block,
+    std::uint32_t offset,
+    std::uint32_t value);
+int anyps1_host_loop_disc_open(
+    const char* path,
+    int mode2);
+std::uint32_t anyps1_host_loop_disc_read(
+    std::uint32_t lba,
+    std::uint32_t offset);
+void anyps1_host_loop_disc_close();
+void anyps1_host_loop_memory_card_close(int slot);
 int anyps1_host_loop_vulkan_init(
     const char* title,
     std::uint32_t width,
