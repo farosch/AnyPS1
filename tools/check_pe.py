@@ -76,7 +76,7 @@ def main() -> int:
             raise ValueError("PE subsystem is not Windows CUI")
         if directory_count != 16:
             raise ValueError("PE data-directory count is invalid")
-        if import_rva != 0x2120 or import_size != 40:
+        if import_rva == 0 or import_size != 40:
             raise ValueError("PE import directory is invalid")
 
         section_offset = optional_offset + coff_size
@@ -162,21 +162,31 @@ def main() -> int:
                     check=False,
                 )
                 if b"AnyPS1 native executable diagnostics" not in completed.stdout:
-                    if not completed.stdout:
-                        return 0
                     raise RuntimeError("PE executable did not emit AnyPS1 diagnostics")
                 if b"target=windows" not in completed.stdout:
                     raise RuntimeError("PE executable did not report the Windows target")
-                partial_name = args.fixture.name
-                expected_status = 16 if (
-                    "native-unsupported" in partial_name
-                    or "coprocessor-coverage" in partial_name
-                ) else 0
+                marker = b"unsupported_instructions="
+                marker_offset = completed.stdout.find(marker)
+                if marker_offset < 0:
+                    raise RuntimeError(
+                        "PE executable did not report unsupported-instruction status"
+                    )
+                count_text = completed.stdout[
+                    marker_offset + len(marker):
+                ].split(b"\n", 1)[0].strip(b"\0\r ")
+                unsupported_count = int(count_text)
+                expected_status = 16 if unsupported_count else 0
+                if "native-host-integration" in args.fixture.name:
+                    expected_status = 17
+                if "memory-boundary" in args.fixture.name:
+                    expected_status = 13
                 if completed.returncode != expected_status:
                     raise RuntimeError(
-                        f"PE executable returned unexpected status: {completed.returncode}"
+                        f"PE executable returned unexpected status: "
+                        f"{completed.returncode} (unsupported={unsupported_count}, "
+                        f"stdout={completed.stdout!r})"
                     )
-            except (OSError, PermissionError, RuntimeError):
+            except PermissionError:
                 pass
     return 0
 

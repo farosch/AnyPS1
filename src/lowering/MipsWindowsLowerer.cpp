@@ -5,6 +5,7 @@
 #include "PayloadRegion.h"
 #include "executable/PeWriter.h"
 #include "host/HostServices.h"
+#include "MipsLoweringSupport.h"
 
 #include <cstdint>
 #include <algorithm>
@@ -24,50 +25,6 @@
 namespace anyps1 {
 
 namespace {
-
-#ifdef _WIN32
-std::uint32_t resolve_static_indirect_target(
-    const std::vector<unsigned char>& data,
-    std::uint32_t load_address,
-    std::uint32_t file_size,
-    std::uint32_t instruction_address,
-    std::uint32_t target_register)
-{
-    std::uint32_t value = 0;
-    bool initialized = false;
-    for (std::int32_t distance = -16; distance <= 0; distance += 4) {
-        const std::int64_t word_address =
-            static_cast<std::int64_t>(instruction_address) + distance;
-        if (word_address < load_address ||
-            word_address >= static_cast<std::int64_t>(load_address) + file_size) {
-            continue;
-        }
-        const std::uint32_t offset =
-            static_cast<std::uint32_t>(word_address - load_address);
-        const std::uint32_t instruction =
-            read_psx32(data, PSX_HEADER_SIZE + offset);
-        const std::uint32_t opcode = instruction >> 26;
-        const std::uint32_t rt = (instruction >> 16) & 31u;
-        const std::uint32_t immediate = instruction & 0xFFFFu;
-        if (rt != target_register) continue;
-        if (opcode == 0x0F) {
-            value = immediate << 16;
-            initialized = true;
-        } else if (opcode == 0x09) {
-            const std::int32_t signed_immediate =
-                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate));
-            value = static_cast<std::uint32_t>(
-                static_cast<std::int64_t>(value) + signed_immediate);
-            initialized = true;
-        } else if (opcode == 0x0D) {
-            value |= immediate;
-            initialized = true;
-        }
-    }
-    return initialized ? value : 0;
-}
-
-#endif
 
 #ifdef _WIN32
 std::filesystem::path find_windows_tool(const char* name)
@@ -204,6 +161,7 @@ void emit_string(std::ofstream& source,
     }
     if (!first) source << ',';
     source << "0\n";
+    source << label << "_length EQU $-" << label << "\n";
 }
 #endif
 
@@ -431,6 +389,14 @@ void MipsWindowsLowerer::lower(
     source << "gte_ctrl dd 32 dup(0)\n";
     source << "fpcsr dd 0\n";
     source << "written dq 0\n";
+    source << "pending_load_valid db 0\n";
+    source << "pending_load_register db 0\n";
+    source << "pending_load_value dd 0\n";
+    source << "previous_load_valid db 0\n";
+    source << "previous_load_register db 0\n";
+    source << "previous_load_value dd 0\n";
+    source << "delay_redirect_valid db 0\n";
+    source << "delay_redirect_address dd 0\n";
 
     emit_string(source, "diag_banner",
                 "AnyPS1 native executable diagnostics\n");
@@ -490,13 +456,6 @@ void MipsWindowsLowerer::lower(
                 " disc=" + std::to_string(host_loop.disc) + "\n");
     emit_string(source, "diag_completed",
                 "native lowering complete\n");
-    emit_string(source, "sdl3_library", "SDL3.dll");
-    emit_string(source, "sdl_init_symbol", "SDL_Init");
-    emit_string(source, "sdl_poll_symbol", "SDL_PollEvent");
-    emit_string(source, "sdl_quit_symbol", "SDL_Quit");
-    emit_string(source, "sdl_vulkan_symbol", "SDL_Vulkan_LoadLibrary");
-    source << "host_event db 1024 dup(0)\n";
-
     source << "payload db ";
     for (std::uint32_t offset = 0; offset < file_size; ++offset) {
         if (offset != 0) {
@@ -515,8 +474,6 @@ void MipsWindowsLowerer::lower(
     source << "EXTERN ReadFile:PROC\n";
     source << "EXTERN SetFilePointer:PROC\n";
     source << "EXTERN CloseHandle:PROC\n";
-    source << "EXTERN LoadLibraryA:PROC\n";
-    source << "EXTERN GetProcAddress:PROC\n";
     source << ".code\n";
     source << "print_diag PROC\n";
     source << "sub rsp,40\n";
@@ -547,53 +504,16 @@ void MipsWindowsLowerer::lower(
     for (const char* label : diagnostics) {
         source << "mov rcx,r12\n";
         source << "lea rdx," << label << "\n";
-        source << "mov r8d,LENGTHOF " << label << "\n";
+        source << "mov r8d," << label << "_length\n";
         source << "mov r9,OFFSET written\n";
         source << "mov qword ptr [rsp+32],0\n";
         source << "call WriteFile\n";
     }
 
-    if (host_loop.input_polling ||
-        host_loop.window_events ||
-        host_loop.audio ||
-        host_loop.framebuffer ||
-        host_loop.vulkan) {
-        source << "lea rcx,sdl3_library\n";
-        source << "call LoadLibraryA\n";
-        source << "test rax,rax\n";
-        source << "jz normal_exit\n";
-        source << "mov rbx,rax\n";
-        source << "mov rcx,rbx\n";
-        source << "lea rdx,sdl_init_symbol\n";
-        source << "call GetProcAddress\n";
-        source << "test rax,rax\n";
-        source << "jz normal_exit\n";
-        source << "mov rcx,6020h\n";
-        source << "call rax\n";
-        source << "mov rcx,rbx\n";
-        source << "lea rdx,sdl_poll_symbol\n";
-        source << "call GetProcAddress\n";
-        source << "test rax,rax\n";
-        source << "jz normal_exit\n";
-        source << "mov rcx,OFFSET host_event\n";
-        source << "call rax\n";
-        if (host_loop.vulkan) {
-            source << "mov rcx,rbx\n";
-            source << "lea rdx,sdl_vulkan_symbol\n";
-            source << "call GetProcAddress\n";
-            source << "test rax,rax\n";
-            source << "jz normal_exit\n";
-            source << "xor rcx,rcx\n";
-            source << "call rax\n";
-        }
-    }
-
     if (unsupported_count != 0) {
         source << "mov ecx,16\n";
-    } else {
-        source << "mov ecx,0\n";
+        source << "call ExitProcess\n";
     }
-    source << "call ExitProcess\n";
 
     source << "lea rsi,payload\n";
     source << "lea rdi,ram\n";
@@ -620,7 +540,81 @@ void MipsWindowsLowerer::lower(
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
         source << "p" << std::hex << address << std::dec << ":\n";
-        if (instruction == 0) continue;
+        source << "mov al,byte ptr pending_load_valid\n";
+        source << "mov byte ptr previous_load_valid,al\n";
+        source << "mov al,byte ptr pending_load_register\n";
+        source << "mov byte ptr previous_load_register,al\n";
+        source << "mov eax,dword ptr pending_load_value\n";
+        source << "mov dword ptr previous_load_value,eax\n";
+        source << "mov byte ptr pending_load_valid,0\n";
+        source << "mov dword ptr [r12],0\n";
+        if (instruction == 0) {
+            source << "cmp byte ptr previous_load_valid,0\n";
+            source << "je p" << std::hex << address << std::dec << "_load_done\n";
+            source << "movzx eax,byte ptr previous_load_register\n";
+            source << "mov edx,dword ptr previous_load_value\n";
+            source << "mov dword ptr [r12+rax*4],edx\n";
+            source << "p" << std::hex << address << std::dec << "_load_done:\n";
+            source << "mov dword ptr [r12],0\n";
+            const std::uint32_t predecessor = address - 4;
+            if (delay_slots.find(address) != delay_slots.end() &&
+                predecessor >= load_address) {
+                const std::uint32_t predecessor_instruction =
+                    read_psx32(
+                        data,
+                        PSX_HEADER_SIZE + predecessor - load_address);
+                const std::uint32_t predecessor_opcode =
+                    predecessor_instruction >> 26;
+                if (predecessor_opcode == 0x02 ||
+                    predecessor_opcode == 0x03) {
+                    const std::uint32_t target =
+                        ((predecessor + 4) & 0xF0000000u) |
+                        ((predecessor_instruction & 0x03FFFFFFu) << 2);
+                    source << "cmp byte ptr delay_redirect_valid,0\n";
+                    source << "je p"
+                           << std::hex << (address + 4) << std::dec << "\n";
+                    source << "jmp p"
+                           << std::hex << target << std::dec << "\n";
+                } else if (predecessor_opcode == 0 &&
+                           ((predecessor_instruction & 63u) == 0x08 ||
+                            (predecessor_instruction & 63u) == 0x09)) {
+                    source << "cmp byte ptr delay_redirect_valid,0\n";
+                    source << "je p"
+                           << std::hex << (address + 4) << std::dec << "\n";
+                    source << "mov eax,dword ptr delay_redirect_address\n";
+                    for (std::uint32_t target : leaders) {
+                        if (target >= load_address &&
+                            target < static_cast<std::uint64_t>(
+                                load_address) + file_size) {
+                            source << "cmp eax," << target << "\n";
+                            source << "je p"
+                                   << std::hex << target << std::dec << "\n";
+                        }
+                    }
+                    source << "jmp unsupported_exit\n";
+                } else if ((predecessor_opcode >= 0x04 &&
+                     predecessor_opcode <= 0x07) ||
+                    predecessor_opcode == 0x01 ||
+                    predecessor_opcode == 0x11 ||
+                    (predecessor_opcode >= 0x14 &&
+                     predecessor_opcode <= 0x17)) {
+                    const std::int32_t displacement =
+                        static_cast<std::int32_t>(
+                            static_cast<std::int16_t>(
+                                predecessor_instruction & 0xFFFFu)) * 4;
+                    const std::uint32_t target =
+                        static_cast<std::uint32_t>(
+                            static_cast<std::int64_t>(predecessor) +
+                            4 + displacement);
+                    source << "cmp byte ptr delay_redirect_valid,0\n";
+                    source << "je p"
+                           << std::hex << (address + 4) << std::dec << "\n";
+                    source << "jmp p"
+                           << std::hex << target << std::dec << "\n";
+                }
+            }
+            continue;
+        }
 
         if (opcode == 0) {
             if (special == 0x00) {
@@ -713,18 +707,28 @@ void MipsWindowsLowerer::lower(
                 source << "mov dword ptr [r12+" << rd * 4 << "],eax\n";
             } else if (special == 0x08) {
                 source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
-                for (std::uint32_t target : leaders) {
-                    if (target >= load_address &&
-                        target < static_cast<std::uint64_t>(load_address) + file_size) {
-                        source << "cmp eax," << target << "\n";
-                        source << "je p" << std::hex << target << std::dec << "\n";
-                    }
-                }
-                source << "jmp unsupported_exit\n";
+                source << "mov dword ptr delay_redirect_address,eax\n";
+                source << "mov byte ptr delay_redirect_valid,1\n";
+                source << "mov al,byte ptr previous_load_valid\n";
+                source << "mov byte ptr pending_load_valid,al\n";
+                source << "mov al,byte ptr previous_load_register\n";
+                source << "mov byte ptr pending_load_register,al\n";
+                source << "mov eax,dword ptr previous_load_value\n";
+                source << "mov dword ptr pending_load_value,eax\n";
+                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
             } else if (special == 0x09) {
                 source << "mov dword ptr [r12+" << rd * 4 << "],"
                        << address + 8 << "\n";
-                source << "jmp unsupported_exit\n";
+                source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
+                source << "mov dword ptr delay_redirect_address,eax\n";
+                source << "mov byte ptr delay_redirect_valid,1\n";
+                source << "mov al,byte ptr previous_load_valid\n";
+                source << "mov byte ptr pending_load_valid,al\n";
+                source << "mov al,byte ptr previous_load_register\n";
+                source << "mov byte ptr pending_load_register,al\n";
+                source << "mov eax,dword ptr previous_load_value\n";
+                source << "mov dword ptr pending_load_value,eax\n";
+                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
             } else if (special == 0x0C) {
                 source << "mov ecx,0\n";
                 source << "call ExitProcess\n";
@@ -821,53 +825,67 @@ void MipsWindowsLowerer::lower(
                    opcode == 0x14 || opcode == 0x15 ||
                    opcode == 0x16 || opcode == 0x17 ||
                    opcode == 0x01 || opcode == 0x11) {
-            const std::int32_t displacement =
-                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
-            const std::uint32_t target =
-                static_cast<std::uint32_t>(
-                    static_cast<std::int64_t>(address) + 4 + displacement);
+            source << "mov byte ptr delay_redirect_valid,0\n";
+            const std::string taken_label =
+                "branch_taken_" + std::to_string(address);
             if (opcode == 0x01) {
                 source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
-                if ((rt & 1u) == 0) source << "jl p" << std::hex << target << std::dec << "\n";
-                else source << "jge p" << std::hex << target << std::dec << "\n";
+                if ((rt & 1u) == 0) source << "jl " << taken_label << "\n";
+                else source << "jge " << taken_label << "\n";
             } else if (opcode == 0x11) {
                 source << "mov eax,dword ptr fpcsr\n";
                 if (rs == 8) {
                     source << "test eax,1\n";
-                    source << "jnz p" << std::hex << target << std::dec << "\n";
+                    source << "jnz " << taken_label << "\n";
                 } else if (rs == 12) {
                     source << "test eax,1\n";
-                    source << "jz p" << std::hex << target << std::dec << "\n";
+                    source << "jz " << taken_label << "\n";
                 }
             } else if (opcode == 0x04) {
                 source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
                 source << "cmp eax,dword ptr [r12+" << rt * 4 << "]\n";
-                source << "je p" << std::hex << target << std::dec << "\n";
+                source << "je " << taken_label << "\n";
             } else if (opcode == 0x05) {
                 source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
                 source << "cmp eax,dword ptr [r12+" << rt * 4 << "]\n";
-                source << "jne p" << std::hex << target << std::dec << "\n";
+                source << "jne " << taken_label << "\n";
             } else if (opcode == 0x06) {
                 source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
-                source << "jle p" << std::hex << target << std::dec << "\n";
+                source << "jle " << taken_label << "\n";
             } else if (opcode == 0x07) {
                 source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
-                source << "jg p" << std::hex << target << std::dec << "\n";
+                source << "jg " << taken_label << "\n";
             } else if (opcode == 0x14) {
                 source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
                 source << "cmp eax,dword ptr [r12+" << rt * 4 << "]\n";
-                source << "je p" << std::hex << target << std::dec << "\n";
+                source << "je " << taken_label << "\n";
             } else if (opcode == 0x15) {
                 source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
                 source << "cmp eax,dword ptr [r12+" << rt * 4 << "]\n";
-                source << "jne p" << std::hex << target << std::dec << "\n";
+                source << "jne " << taken_label << "\n";
             } else if (opcode == 0x16) {
                 source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
-                source << "jle p" << std::hex << target << std::dec << "\n";
+                source << "jle " << taken_label << "\n";
             } else if (opcode == 0x17) {
                 source << "cmp dword ptr [r12+" << rs * 4 << "],0\n";
-                source << "jg p" << std::hex << target << std::dec << "\n";
+                source << "jg " << taken_label << "\n";
             }
+            source << "mov al,byte ptr previous_load_valid\n";
+            source << "mov byte ptr pending_load_valid,al\n";
+            source << "mov al,byte ptr previous_load_register\n";
+            source << "mov byte ptr pending_load_register,al\n";
+            source << "mov eax,dword ptr previous_load_value\n";
+            source << "mov dword ptr pending_load_value,eax\n";
+            source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+            source << taken_label << ":\n";
+            source << "mov byte ptr delay_redirect_valid,1\n";
+            source << "mov al,byte ptr previous_load_valid\n";
+            source << "mov byte ptr pending_load_valid,al\n";
+            source << "mov al,byte ptr previous_load_register\n";
+            source << "mov byte ptr pending_load_register,al\n";
+            source << "mov eax,dword ptr previous_load_value\n";
+            source << "mov dword ptr pending_load_value,eax\n";
+            source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
         } else if (opcode == 0x02 || opcode == 0x03) {
             const std::uint32_t target =
                 ((address + 4) & 0xF0000000u) |
@@ -883,13 +901,31 @@ void MipsWindowsLowerer::lower(
                         source << "call CloseHandle\n";
                     } else if (file_call.kind == Ps1FileCallKind::Read) {
                         source << "mov ecx,dword ptr [r12+16]\n";
-                        source << "mov rdx,dword ptr [r12+20]\n";
+                        source << "mov eax,dword ptr [r12+20]\n";
+                        source << "and eax,1FFFFFFFh\n";
+                        source << "cmp eax,200000h\n";
+                        source << "jae memory_fault_exit\n";
+                        source << "mov r10d,eax\n";
+                        source << "add r10d,dword ptr [r12+24]\n";
+                        source << "cmp r10d,200000h\n";
+                        source << "ja memory_fault_exit\n";
+                        source << "lea rdx,ram\n";
+                        source << "add rdx,rax\n";
                         source << "mov r8d,dword ptr [r12+24]\n";
                         source << "lea r9,written\n";
                         source << "call ReadFile\n";
                     } else if (file_call.kind == Ps1FileCallKind::Write) {
                         source << "mov ecx,dword ptr [r12+16]\n";
-                        source << "mov rdx,dword ptr [r12+20]\n";
+                        source << "mov eax,dword ptr [r12+20]\n";
+                        source << "and eax,1FFFFFFFh\n";
+                        source << "cmp eax,200000h\n";
+                        source << "jae memory_fault_exit\n";
+                        source << "mov r10d,eax\n";
+                        source << "add r10d,dword ptr [r12+24]\n";
+                        source << "cmp r10d,200000h\n";
+                        source << "ja memory_fault_exit\n";
+                        source << "lea rdx,ram\n";
+                        source << "add rdx,rax\n";
                         source << "mov r8d,dword ptr [r12+24]\n";
                         source << "lea r9,written\n";
                         source << "call WriteFile\n";
@@ -899,24 +935,55 @@ void MipsWindowsLowerer::lower(
                         source << "xor r8d,r8d\n";
                         source << "call SetFilePointer\n";
                     } else {
-                        source << "mov ecx,dword ptr [r12+16]\n";
+                        source << "mov eax,dword ptr [r12+16]\n";
+                        source << "and eax,1FFFFFFFh\n";
+                        source << "cmp eax,200000h\n";
+                        source << "jae memory_fault_exit\n";
+                        source << "lea rcx,ram\n";
+                        source << "add rcx,rax\n";
                         source << "mov edx,dword ptr [r12+20]\n";
                         source << "mov r8d,dword ptr [r12+24]\n";
                         source << "call CreateFileA\n";
                     }
                 } else {
-                    source << "call p" << std::hex << target << std::dec << "\n";
+                    source << "mov byte ptr delay_redirect_valid,1\n";
+                    source << "mov al,byte ptr previous_load_valid\n";
+                    source << "mov byte ptr pending_load_valid,al\n";
+                    source << "mov al,byte ptr previous_load_register\n";
+                    source << "mov byte ptr pending_load_register,al\n";
+                    source << "mov eax,dword ptr previous_load_value\n";
+                    source << "mov dword ptr pending_load_value,eax\n";
+                    source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
                 }
             } else {
-                source << "jmp p" << std::hex << target << std::dec << "\n";
+                source << "mov byte ptr delay_redirect_valid,1\n";
+                source << "mov al,byte ptr previous_load_valid\n";
+                source << "mov byte ptr pending_load_valid,al\n";
+                source << "mov al,byte ptr previous_load_register\n";
+                source << "mov byte ptr pending_load_register,al\n";
+                source << "mov eax,dword ptr previous_load_value\n";
+                source << "mov dword ptr pending_load_value,eax\n";
+                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
             }
         } else if (opcode == 0x23 || opcode == 0x21 ||
                    opcode == 0x20 || opcode == 0x24 || opcode == 0x25 ||
                    opcode == 0x22 || opcode == 0x26 ||
                    opcode == 0x31 || opcode == 0x32) {
+            const std::uint32_t access_size =
+                opcode == 0x20 || opcode == 0x24 ? 1u :
+                opcode == 0x21 || opcode == 0x25 ? 2u : 4u;
             source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
             source << "add eax," << static_cast<std::int32_t>(
                 static_cast<std::int16_t>(immediate)) << "\n";
+            source << "and eax,1FFFFFFFh\n";
+            source << "cmp eax,1F801000h\n";
+            source << "jb host_address_continue_" << std::hex << address << std::dec << "\n";
+            source << "cmp eax,1F802000h\n";
+            source << "jae host_address_continue_" << std::hex << address << std::dec << "\n";
+            source << "jmp unsupported_host_exit\n";
+            source << "host_address_continue_" << std::hex << address << std::dec << ":\n";
+            source << "cmp eax," << (0x200000u - access_size) << "\n";
+            source << "ja memory_fault_exit\n";
             source << "and eax,01FFFFFh\n";
             source << "lea rbx,ram\n";
             if (opcode == 0x20) source << "movsx edx,byte ptr [rbx+rax]\n";
@@ -933,13 +1000,26 @@ void MipsWindowsLowerer::lower(
             if (opcode == 0x31 || opcode == 0x32) {
                 // LWC1/LWC2/ SWC2-style value transfers are represented in PS1 memory.
             } else {
-                source << "mov dword ptr [r12+" << rt * 4 << "],edx\n";
+                source << "mov dword ptr pending_load_value,edx\n";
+                source << "mov byte ptr pending_load_register," << rt << "\n";
+                source << "mov byte ptr pending_load_valid,1\n";
             }
         } else if (opcode == 0x2B || opcode == 0x29 || opcode == 0x28 ||
                    opcode == 0x2E || opcode == 0x39 || opcode == 0x3A) {
+            const std::uint32_t access_size =
+                opcode == 0x28 ? 1u : opcode == 0x29 ? 2u : 4u;
             source << "mov eax,dword ptr [r12+" << rs * 4 << "]\n";
             source << "add eax," << static_cast<std::int32_t>(
                 static_cast<std::int16_t>(immediate)) << "\n";
+            source << "and eax,1FFFFFFFh\n";
+            source << "cmp eax,1F801000h\n";
+            source << "jb host_store_continue_" << std::hex << address << std::dec << "\n";
+            source << "cmp eax,1F802000h\n";
+            source << "jae host_store_continue_" << std::hex << address << std::dec << "\n";
+            source << "jmp unsupported_host_exit\n";
+            source << "host_store_continue_" << std::hex << address << std::dec << ":\n";
+            source << "cmp eax," << (0x200000u - access_size) << "\n";
+            source << "ja memory_fault_exit\n";
             source << "and eax,01FFFFFh\n";
             source << "lea rbx,ram\n";
             source << "mov edx,dword ptr [r12+" << rt * 4 << "]\n";
@@ -955,29 +1035,86 @@ void MipsWindowsLowerer::lower(
         } else {
             source << "jmp unsupported_exit\n";
         }
+        source << "cmp byte ptr previous_load_valid,0\n";
+        source << "je p" << std::hex << address << std::dec << "_load_done\n";
+        source << "movzx eax,byte ptr previous_load_register\n";
+        source << "mov edx,dword ptr previous_load_value\n";
+        source << "mov dword ptr [r12+rax*4],edx\n";
+        source << "p" << std::hex << address << std::dec << "_load_done:\n";
+        source << "mov dword ptr [r12],0\n";
+        if (delay_slots.find(address) != delay_slots.end()) {
+            const std::uint32_t predecessor = address - 4;
+            if (predecessor >= load_address) {
+                const std::uint32_t predecessor_instruction =
+                    read_psx32(
+                        data,
+                        PSX_HEADER_SIZE + predecessor - load_address);
+                const std::uint32_t predecessor_opcode =
+                    predecessor_instruction >> 26;
+                if (predecessor_opcode == 0x02 ||
+                    predecessor_opcode == 0x03) {
+                    const std::uint32_t target =
+                        ((predecessor + 4) & 0xF0000000u) |
+                        ((predecessor_instruction & 0x03FFFFFFu) << 2);
+                    source << "cmp byte ptr delay_redirect_valid,0\n";
+                    source << "je p"
+                           << std::hex << (address + 4) << std::dec << "\n";
+                    source << "jmp p"
+                           << std::hex << target << std::dec << "\n";
+                } else if (predecessor_opcode == 0 &&
+                           ((predecessor_instruction & 63u) == 0x08 ||
+                            (predecessor_instruction & 63u) == 0x09)) {
+                    source << "cmp byte ptr delay_redirect_valid,0\n";
+                    source << "je p"
+                           << std::hex << (address + 4) << std::dec << "\n";
+                    source << "mov eax,dword ptr delay_redirect_address\n";
+                    for (std::uint32_t target : leaders) {
+                        if (target >= load_address &&
+                            target < static_cast<std::uint64_t>(
+                                load_address) + file_size) {
+                            source << "cmp eax," << target << "\n";
+                            source << "je p"
+                                   << std::hex << target << std::dec << "\n";
+                        }
+                    }
+                    source << "jmp unsupported_exit\n";
+                } else if ((predecessor_opcode >= 0x04 &&
+                     predecessor_opcode <= 0x07) ||
+                    predecessor_opcode == 0x01 ||
+                    predecessor_opcode == 0x11 ||
+                    (predecessor_opcode >= 0x14 &&
+                     predecessor_opcode <= 0x17)) {
+                    const std::int32_t displacement =
+                        static_cast<std::int32_t>(
+                            static_cast<std::int16_t>(
+                                predecessor_instruction & 0xFFFFu)) * 4;
+                    const std::uint32_t target =
+                        static_cast<std::uint32_t>(
+                            static_cast<std::int64_t>(predecessor) +
+                            4 + displacement);
+                    source << "cmp byte ptr delay_redirect_valid,0\n";
+                    source << "je p"
+                           << std::hex << (address + 4) << std::dec << "\n";
+                    source << "jmp p"
+                           << std::hex << target << std::dec << "\n";
+                }
+            }
+        }
     }
 
+    source << "jmp normal_exit\n";
     source << "divide_zero_exit:\n";
     source << "mov ecx,11\n";
     source << "call ExitProcess\n";
+    source << "unsupported_host_exit:\n";
+    source << "mov ecx,17\n";
+    source << "call ExitProcess\n";
+    source << "memory_fault_exit:\n";
+    source << "mov ecx,13\n";
+    source << "call ExitProcess\n";
     source << "normal_exit:\n";
-    if (host_loop.input_polling || host_loop.window_events ||
-        host_loop.audio || host_loop.framebuffer || host_loop.vulkan) {
-        source << "lea rcx,sdl3_library\n";
-        source << "call LoadLibraryA\n";
-        source << "test rax,rax\n";
-        source << "jz host_loop_quit_done\n";
-        source << "mov rbx,rax\n";
-        source << "mov rcx,rbx\n";
-        source << "lea rdx,sdl_quit_symbol\n";
-        source << "call GetProcAddress\n";
-        source << "test rax,rax\n";
-        source << "jz host_loop_quit_done\n";
-        source << "call rax\n";
-        source << "host_loop_quit_done:\n";
-    }
     source << "lea rdx,diag_completed\n";
-    source << "mov r8d,LENGTHOF diag_completed\n";
+    source << "mov r8d,diag_completed_length\n";
     source << "mov rcx,r12\n";
     source << "mov r9,OFFSET written\n";
     source << "mov qword ptr [rsp+32],0\n";

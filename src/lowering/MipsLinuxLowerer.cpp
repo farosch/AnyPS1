@@ -6,6 +6,7 @@
 #include "PayloadRegion.h"
 #include "memory/MemoryMap.h"
 #include "host/HostServices.h"
+#include "MipsLoweringSupport.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -31,47 +32,6 @@ constexpr std::uint32_t PS1_SCRATCHPAD_SIZE = 0x400u;
 constexpr std::uint32_t PS1_MMIO_BASE = 0x1F801000u;
 constexpr std::uint32_t PS1_BIOS_BASE = 0x1FC00000u;
 constexpr std::uint32_t PS1_BIOS_SIZE = 0x00080000u;
-
-std::uint32_t resolve_static_indirect_target(
-    const std::vector<unsigned char>& data,
-    std::uint32_t load_address,
-    std::uint32_t file_size,
-    std::uint32_t instruction_address,
-    std::uint32_t target_register)
-{
-    std::uint32_t value = 0;
-    bool initialized = false;
-    for (std::int32_t distance = -16; distance <= 0; distance += 4) {
-        const std::int64_t word_address =
-            static_cast<std::int64_t>(instruction_address) + distance;
-        if (word_address < load_address ||
-            word_address >= static_cast<std::int64_t>(load_address) + file_size) {
-            continue;
-        }
-        const std::uint32_t offset =
-            static_cast<std::uint32_t>(word_address - load_address);
-        const std::uint32_t instruction =
-            read_psx32(data, PSX_HEADER_SIZE + offset);
-        const std::uint32_t opcode = instruction >> 26;
-        const std::uint32_t rt = (instruction >> 16) & 31u;
-        const std::uint32_t immediate = instruction & 0xFFFFu;
-        if (rt != target_register) continue;
-        if (opcode == 0x0F) {
-            value = immediate << 16;
-            initialized = true;
-        } else if (opcode == 0x09) {
-            const std::int32_t signed_immediate =
-                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate));
-            value = static_cast<std::uint32_t>(
-                static_cast<std::int64_t>(value) + signed_immediate);
-            initialized = true;
-        } else if (opcode == 0x0D) {
-            value |= immediate;
-            initialized = true;
-        }
-    }
-    return initialized ? value : 0;
-}
 
 }
 
@@ -303,6 +263,10 @@ void MipsLinuxLowerer::lower(
     source << "mmio_state:\n.skip 8192\n";
     source << "gte_data:\n.skip 128\ngte_ctrl:\n.skip 128\n";
     source << "fregs:\n.skip 256\nfpcsr:\n.skip 4\n";
+    source << "pending_load_valid:\n.skip 1\npending_load_register:\n.skip 1\n";
+    source << "pending_load_value:\n.skip 4\n";
+    source << "previous_load_valid:\n.skip 1\nprevious_load_register:\n.skip 1\n";
+    source << "previous_load_value:\n.skip 4\n";
     source << ".section .rodata\n";
     source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
     source << "diag_target:.asciz \"" << escape_assembly_string(target) << "\"\n";
@@ -385,26 +349,19 @@ void MipsLinuxLowerer::lower(
     source << "syscall\n";
     source << "ret\n";
     source << "anyps1_host_loop_controller_state:\n";
-    source << "xor %eax, %eax\n";
-    source << "ret\n";
+    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
     source << "anyps1_host_loop_spu_read:\n";
-    source << "xor %eax, %eax\n";
-    source << "ret\n";
+    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
     source << "anyps1_host_loop_gpu_write:\n";
-    source << "xor %eax, %eax\n";
-    source << "ret\n";
+    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
     source << "anyps1_host_loop_vulkan_present:\n";
-    source << "xor %eax, %eax\n";
-    source << "ret\n";
+    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
     source << "anyps1_host_loop_memory_card_read:\n";
-    source << "xor %eax, %eax\n";
-    source << "ret\n";
+    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
     source << "anyps1_host_loop_memory_card_write:\n";
-    source << "xor %eax, %eax\n";
-    source << "ret\n";
+    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
     source << "anyps1_host_loop_disc_read:\n";
-    source << "xor %eax, %eax\n";
-    source << "ret\n";
+    source << "mov $17, %edi\nmov $60, %eax\nsyscall\n";
 
     auto emit_unsupported_stub = [&](std::uint32_t instruction) {
         const UnsupportedInstruction unsupported =
@@ -414,7 +371,13 @@ void MipsLinuxLowerer::lower(
                << "\n";
     };
 
-    auto emit_normal = [&](std::uint32_t address, std::uint32_t instruction) {
+    auto emit_schedule_load = [&](std::uint32_t rt) {
+        source << "movl %edx, pending_load_value(%rip)\n";
+        source << "movb $" << rt << ", pending_load_register(%rip)\n";
+        source << "movb $1, pending_load_valid(%rip)\n";
+    };
+
+    auto emit_normal_body = [&](std::uint32_t address, std::uint32_t instruction) {
         const std::uint32_t opcode = instruction >> 26;
         const std::uint32_t rs = (instruction >> 21) & 31u;
         const std::uint32_t rt = (instruction >> 16) & 31u;
@@ -878,6 +841,9 @@ void MipsLinuxLowerer::lower(
         } else if (opcode == 0x2F) {
             // Host cache operations are folded into native memory protection/state.
         } else if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 || opcode == 0x24 || opcode == 0x25) {
+            const std::uint32_t access_size =
+                opcode == 0x20 || opcode == 0x24 ? 1u :
+                opcode == 0x21 || opcode == 0x25 ? 2u : 4u;
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
             source << "movl %eax, %ecx\n";
@@ -885,15 +851,82 @@ void MipsLinuxLowerer::lower(
             source << "cmpl $0x1F800000, %ecx\n";
             source << "jb ram_load_" << std::hex << address << std::dec << "\n";
             source << "cmpl $0x1F800400, %ecx\n";
-            source << "jb scratch_load_" << std::hex << address << std::dec << "\n";
+            source << "jae mmio_load_" << std::hex << address << std::dec << "\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "cmpl $" << (0x401u - access_size) << ", %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp scratch_load_" << std::hex << address << std::dec << "\n";
+            source << "mmio_load_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x1F802000, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "cmpl $" << (0x1F802001u - access_size) << ", %ecx\n";
             source << "jae mmio_exit\n";
             source << "subl $0x1F800000, %ecx\n";
             source << "leaq mmio_state(%rip), %rbx\n";
             source << "andl $0x1FFF, %ecx\n";
+            source << "cmpl $0x1050, %ecx\n";
+            source << "jb mmio_load_controller_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1070, %ecx\n";
+            source << "jae mmio_load_cd_" << std::hex << address << std::dec << "\n";
+            source << "movl %ecx, %edi\n";
+            source << "shrl $4, %edi\n";
+            source << "andl $1, %edi\n";
+            source << "movl %ecx, %esi\n";
+            source << "shrl $4, %esi\n";
+            source << "andl $1023, %esi\n";
+            source << "movl %ecx, %edx\n";
+            source << "andl $15, %edx\n";
+            source << "shll $2, %edx\n";
+            source << "call anyps1_host_loop_memory_card_read\n";
+            source << "movl %eax, %edx\n";
+            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
+            source << "mmio_load_cd_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x1800, %ecx\n";
+            source << "jb mmio_load_default_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1820, %ecx\n";
+            source << "jae mmio_load_default_" << std::hex << address << std::dec << "\n";
+            source << "movl %ecx, %esi\n";
+            source << "andl $2047, %esi\n";
+            source << "movl %esi, %edi\n";
+            source << "movl $0, %esi\n";
+            source << "call anyps1_host_loop_disc_read\n";
+            source << "movl %eax, %edx\n";
+            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
+            source << "mmio_load_controller_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x1040, %ecx\n";
+            source << "jb mmio_load_default_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1080, %ecx\n";
+            source << "jae mmio_load_spu_" << std::hex << address << std::dec << "\n";
+            source << "sub $8, %rsp\n";
+            source << "call anyps1_host_loop_controller_state\n";
+            source << "add $8, %rsp\n";
+            source << "movl %eax, %edx\n";
+            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
+            source << "mmio_load_spu_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x1C00, %ecx\n";
+            source << "jb mmio_load_default_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1D80, %ecx\n";
+            source << "jae mmio_load_default_" << std::hex << address << std::dec << "\n";
+            source << "movl %ecx, %edi\n";
+            source << "addl $0x1F800000, %edi\n";
+            source << "sub $8, %rsp\n";
+            source << "call anyps1_host_loop_spu_read\n";
+            source << "add $8, %rsp\n";
+            source << "movl %eax, %edx\n";
+            source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
+            source << "mmio_load_default_" << std::hex << address << std::dec << ": \n";
+            if (opcode == 0x20) source << "movsbl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x21) source << "movswl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x23) source << "movl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x24) source << "movzbl (%rbx,%rcx), %edx\n";
+            else source << "movzwl (%rbx,%rcx), %edx\n";
+            emit_schedule_load(rt);
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "ram_load_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x200000, %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "cmpl $" << (0x200001u - access_size) << ", %ecx\n";
             source << "jae memory_fault_exit\n";
             source << "leaq ram(%rip), %rbx\n";
             source << "scratch_load_" << std::hex << address << std::dec << ": \n";
@@ -902,9 +935,11 @@ void MipsLinuxLowerer::lower(
             else if (opcode == 0x23) source << "movl (%rbx,%rcx), %edx\n";
             else if (opcode == 0x24) source << "movzbl (%rbx,%rcx), %edx\n";
             else source << "movzwl (%rbx,%rcx), %edx\n";
-            source << "movl %edx, " << rt * 4 << "(%r12)\n";
+            emit_schedule_load(rt);
             source << "mmio_load_done_" << std::hex << address << std::dec << ": \n";
         } else if (opcode == 0x28 || opcode == 0x29 || opcode == 0x2B) {
+            const std::uint32_t access_size =
+                opcode == 0x28 ? 1u : opcode == 0x29 ? 2u : 4u;
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
             source << "movl %eax, %ecx\n";
@@ -912,8 +947,16 @@ void MipsLinuxLowerer::lower(
             source << "cmpl $0x1F800000, %ecx\n";
             source << "jb ram_store_" << std::hex << address << std::dec << "\n";
             source << "cmpl $0x1F800400, %ecx\n";
-            source << "jb scratch_store_" << std::hex << address << std::dec << "\n";
+            source << "jae mmio_store_" << std::hex << address << std::dec << "\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "cmpl $" << (0x401u - access_size) << ", %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp scratch_store_" << std::hex << address << std::dec << "\n";
+            source << "mmio_store_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x1F802000, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "cmpl $" << (0x1F802001u - access_size) << ", %ecx\n";
             source << "jae mmio_exit\n";
             source << "subl $0x1F800000, %ecx\n";
             source << "leaq mmio_state(%rip), %rbx\n";
@@ -925,6 +968,8 @@ void MipsLinuxLowerer::lower(
             source << "mmio_store_done_" << std::hex << address << std::dec << ": \n";
             source << "ram_store_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x200000, %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "cmpl $" << (0x200001u - access_size) << ", %ecx\n";
             source << "jae memory_fault_exit\n";
             source << "leaq ram(%rip), %rbx\n";
             source << "scratch_store_" << std::hex << address << std::dec << ": \n";
@@ -1101,7 +1146,8 @@ void MipsLinuxLowerer::lower(
                 source << "orl %eax, %esi\n";
                 source << "lwr_done_" << std::hex << address << std::dec << ": \n";
             }
-            source << "movl %esi, " << rt * 4 << "(%r12)\n";
+            source << "movl %esi, %edx\n";
+            emit_schedule_load(rt);
         } else if (opcode == 0x2A || opcode == 0x2E) {
             // Little-endian PS1 SWL/SWR: merge a register into a
             // word-aligned store according to the effective address.
@@ -1192,6 +1238,28 @@ void MipsLinuxLowerer::lower(
     };
 
     std::set<std::uint32_t> emitted_addresses;
+    std::uint32_t emitted_instruction_serial = 0;
+    auto emit_normal = [&](std::uint32_t address, std::uint32_t instruction) {
+        const std::string serial = std::to_string(emitted_instruction_serial++);
+        source << "movzbl pending_load_valid(%rip), %eax\n";
+        source << "movb %al, previous_load_valid(%rip)\n";
+        source << "movzbl pending_load_register(%rip), %eax\n";
+        source << "movb %al, previous_load_register(%rip)\n";
+        source << "movl pending_load_value(%rip), %eax\n";
+        source << "movl %eax, previous_load_value(%rip)\n";
+        source << "movb $0, pending_load_valid(%rip)\n";
+        emit_normal_body(address, instruction);
+        source << "cmpb $0, previous_load_valid(%rip)\n";
+        const std::string no_commit =
+            "previous_load_skip_" + serial;
+        source << "je " << no_commit << "\n";
+        source << "movzbl previous_load_register(%rip), %eax\n";
+        source << "shll $2, %eax\n";
+        source << "movl previous_load_value(%rip), %edx\n";
+        source << "movl %edx, (%r12,%rax)\n";
+        source << no_commit << ":\n";
+        source << "movl $0, 0(%r12)\n";
+    };
     std::set<std::uint32_t> emitted_delay_slots;
     for (std::uint32_t address : leaders) {
         if (address < load_address || address >= load_address + file_size) continue;
@@ -1220,7 +1288,10 @@ void MipsLinuxLowerer::lower(
                 emitted_addresses.insert(address);
             }
             emitted_delay_slots.insert(address);
-            if (!address_is_control) continue;
+            if (!address_is_control) {
+                source << "jmp p" << std::hex << (address + 4) << std::dec << "\n";
+                continue;
+            }
         }
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
             || opcode == 0x06 || opcode == 0x07
@@ -1299,6 +1370,7 @@ void MipsLinuxLowerer::lower(
                     emit_unsupported_stub(instruction);
                 }
             }
+            source << "jmp p" << std::hex << (address + 8) << std::dec << "\n";
         } else if (jump) {
             const std::uint32_t jump_target =
                 ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
@@ -1307,12 +1379,12 @@ void MipsLinuxLowerer::lower(
                 const Ps1FileCallPlan file_call =
                     map_ps1_file_call(jump_target);
                 if (file_call.kind != Ps1FileCallKind::Unsupported) {
-                    source << "movl 16(%r12), %eax\n";
-                    source << "andl $0x1FFFFF, %eax\n";
-                    source << "leaq ram(%rip), %rbx\n";
-                    source << "addq %rax, %rbx\n";
                     if (file_call.kind == Ps1FileCallKind::Open) {
-                        source << "movq %rbx, %rdi\n";
+                        source << "movl 16(%r12), %eax\n";
+                        source << "cmpl $0x200000, %eax\n";
+                        source << "jae memory_fault_exit\n";
+                        source << "leaq ram(%rip), %rdi\n";
+                        source << "addq %rax, %rdi\n";
                         source << "movl 20(%r12), %esi\n";
                         source << "movl 24(%r12), %edx\n";
                         source << "mov $" << file_call.linux_syscall << ", %eax\n";
@@ -1320,6 +1392,17 @@ void MipsLinuxLowerer::lower(
                         source << "movl %eax, 8(%r12)\n";
                     } else if (file_call.kind == Ps1FileCallKind::Read) {
                         source << "movl 16(%r12), %edi\n";
+                        source << "movl 20(%r12), %eax\n";
+                        source << "cmpl $0x200000, %eax\n";
+                        source << "jae memory_fault_exit\n";
+                        source << "movl 24(%r12), %ecx\n";
+                        source << "addl %ecx, %eax\n";
+                        source << "jb memory_fault_exit\n";
+                        source << "cmpl $0x200000, %eax\n";
+                        source << "ja memory_fault_exit\n";
+                        source << "movl 20(%r12), %eax\n";
+                        source << "leaq ram(%rip), %rbx\n";
+                        source << "addq %rax, %rbx\n";
                         source << "movq %rbx, %rsi\n";
                         source << "movl 24(%r12), %edx\n";
                         source << "mov $" << file_call.linux_syscall << ", %eax\n";
@@ -1327,6 +1410,17 @@ void MipsLinuxLowerer::lower(
                         source << "movl %eax, 8(%r12)\n";
                     } else if (file_call.kind == Ps1FileCallKind::Write) {
                         source << "movl 16(%r12), %edi\n";
+                        source << "movl 20(%r12), %eax\n";
+                        source << "cmpl $0x200000, %eax\n";
+                        source << "jae memory_fault_exit\n";
+                        source << "movl 24(%r12), %ecx\n";
+                        source << "addl %ecx, %eax\n";
+                        source << "jb memory_fault_exit\n";
+                        source << "cmpl $0x200000, %eax\n";
+                        source << "ja memory_fault_exit\n";
+                        source << "movl 20(%r12), %eax\n";
+                        source << "leaq ram(%rip), %rbx\n";
+                        source << "addq %rax, %rbx\n";
                         source << "movq %rbx, %rsi\n";
                         source << "movl 24(%r12), %edx\n";
                         source << "mov $" << file_call.linux_syscall << ", %eax\n";

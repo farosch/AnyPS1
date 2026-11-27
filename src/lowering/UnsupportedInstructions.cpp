@@ -126,17 +126,23 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
             return false;
         }
     }
+    if (opcode == 0x11) {
+        if (rs == 16) {
+            return special <= 7 || (special >= 12 && special <= 15) ||
+                special == 0x20 || special == 0x24 ||
+                (special >= 0x30 && special <= 0x37);
+        }
+        return rs == 0 || rs == 2 || rs == 4 || rs == 6 ||
+            rs == 8;
+    }
     if (opcode == 0x13) {
-        return true;
+        return rs == 0 || rs == 2 || rs == 4 || rs == 6;
     }
     if (opcode == 0x10) {
         return rs == 0x00 || rs == 0x02 || rs == 0x04 ||
                rs == 0x06 || (rs == 0x10 && special == 0x10);
     }
     if (opcode == 0x12) {
-        if (rs == 0x00 || rs == 0x02 || rs == 0x04 || rs == 0x06) {
-            return true;
-        }
         switch (instruction) {
         case 0x48C0C000u:
         case 0x48C0C800u:
@@ -145,24 +151,26 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
         case 0x48C8E000u:
         case 0x48C8E800u:
         case 0x48C8F000u:
-            return true;
-        default:
             return false;
+        default:
+            break;
         }
+        if (rs == 0x00 || rs == 0x02 || rs == 0x04 || rs == 0x06) {
+            return true;
+        }
+        return false;
     }
     switch (opcode) {
     case 0x01: case 0x02: case 0x03: case 0x04:
     case 0x05: case 0x06: case 0x07: case 0x08:
     case 0x09: case 0x0A: case 0x0B: case 0x0C:
-    case 0x0D: case 0x0E: case 0x0F: case 0x11:
+    case 0x0D: case 0x0E:     case 0x0F:
     case 0x14: case 0x15: case 0x16: case 0x17:
     case 0x20:
     case 0x21: case 0x22: case 0x23: case 0x24:
     case 0x25: case 0x26: case 0x28: case 0x29:
-    case 0x2A: case 0x2B: case 0x2E: case 0x2F: case 0x31:
-    case 0x30: case 0x32: case 0x33: case 0x38:
-    case 0x35: case 0x36: case 0x37: case 0x39: case 0x3A:
-    case 0x3B: case 0x3D: case 0x3E: case 0x3F:
+    case 0x2A: case 0x2B: case 0x2E: case 0x2F:
+    case 0x31: case 0x32: case 0x39: case 0x3A:
         return true;
     default:
         return false;

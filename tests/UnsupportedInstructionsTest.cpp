@@ -67,9 +67,9 @@ int main()
             0x48C8F000u
         };
         for (const std::uint32_t operation : gte_operations) {
-            if (!anyps1::is_supported_mips_instruction(operation)) {
+            if (anyps1::is_supported_mips_instruction(operation)) {
                 throw std::runtime_error(
-                    "supported COP2/GTE operation was classified as unsupported");
+                    "placeholder COP2/GTE operation was classified as supported");
             }
         }
         if (!anyps1::is_supported_mips_instruction(0xC8200000u) ||
@@ -79,13 +79,9 @@ int main()
         }
         const std::uint32_t cop3_load_store_words[] = {
             0x4C000000u,
-            0x4C000000u,
-            0xC0000000u,
-            0xCC000000u,
-            0xE0000000u,
-            0xEC000000u,
-            0xF8000000u,
-            0xE0000000u,
+            0x4C400000u,
+            0x4C800000u,
+            0x4CC00000u,
         };
         for (const std::uint32_t word : cop3_load_store_words) {
             if (!anyps1::is_supported_mips_instruction(word)) {
@@ -98,6 +94,19 @@ int main()
                     }(word));
             }
         }
+        const std::uint32_t unsupported_coprocessor_words[] = {
+            0xC0000000u,
+            0xCC000000u,
+            0xE0000000u,
+            0xEC000000u,
+            0xF8000000u,
+        };
+        for (const std::uint32_t word : unsupported_coprocessor_words) {
+            if (anyps1::is_supported_mips_instruction(word)) {
+                throw std::runtime_error(
+                    "unimplemented coprocessor operation was classified as supported");
+            }
+        }
         const std::uint32_t ldc_sdc_words[] = {
                     0xD4200000u,
                     0xD8200000u,
@@ -107,10 +116,10 @@ int main()
                     0xFC200000u
         };
         for (const std::uint32_t word : ldc_sdc_words) {
-                    if (!anyps1::is_supported_mips_instruction(word)) {
-                        throw std::runtime_error(
-                            "64-bit coprocessor load/store was classified as unsupported");
-                    }
+            if (anyps1::is_supported_mips_instruction(word)) {
+                throw std::runtime_error(
+                    "unimplemented 64-bit coprocessor load/store was classified as supported");
+            }
         }
 
         const anyps1::UnsupportedInstruction lwc1 =

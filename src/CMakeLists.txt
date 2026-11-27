@@ -28,6 +28,7 @@ add_library(anyps1_lowering
     lowering/MipsLowerer.cpp
     lowering/MipsLinuxLowerer.cpp
     lowering/MipsWindowsLowerer.cpp
+    lowering/MipsLoweringSupport.cpp
     lowering/UnsupportedInstructions.cpp
     lowering/PayloadRegion.cpp
 )
@@ -42,6 +43,7 @@ add_library(anyps1_input
 
 add_library(anyps1_host
     host/HostServices.cpp
+    host/NativeHostAbi.cpp
 )
 
 add_library(anyps1_memory

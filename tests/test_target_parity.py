@@ -6,8 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class TargetParityTest(unittest.TestCase):
-    def test_linux_windows_mips_and_gpu_support(self):
+class LoweringInventoryTest(unittest.TestCase):
+    def test_linux_windows_lowering_inventory(self):
         fixture_path = (
             ROOT / "tests" / "fixtures" / "json" / "target-parity.json"
         )
@@ -79,29 +79,11 @@ class TargetParityTest(unittest.TestCase):
             "resolve_static_indirect_target",
             "call_edges=",
             "unresolved_indirect_transfers=",
-            "sdl3_library",
-            "SDL_Vulkan_LoadLibrary",
-            "LoadLibraryA",
         ):
             self.assertIn(
                 pattern,
                 windows,
                 f"Windows lowerer is missing host/CFG parity feature {pattern}",
-            )
-
-        for pattern in (
-            "anyps1_host_loop_controller_state",
-            "anyps1_host_loop_spu_read",
-            "anyps1_host_loop_gpu_write",
-            "anyps1_host_loop_vulkan_present",
-            "anyps1_host_loop_memory_card_read",
-            "anyps1_host_loop_memory_card_write",
-            "anyps1_host_loop_disc_read",
-        ):
-            self.assertIn(
-                pattern,
-                linux,
-                f"Linux lowerer is missing host-loop integration {pattern}",
             )
 
         graphics = ROOT / "src" / "gpu" / "Graphics.cpp"

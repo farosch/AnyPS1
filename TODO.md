@@ -141,20 +141,20 @@
 - [x] Add unsupported MMIO and BIOS-vector fixtures.
 - [x] Implement native file lowering for open/read/write/seek/close operations
   in Linux/Windows lowering at PS1 A0 file-vector calls.
-- [x] Integrate input polling into the actual generated executable loop.
-- [x] Integrate SDL3 window creation and event pumping into the Linux/Windows
+- [ ] Integrate input polling into the actual generated executable loop.
+- [ ] Integrate SDL3 window creation and event pumping into the Linux/Windows
   generated executable loop.
-- [x] Integrate native audio lowering for PS1 SPU operations into generated
+- [ ] Integrate native audio lowering for PS1 SPU operations into generated
   executable loops.
-- [x] Integrate native video framebuffer presentation into generated executable
+- [ ] Integrate native video framebuffer presentation into generated executable
   loops.
-- [x] Integrate native Vulkan swapchain, image, sampler, pipeline, and
+- [ ] Integrate native Vulkan swapchain, image, sampler, pipeline, and
   command-buffer resources.
-- [x] Expose host-native diagnostics through generated executable structured
+- [ ] Expose host-native diagnostics through generated executable structured
   exit codes and logs.
-- [x] Integrate title-independent memory-card storage mapping into generated
+- [ ] Integrate title-independent memory-card storage mapping into generated
   executable loops.
-- [x] Integrate title-independent CD/disc filesystem and asset access mapping
+- [ ] Integrate title-independent CD/disc filesystem and asset access mapping
   into generated executable loops.
 - [x] Add explicit unsupported exits for every unimplemented BIOS vector and
   MMIO device family.
@@ -168,7 +168,7 @@
   fixture validation.
 - [x] Add `objdump`/`llvm-readobj` format-inspector support.
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
-- [x] Implement native Windows MIPS lowering equivalent to Linux lowering.
+- [ ] Implement native Windows MIPS lowering equivalent to Linux lowering.
 - [x] Generate imports and relocations for real Windows host-native code.
 - [x] Document PE32 support as optional: no PE32-only x86 compatibility target
   is required because the native backend emits AMD64 PE32+.

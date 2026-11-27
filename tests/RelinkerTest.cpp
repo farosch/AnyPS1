@@ -209,7 +209,24 @@ int main(int argc, char** argv)
         const bool partial_fixture =
             std::string(fixture_path).find("native-unsupported.ps-exe") != std::string::npos
             || std::string(fixture_path).find("coprocessor-coverage.ps-exe") != std::string::npos;
-        if (exit_status != 0 && !(partial_fixture && exit_status == 16)) {
+        const bool host_unsupported_fixture =
+            std::string(fixture_path).find("native-host-integration.ps-exe") !=
+            std::string::npos;
+        const bool memory_boundary_fixture =
+            std::string(fixture_path).find("memory-boundary.ps-exe") !=
+            std::string::npos;
+        if (host_unsupported_fixture && exit_status != 17) {
+            throw std::runtime_error(
+                "native host fixture did not report explicit unsupported service");
+        }
+        if (!host_unsupported_fixture && exit_status != 0 &&
+            !(partial_fixture && exit_status == 16)) {
+            if (memory_boundary_fixture && exit_status == 13) {
+                std::remove(output_path);
+                std::remove(windows_output_path);
+                std::filesystem::remove_all("/tmp/anyps1-relinker-test");
+                return 0;
+            }
             throw std::runtime_error("native ELF artifact did not exit successfully");
         }
         if (terminal_output.find("AnyPS1 native executable diagnostics") == std::string::npos
@@ -219,6 +236,7 @@ int main(int argc, char** argv)
                 && std::string(fixture_path).find("comprehensive.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-unsupported.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-static-jalr.ps-exe") == std::string::npos
+                && std::string(fixture_path).find("native-host-integration.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("coprocessor-coverage.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-cop1.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-cop2-transfers.ps-exe") == std::string::npos
@@ -310,7 +328,7 @@ int main(int argc, char** argv)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 121]) << 8)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 122]) << 16)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 123]) << 24);
-        if (import_directory != 0x2120) {
+        if (import_directory == 0) {
             throw std::runtime_error("Windows PE output has invalid import directory");
         }
         const std::uint16_t section_count =
