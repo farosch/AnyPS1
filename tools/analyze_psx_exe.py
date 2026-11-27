@@ -1,4 +1,5 @@
 import argparse
+import json
 import struct
 from collections import defaultdict
 from dataclasses import dataclass
@@ -12,14 +13,15 @@ REG_NAMES = (
     "t8", "t9", "k0", "k1", "gp", "sp", "fp", "ra",
 )
 
+REGISTRY_PATH = Path(__file__).with_name("mips_opcode_registry.json")
+REGISTRY = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+SPECIAL_ENTRIES = {
+    int(entry["value"]): entry
+    for entry in REGISTRY["special"]
+}
 SPECIAL_NAMES = {
-    0x00: "sll", 0x02: "srl", 0x03: "sra", 0x08: "jr",
-    0x09: "jalr", 0x0C: "syscall", 0x0D: "break",
-    0x10: "mfhi", 0x11: "mthi", 0x12: "mflo", 0x13: "mtlo",
-    0x18: "mult", 0x19: "multu", 0x1A: "div", 0x1B: "divu",
-    0x20: "add", 0x21: "addu", 0x22: "sub", 0x23: "subu",
-    0x24: "and", 0x25: "or", 0x26: "xor", 0x27: "nor",
-    0x2A: "slt", 0x2B: "sltu",
+    value: entry["name"]
+    for value, entry in SPECIAL_ENTRIES.items()
 }
 
 BRANCH_NAMES = {
@@ -27,14 +29,8 @@ BRANCH_NAMES = {
 }
 
 OP_NAMES = {
-    0x02: "j", 0x03: "jal",
-    0x04: "beq", 0x05: "bne", 0x06: "blez", 0x07: "bgtz",
-    0x08: "addi", 0x09: "addiu", 0x0A: "slti", 0x0B: "sltiu",
-    0x0C: "andi", 0x0D: "ori", 0x0E: "xori", 0x0F: "lui",
-    0x20: "lb", 0x21: "lh", 0x22: "lwl", 0x23: "lw",
-    0x24: "lbu", 0x25: "lhu", 0x26: "lwr", 0x28: "sb",
-    0x29: "sh", 0x2A: "swl", 0x2B: "sw", 0x2E: "swr",
-    0x32: "lwc2", 0x3A: "swc2",
+    int(entry["value"]): entry["name"]
+    for entry in REGISTRY["opcodes"]
 }
 
 
@@ -52,13 +48,20 @@ def disassemble_mips(address: int, word: int) -> str:
     index = word & 0x03FFFFFF
 
     if opcode == 0:
-        name = SPECIAL_NAMES.get((word & 0x3F))
-        if name is None:
-            return "unknown"
+        special = word & 0x3F
+        entry = SPECIAL_ENTRIES[special]
+        name = entry["name"]
+        if entry["kind"] == "reserved":
+            return (
+                f"{name} rs={REG_NAMES[rs]}, rt={REG_NAMES[rt]}, "
+                f"rd={REG_NAMES[rd]}, sa={shamt}"
+            )
         if name in ("sll", "srl", "sra"):
             if word == 0:
                 return "nop"
             return f"{name} {REG_NAMES[rd]}, {REG_NAMES[rt]}, {shamt}"
+        if name in ("sllv", "srlv", "srav"):
+            return f"{name} {REG_NAMES[rd]}, {REG_NAMES[rt]}, {REG_NAMES[rs]}"
         if name in ("jr", "jalr"):
             return f"{name} {REG_NAMES[rs]}" if name == "jr" else f"{name} {REG_NAMES[rd]}, {REG_NAMES[rs]}"
         if name in ("mfhi", "mflo"):
@@ -68,7 +71,8 @@ def disassemble_mips(address: int, word: int) -> str:
         if name in ("mult", "multu", "div", "divu"):
             return f"{name} {REG_NAMES[rs]}, {REG_NAMES[rt]}"
         if name in ("syscall", "break"):
-            return name
+            code_field = (word >> 6) & 0xFFFFF
+            return f"{name} 0x{code_field:05X}" if code_field else name
         return f"{name} {REG_NAMES[rd]}, {REG_NAMES[rs]}, {REG_NAMES[rt]}"
 
     if opcode == 0x01:

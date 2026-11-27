@@ -7,6 +7,33 @@
 int main()
 {
     try {
+        for (std::uint32_t function = 0; function < 64; ++function) {
+            const std::uint32_t instruction =
+                (0x1Au << 21) | (0x0Bu << 16) | (0x0Cu << 11) |
+                (0x07u << 6) | function;
+            const anyps1::MipsInstructionOperands operands =
+                anyps1::decode_mips_operands(instruction);
+            if (operands.rs != 0x1A || operands.rt != 0x0B ||
+                operands.rd != 0x0C || operands.shamt != 7 ||
+                operands.name.empty() || operands.format.empty()) {
+                throw std::runtime_error(
+                    "SPECIAL operand decoding is incomplete");
+            }
+        }
+
+        const anyps1::MipsInstructionOperands reserved_operands =
+            anyps1::decode_mips_operands(
+                (0x08u << 21) | (0x09u << 16) |
+                (0x0Au << 11) | (5u << 6) | 0x05u);
+        if (!reserved_operands.reserved_special ||
+            reserved_operands.name != "reserved_special_05" ||
+            reserved_operands.format != "rs, rt, rd, sa" ||
+            reserved_operands.rs != 8 || reserved_operands.rt != 9 ||
+            reserved_operands.rd != 10 || reserved_operands.shamt != 5) {
+            throw std::runtime_error(
+                "reserved SPECIAL operand decoding is incorrect");
+        }
+
         const anyps1::UnsupportedInstruction cop1 =
             anyps1::classify_unsupported_instruction(0x44400000u);
         if (cop1.kind != anyps1::UnsupportedInstructionKind::Cop1 ||
@@ -28,10 +55,10 @@ int main()
             throw std::runtime_error("LWC1 instruction was not classified");
         }
 
-        const anyps1::UnsupportedInstruction reserved =
+        const anyps1::UnsupportedInstruction reserved_opcode =
             anyps1::classify_unsupported_instruction(0xFC000000u);
-        if (reserved.kind != anyps1::UnsupportedInstructionKind::ReservedOpcode ||
-            reserved.name != "unknown_opcode_3f") {
+        if (reserved_opcode.kind != anyps1::UnsupportedInstructionKind::ReservedOpcode ||
+            reserved_opcode.name != "reserved_opcode_3f") {
             throw std::runtime_error("reserved opcode was not classified");
         }
         return 0;

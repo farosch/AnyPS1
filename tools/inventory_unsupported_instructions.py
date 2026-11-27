@@ -8,30 +8,25 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 
-SPECIAL_NAMES = {
-    0x00: "sll", 0x02: "srl", 0x03: "sra", 0x04: "sllv",
-    0x06: "srlv", 0x07: "srav", 0x08: "jr", 0x09: "jalr",
-    0x0C: "syscall", 0x0D: "break", 0x10: "mfhi", 0x11: "mthi",
-    0x12: "mflo", 0x13: "mtlo", 0x18: "mult", 0x19: "multu",
-    0x1A: "div", 0x1B: "divu", 0x20: "add", 0x21: "addu",
-    0x22: "sub", 0x23: "subu", 0x24: "and", 0x25: "or",
-    0x26: "xor", 0x27: "nor", 0x2A: "slt", 0x2B: "sltu",
-}
-
+REGISTRY_PATH = Path(__file__).with_name("mips_opcode_registry.json")
+REGISTRY = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
 OP_NAMES = {
-    0x01: "regimm", 0x02: "j", 0x03: "jal",
-    0x04: "beq", 0x05: "bne", 0x06: "blez", 0x07: "bgtz",
-    0x08: "addi", 0x09: "addiu", 0x0A: "slti", 0x0B: "sltiu",
-    0x0C: "andi", 0x0D: "ori", 0x0E: "xori", 0x0F: "lui",
-    0x10: "cop0", 0x11: "cop1", 0x12: "cop2", 0x13: "cop3",
-    0x20: "lb", 0x21: "lh", 0x22: "lwl", 0x23: "lw",
-    0x24: "lbu", 0x25: "lhu", 0x26: "lwr", 0x28: "sb",
-    0x29: "sh", 0x2A: "swl", 0x2B: "sw", 0x2E: "swr",
-    0x30: "lwc0", 0x31: "lwc1", 0x32: "lwc2", 0x33: "lwc3",
-    0x38: "swc0", 0x39: "swc1", 0x3A: "swc2", 0x3B: "swc3",
+    int(entry["value"]): entry["name"]
+    for entry in REGISTRY["opcodes"]
 }
-
-SUPPORTED_SPECIAL = set(SPECIAL_NAMES)
+SPECIAL_ENTRIES = {
+    int(entry["value"]): entry
+    for entry in REGISTRY["special"]
+}
+SPECIAL_NAMES = {
+    value: entry["name"]
+    for value, entry in SPECIAL_ENTRIES.items()
+}
+SUPPORTED_SPECIAL = {
+    value
+    for value, entry in SPECIAL_ENTRIES.items()
+    if entry["kind"] == "known"
+}
 SUPPORTED_OPS = {
     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
@@ -75,7 +70,7 @@ def classify_payload_region(word: int) -> str:
 def instruction_name(word: int) -> str:
     opcode = word >> 26
     if opcode == 0:
-        return SPECIAL_NAMES.get(word & 0x3F, f"unknown_special_{word & 0x3f:02x}")
+        return SPECIAL_NAMES[word & 0x3F]
     if opcode in OP_NAMES:
         return OP_NAMES[opcode]
     return f"unknown_opcode_{opcode:02x}"
@@ -157,10 +152,24 @@ def inventory(path: Path) -> dict:
         name = instruction_name(word)
         family_counts[name] += 1
         exact_counts[f"{word:08X}"] += 1
+        rs = (word >> 21) & 0x1F
+        rt = (word >> 16) & 0x1F
+        rd = (word >> 11) & 0x1F
+        shamt = (word >> 6) & 0x1F
+        immediate = word & 0xFFFF
         unsupported.append({
             "address": f"0x{address:08X}",
             "instruction": f"0x{word:08X}",
             "name": name,
+            "operands": {
+                "rs": rs,
+                "rt": rt,
+                "rd": rd,
+                "shamt": shamt,
+                "immediate": immediate,
+                "index": word & 0x03FFFFFF,
+                "code": (word >> 6) & 0xFFFFF,
+            },
         })
     return {
         "executable": str(path),

@@ -226,9 +226,9 @@
 
 ### Remaining
 
-- [ ] Replace separate Python and C++ opcode-name tables with one generated or
+- [x] Replace separate Python and C++ opcode-name tables with one generated or
   shared canonical opcode registry.
-- [ ] Add exact MIPS function names and operand decoding for every reserved
+- [x] Add exact MIPS function names and operand decoding for every reserved
   SPECIAL function.
 - [ ] Add exact disassembly for every inventory entry.
 - [ ] Add source-fix stubs for instruction-family implementation functions.

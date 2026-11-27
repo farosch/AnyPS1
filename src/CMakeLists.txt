@@ -2,6 +2,20 @@ add_library(anyps1_format
     format/PsExe.cpp
 )
 
+set(MIPS_OPCODE_REGISTRY_HEADER
+    ${CMAKE_BINARY_DIR}/generated/MipsOpcodeRegistry.h)
+add_custom_command(
+    OUTPUT ${MIPS_OPCODE_REGISTRY_HEADER}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/generate_mips_opcode_registry.py
+        --registry ${CMAKE_SOURCE_DIR}/tools/mips_opcode_registry.json
+        --output ${MIPS_OPCODE_REGISTRY_HEADER}
+    DEPENDS
+        ${CMAKE_SOURCE_DIR}/tools/mips_opcode_registry.json
+        ${CMAKE_SOURCE_DIR}/tools/generate_mips_opcode_registry.py
+    VERBATIM)
+add_custom_target(generate_mips_opcode_registry
+    DEPENDS ${MIPS_OPCODE_REGISTRY_HEADER})
+
 add_library(anyps1_executable
     executable/PeWriter.cpp
 )
@@ -30,6 +44,11 @@ add_library(anyps1_relinker
 
 foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1_input anyps1_host anyps1_relinker)
     target_include_directories(${target} PUBLIC ${CMAKE_SOURCE_DIR}/src)
+endforeach()
+
+foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1_input anyps1_host anyps1_relinker)
+    target_include_directories(${target} PUBLIC ${CMAKE_BINARY_DIR}/generated)
+    add_dependencies(${target} generate_mips_opcode_registry)
 endforeach()
 
 target_link_libraries(anyps1_input PUBLIC SDL3::SDL3)
