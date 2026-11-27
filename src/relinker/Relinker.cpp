@@ -28,6 +28,10 @@ bool relink(RelinkOptions& options)
     if (!options.target.has_value()) {
         throw std::invalid_argument("target platform must be set explicitly");
     }
+    if (options.architecture != TargetArchitecture::X64) {
+        throw std::invalid_argument(
+            "native architecture lowering is not implemented for this target");
+    }
     RelinkOptions resolved = options;
     const std::filesystem::path input_path(options.input);
     resolved.input = resolve_relink_input(options.input).string();

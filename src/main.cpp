@@ -28,6 +28,7 @@ int main(int argc, char** argv)
         anyps1::RelinkOptions options;
         options.input = argv[3];
         options.target = target;
+        options.architecture = anyps1::TargetArchitecture::X64;
         try {
             if (!anyps1::relink(options)) {
                 return 1;
