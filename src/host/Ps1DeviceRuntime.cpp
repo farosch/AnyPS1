@@ -34,6 +34,11 @@ void Ps1DeviceRuntime::set_controller_state(std::uint32_t buttons)
     controller_buttons = buttons;
 }
 
+void Ps1DeviceRuntime::assert_interrupt(std::uint32_t bit)
+{
+    interrupt_status |= bit;
+}
+
 void Ps1DeviceRuntime::queue_cd_response(
     const std::uint8_t* values,
     std::size_t count)

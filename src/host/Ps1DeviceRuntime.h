@@ -38,6 +38,7 @@ struct Ps1DeviceRuntime {
         std::uint32_t* ram,
         std::uint32_t word_count = 0x80000u);
     void set_controller_state(std::uint32_t buttons);
+    void assert_interrupt(std::uint32_t bit);
     std::uint32_t read(std::uint32_t address);
     int write(std::uint32_t address, std::uint32_t value);
     int tick(std::uint32_t cycles);
