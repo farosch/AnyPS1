@@ -172,3 +172,10 @@ ctest --test-dir build --output-on-failure
 Tests materialize generated binary inputs from JSON descriptions under
 `tests/fixtures/json/`. Generated `.ps-exe` and `.bin` files remain build
 artifacts and are not source-controlled fixtures.
+
+## Reference conversion validation
+
+The `tools/report_relink_gaps.py` helper performs format-generic smoke validation
+against locally extracted reference executables discovered through `SYSTEM.CNF`.
+It reports each executable's first conversion gap without embedding title,
+platform, or asset-specific behavior in the relinker or tests.

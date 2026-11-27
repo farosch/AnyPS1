@@ -108,16 +108,9 @@ void write_linux_native_cfg(
                 leaders.insert(address + 8);
                 work.push(address + 8);
             }
-        } else if (!jr && !stop) {
+        } else if (!jr && !jalr && !stop) {
             leaders.insert(address + 4);
             work.push(address + 4);
-        }
-        if (jr || jalr) {
-            for (std::uint32_t candidate = load_address;
-                 candidate < load_address + file_size;
-                 candidate += 4) {
-                leaders.insert(candidate);
-            }
         }
         if (branch || jump || jr || jalr) {
             const std::uint32_t delay_address = address + 4;
@@ -548,9 +541,13 @@ void write_linux_native_cfg(
             const std::uint32_t target =
                 static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
             if (opcode == 0x04) {
-                source << "cmpl " << rt * 4 << "(%r12), " << rs * 4 << "(%r12)\nje p" << std::hex << target << std::dec << "\n";
+                source << "movl " << rs * 4 << "(%r12), %eax\n";
+                source << "cmpl " << rt * 4 << "(%r12), %eax\n";
+                source << "je p" << std::hex << target << std::dec << "\n";
             } else if (opcode == 0x05) {
-                source << "cmpl " << rt * 4 << "(%r12), " << rs * 4 << "(%r12)\njne p" << std::hex << target << std::dec << "\n";
+                source << "movl " << rs * 4 << "(%r12), %eax\n";
+                source << "cmpl " << rt * 4 << "(%r12), %eax\n";
+                source << "jne p" << std::hex << target << std::dec << "\n";
             } else if (opcode == 0x06) {
                 source << "cmpl $0, " << rs * 4 << "(%r12)\njle p" << std::hex << target << std::dec << "\n";
             } else if (opcode == 0x07) {

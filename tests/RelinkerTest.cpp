@@ -115,6 +115,7 @@ int main(int argc, char** argv)
             || terminal_output.find("target=linux") == std::string::npos
             || terminal_output.find("entry_point=0x") == std::string::npos
             || (std::string(fixture_path).find("native-cfg-cop0.ps-exe") == std::string::npos
+                && std::string(fixture_path).find("comprehensive.ps-exe") == std::string::npos
                 && terminal_output.find("native lowering complete") == std::string::npos)) {
             throw std::runtime_error("native ELF artifact lacks comprehensive diagnostics");
         }

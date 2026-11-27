@@ -74,12 +74,14 @@
 
 ## Validation
 
-- [ ] Replace synthetic-only lowerer tests with minimal executable fixtures
+- [x] Replace synthetic-only lowerer tests with minimal executable fixtures
   covering arithmetic, load/store, branches, calls, delay slots, and entrypoints.
 - [x] Add negative fixtures for malformed and truncated PS-X headers.
 - [ ] Relink all available reference games and report the exact first native
-  lowering gap for each executable.
+  lowering gap for each executable. Run
+  `python3 tools/report_relink_gaps.py --binary build/anyps1 --reference-root references/games --output build/reference-relink-report.txt`
+  as an opt-in smoke operation; it must not become a title-specific CTest or relinker requirement.
 - [x] Add end-to-end tests that run a lowered executable and verify native exit
   status and observable host output.
-- [ ] Add all conversion results to TODO/dev docs without recording interpretation
+- [x] Add all conversion results to TODO/dev docs without recording interpretation
   behavior as a relinker requirement.
