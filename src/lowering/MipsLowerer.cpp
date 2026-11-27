@@ -450,6 +450,7 @@ void write_linux_native_cfg(
     source << ".text\n.section .bss\n.p2align 4\n";
     source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
     source << "cop0:\n.skip 128\n";
+    source << "gte_data:\n.skip 128\ngte_ctrl:\n.skip 128\n";
     source << "fregs:\n.skip 256\nfpcsr:\n.skip 4\n";
     source << ".section .rodata\n";
     source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
@@ -623,7 +624,37 @@ void write_linux_native_cfg(
                 emit_unsupported_stub(instruction);
             }
         } else if (opcode == 0x12) {
-            emit_unsupported_stub(instruction);
+            const std::uint32_t cop2_rs = rs;
+            const std::uint32_t cop2_reg = rd;
+            if (cop2_rs == 0) {
+                source << "movl gte_data+" << cop2_reg * 4 << "(%rip), %eax\n";
+                source << "movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (cop2_rs == 2) {
+                source << "movl gte_ctrl+" << cop2_reg * 4 << "(%rip), %eax\n";
+                source << "movl %eax, " << rt * 4 << "(%r12)\n";
+            } else if (cop2_rs == 4) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n";
+                source << "movl %eax, gte_data+" << cop2_reg * 4 << "(%rip)\n";
+            } else if (cop2_rs == 6) {
+                source << "movl " << rt * 4 << "(%r12), %eax\n";
+                source << "movl %eax, gte_ctrl+" << cop2_reg * 4 << "(%rip)\n";
+            } else if (cop2_rs == 16) {
+                switch (instruction & 0x3Fu) {
+                case 0x01:
+                    source << "movl gte_data+48(%rip), %eax\n";
+                    source << "movl gte_data+52(%rip), %ecx\n";
+                    source << "movl gte_data+56(%rip), %edx\n";
+                    source << "movl %eax, gte_data+36(%rip)\n";
+                    source << "movl %ecx, gte_data+40(%rip)\n";
+                    source << "movl %edx, gte_data+44(%rip)\n";
+                    break;
+                default:
+                    emit_unsupported_stub(instruction);
+                    break;
+                }
+            } else {
+                emit_unsupported_stub(instruction);
+            }
         } else if (opcode == 0x11) {
             const std::uint32_t cop1_rs = rs;
             const std::uint32_t cop1_fd = rd;
@@ -899,6 +930,30 @@ void write_linux_native_cfg(
             if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
             else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
             else source << "movl %edx, (%rbx,%rcx)\n";
+        } else if (opcode == 0x32 || opcode == 0x3A) {
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
+            source << "movl %eax, %ecx\n";
+            source << "andl $0x1FFFFFFF, %ecx\n";
+            source << "cmpl $0x1F800000, %ecx\n";
+            source << "jb gte_ram_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1F800400, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp gte_finish_" << std::hex << address << std::dec << "\n";
+            source << "gte_ram_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x200000, %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq ram(%rip), %rbx\n";
+            source << "gte_finish_" << std::hex << address << std::dec << ": \n";
+            if (opcode == 0x32) {
+                source << "movl (%rbx,%rcx), %eax\n";
+                source << "movl %eax, gte_data+" << rt * 4 << "(%rip)\n";
+            } else {
+                source << "movl gte_data+" << rt * 4 << "(%rip), %eax\n";
+                source << "movl %eax, (%rbx,%rcx)\n";
+            }
         } else if (opcode == 0x31 || opcode == 0x39) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
             source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";

@@ -204,6 +204,7 @@ int main(int argc, char** argv)
                 && std::string(fixture_path).find("native-static-jalr.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("coprocessor-coverage.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-cop1.ps-exe") == std::string::npos
+                && std::string(fixture_path).find("native-cop2-transfers.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-cop1-edge-cases.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("native-sparse-cfg.ps-exe") == std::string::npos
                 && std::string(fixture_path).find("mips-edge-cases.ps-exe") == std::string::npos
