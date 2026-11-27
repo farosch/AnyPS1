@@ -36,3 +36,12 @@ add_test(NAME relinker_native_comprehensive COMMAND anyps1_relinker_test ${FIXTU
 add_test(NAME relinker_invalid_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/invalid.ps-exe)
 add_test(NAME relinker_truncated_fixture COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/truncated.ps-exe)
 
+find_program(SPIRV_VAL_EXECUTABLE NAMES spirv-val)
+find_program(SPIRV_OPT_EXECUTABLE NAMES spirv-opt)
+add_executable(anyps1_graphics_test GraphicsTest.cpp)
+target_include_directories(anyps1_graphics_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(anyps1_graphics_test PRIVATE anyps1_gpu)
+add_test(NAME graphics_ir_spirv COMMAND anyps1_graphics_test)
+set_tests_properties(graphics_ir_spirv PROPERTIES ENVIRONMENT
+    "SPIRV_VAL_EXECUTABLE=${SPIRV_VAL_EXECUTABLE};SPIRV_OPT_EXECUTABLE=${SPIRV_OPT_EXECUTABLE}")
+

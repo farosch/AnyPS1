@@ -63,14 +63,14 @@
 
 ## PS1 GPU lowering and Vulkan shaders
 
-- [ ] Define a generic host graphics IR for PS1 GP0/GP1 commands and VRAM operations.
-- [ ] Lower GP0 and GP1 state changes into Vulkan resources and command-buffer operations.
-- [ ] Emit SPIR-V shaders for PS1 polygon, textured-polygon, sprite, rectangle,
+- [x] Define a generic host graphics IR for PS1 GP0/GP1 commands and VRAM operations.
+- [x] Lower GP0 and GP1 state changes into Vulkan resources and command-buffer operations.
+- [x] Emit SPIR-V shaders for PS1 polygon, textured-polygon, sprite, rectangle,
   blending, and framebuffer operations.
-- [ ] Add SPIR-V validation and optimization through `SPIRV-Tools` in conversion tests.
-- [ ] Use `glslang` or a direct SPIR-V emitter for host shader generation.
-- [ ] Add a Vulkan backend for Linux and Windows without adding NVIDIA/CUDA-only dependencies.
-- [ ] Preserve unsupported GPU commands as explicit conversion failures.
+- [x] Add SPIR-V validation and optimization through `SPIRV-Tools` in conversion tests.
+- [x] Use `glslang` or a direct SPIR-V emitter for host shader generation.
+- [x] Add a Vulkan backend for Linux and Windows without adding NVIDIA/CUDA-only dependencies.
+- [x] Preserve unsupported GPU commands as explicit conversion failures.
 
 ## Validation
 

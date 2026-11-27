@@ -149,8 +149,12 @@ cmake -S . -B build -G Ninja \
   -DANYPS1_ENABLE_GLSLANG=ON
 ```
 
-GPU lowering is not complete. Unsupported GPU commands must fail explicitly
-and must not silently disappear or fall back to an emulator-style runtime.
+GPU lowering includes a generic GP0/GP1-to-graphics-IR implementation in
+`src/gpu/`, Vulkan resource planning for Linux and Windows, and direct SPIR-V
+fragment module emission for PS1 polygon, textured-polygon, sprite, rectangle,
+and framebuffer primitives. Conversion tests validate modules with
+`spirv-val` and optimize them with `spirv-opt` when available.
+Unsupported GPU commands fail explicitly and never fall back to an emulator.
 
 ## Layout
 
