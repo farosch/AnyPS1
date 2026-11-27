@@ -888,13 +888,19 @@ void write_linux_native_cfg(
         const std::uint32_t special = instruction & 63u;
         source << "p" << std::hex << address << std::dec << ":\n";
 
-        if (delay_slots.find(address) != delay_slots.end() && emitted_delay_slots.find(address) == emitted_delay_slots.end()) {
-            emit_normal(address, instruction);
+        if (delay_slots.find(address) != delay_slots.end() &&
+            emitted_delay_slots.find(address) == emitted_delay_slots.end()) {
+            const bool address_is_control =
+                opcode == 0x01 || opcode == 0x04 || opcode == 0x05 ||
+                opcode == 0x06 || opcode == 0x07 ||
+                opcode == 0x02 || opcode == 0x03 ||
+                (opcode == 0 && (special == 0x08 || special == 0x09));
+            if (!address_is_control) {
+                emit_normal(address, instruction);
+            }
             emitted_delay_slots.insert(address);
-            continue;
+            if (!address_is_control) continue;
         }
-        if (delay_slots.find(address) != delay_slots.end()) continue;
-
         const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
             || opcode == 0x06 || opcode == 0x07
             || (opcode == 0x11 && rs == 8);

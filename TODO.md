@@ -65,7 +65,7 @@
   delay-slot fixtures against real instruction sequences.
 - [ ] Verify exact MIPS signed/unsigned overflow, division edge cases,
   endianness, unaligned access, and HI/LO semantics with focused fixtures.
-- [ ] Add support for sparse control-flow regions and discontinuous executable
+- [x] Add support for sparse control-flow regions and discontinuous executable
   sections in CFG discovery.
 
 ## Linux executable conversion
