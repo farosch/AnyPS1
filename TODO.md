@@ -51,8 +51,10 @@
 
 ### Remaining
 
-- [ ] Complete native COP1 floating-point lowering: add/sub/mul/div/sqrt,
-  conversions, comparisons, BC1 branches, and all LWC1/SWC1 edge paths.
+- [x] Add native COP1 MFC1/MTC1/CFC1/CTC1, add/sub/mul/div/sqrt, Cvt.S.W,
+  Cvt.W.S, C.EQ/LT/LE, BC1 branches, and checked LWC1/SWC1 memory paths.
+- [ ] Add remaining COP1 conversions/comparison variants and exhaustive
+  floating-point edge-path fixtures.
 - [x] Classify COP2/GTE instructions and named GTE operations with exact
   unsupported stubs; native matrix/vector/color lowering remains open.
 - [x] Implement COP3 opcode classification and exact unsupported execution
