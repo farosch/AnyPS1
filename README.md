@@ -6,6 +6,12 @@ The code-derived implementation overview is available in
 [preview/progress.html](preview/progress.html). It is generated from source and
 test evidence, not TODO text:
 
+<p align="center">
+  <a href="preview/progress.html">
+    <img src="preview/progress.png" alt="AnyPS1 implementation progress" />
+  </a>
+</p>
+
 ```sh
 cmake --build build --target progress
 ```
