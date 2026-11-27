@@ -1,39 +1,11 @@
 # TODO
 
-## Current relinker blockers
+## MIPS and COP lowering
 
 - [x] Split native relinking dispatch into platform-specific `MipsLinuxLowerer`
   and `MipsWindowsLowerer` classes behind a shared `MipsLowerer` interface.
-- [x] Replace fixed-block and partial Linux lowering with CFG lowering for
-  every instruction represented by checked-in executable fixtures and
-  statically reachable host/MMIO families, with explicit unsupported exits
-  for irreducible gaps.
-- [x] Lower COP3 register transfers and COP0/COP3 coprocessor load/store
-  families directly, including LWC0/LWC3/SWC0/SWC3 and SDC2.
-- [x] Route PS1 RAM-adjacent MMIO loads/stores through a generic native
-  `mmio_state` mapping with explicit out-of-range faults.
-- [x] Remove legacy fixed-block Linux lowering paths; route Linux relinking
-  exclusively through `MipsLinuxLowerer::lower`.
-- [x] Improve CFG discovery beyond static leaders. Resolve JALR targets when
-  they are statically provable, preserve indirect-call edges, and emit explicit
-  unsupported exits for unresolved indirect control flow.
-- [x] Distinguish executable code from embedded data, tables, padding,
-  `.rodata`, and payload regions when counting unsupported instructions.
-- [x] Report exact supported/reachable word counts, unsupported word counts,
-  leader counts, call-edge counts, unresolved-indirect counts, and the first
-  unsupported address without including data words as instructions.
-- [x] Add per-instruction native lowering fixtures for every MIPS I opcode,
-  COP0 operation, COP1 operation, COP2/GTE operation, COP3 operation,
-  coprocessor load/store, and reserved opcode.
-- [x] Remove the remaining generic reserved-opcode and coprocessor stubs that
-  can be lowered directly, and keep only irreducibly unsupported operations
-  as explicit conversion failures.
-- [x] Replace substring-based unsupported-instruction heuristics with a shared
-  opcode/classification implementation used by lowering, disassembly,
-  diagnostics, and inventory tools.
-
-## MIPS and COP lowering
-
+- [x] Replace fixed-block lowering with CFG lowering for fixture-reachable
+  code and host/MMIO families, preserving explicit unsupported exits.
 - [x] Add direct native lowering for NOP and the arithmetic/control subset.
 - [x] Lower fixed and variable shifts.
 - [x] Lower MIPS I arithmetic, logical, compare, immediate, branch, and jump
@@ -44,6 +16,8 @@
 - [x] Lower SYSCALL and BREAK to native process exit behavior.
 - [x] Add PC-relative branch and static J/JAL lowering.
 - [x] Add JR/JALR emission and JALR target deduplication.
+- [x] Resolve statically provable JALR targets and preserve unresolved
+  indirect-control-flow exits and call-edge diagnostics.
 - [x] Add branch-delay-slot emission and load-delay behavior.
 - [x] Implement signed ADD/ADDI/SUB overflow exits.
 - [x] Implement divide-by-zero exits.
@@ -64,6 +38,8 @@
   unsupported stubs; native matrix/vector/color lowering remains open.
 - [x] Implement COP3 opcode classification and exact unsupported execution
   stubs.
+- [x] Lower COP3 register transfers and COP0/COP3 load/store forms directly
+  where the native memory mapping is implemented.
 - [x] Implement the native COP1 LWC1/SWC1 subset and add checked unsupported
   stubs for LWC0-LWC3/SWC0-SWC3 coprocessor families.
 - [x] Complete load-delay behavior for every MIPS load form and verify the
@@ -75,6 +51,8 @@
 
 ## Linux executable conversion
 
+- [x] Route Linux relinking exclusively through `MipsLinuxLowerer::lower`;
+  remove legacy fixed-block and assembly lowering paths.
 - [x] Add an explicit `--target linux|windows` parameter.
 - [x] Generate ELF64 x86-64 executables with a native `_start` entrypoint.
 - [x] Emit valid ELF entry, program-header, section-header, text, rodata,
@@ -110,6 +88,8 @@
 
 ## Memory and address lowering
 
+- [x] Route PS1 RAM-adjacent MMIO loads/stores through the native
+  `mmio_state` mapping with explicit out-of-range faults.
 - [x] Map 2 MiB PS1 RAM and 1 KiB scratchpad into native memory.
 - [x] Normalize 32-bit PS1 addresses to host RAM/scratchpad offsets.
 - [x] Preserve 8/16/32-bit load/store behavior and signed/unsigned extensions.
@@ -209,6 +189,14 @@
 
 ## Unsupported instruction tracking
 
+- [x] Distinguish executable code from embedded data, tables, padding,
+  `.rodata`, and payload regions during unsupported-instruction counts.
+- [x] Report supported, reachable, unsupported, leader, call-edge,
+  unresolved-indirect, and first-gap metrics without counting data as code.
+- [x] Remove directly lowerable reserved-opcode and coprocessor stubs while
+  retaining explicit failures for irreducibly unsupported operations.
+- [x] Replace substring-based unsupported-instruction heuristics with the
+  shared lowering, disassembly, diagnostic, and inventory classifier.
 - [x] Add a C++ unsupported-instruction classifier for SPECIAL, COP0/COP1/COP2/
   COP3, coprocessor load/store, and reserved opcodes.
 - [x] Add exact GTE/COP2 function names for known operations.
@@ -230,6 +218,8 @@
 
 ## Validation and quality
 
+- [x] Add per-instruction fixtures for MIPS I, COP0, COP1, COP2/GTE, COP3,
+  coprocessor load/store, and reserved-opcode behavior.
 - [x] Add checked-in JSON executable fixtures for arithmetic, loads/stores,
   branches, calls, delay slots, entrypoints, memory, host integration, and
   unsupported paths.
