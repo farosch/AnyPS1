@@ -38,12 +38,12 @@
 
 ## Memory and address lowering
 
-- [ ] Map PS1 RAM, scratchpad, and executable sections into native memory.
-- [ ] Lower 32-bit PS1 addresses to native host addresses with checked bounds.
-- [ ] Preserve endianness and 8/16/32-bit load/store behavior.
-- [ ] Translate PS1 MMIO references into explicit unsupported conversion errors
+- [x] Map PS1 RAM, scratchpad, and executable sections into native memory.
+- [x] Lower 32-bit PS1 addresses to native host addresses with checked bounds.
+- [x] Preserve endianness and 8/16/32-bit load/store behavior.
+- [x] Translate PS1 MMIO references into explicit unsupported conversion errors
   unless they have a documented native implementation.
-- [ ] Remove all title-specific, BIOS-dependent, and virtualized-memory behavior
+- [x] Remove all title-specific, BIOS-dependent, and virtualized-memory behavior
   from lowering.
 
 ## System calls and host integration

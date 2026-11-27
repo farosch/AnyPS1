@@ -129,7 +129,7 @@ void write_linux_native_cfg(
     const std::string lowered = "lowered_words=" + std::to_string(leaders.size()) + "\n";
     const std::string completed = "native lowering complete\n";
     source << ".text\n.section .bss\n.p2align 4\n";
-    source << "regs:\n.skip 136\nram:\n.skip 2097152\n";
+    source << "regs:\n.skip 136\nram:\n.skip 2097152\nscratchpad:\n.skip 1024\n";
     source << ".section .rodata\n";
     source << "diag_banner:.asciz \"" << escape_assembly_string(banner) << "\"\n";
     source << "diag_target:.asciz \"" << escape_assembly_string(target) << "\"\n";
@@ -163,6 +163,8 @@ void write_linux_native_cfg(
     source << ".text\n";
     source << "overflow_exit:\nmov $12, %edi\nmov $60, %eax\nsyscall\n";
     source << "divide_zero_exit:\nmov $11, %edi\nmov $60, %eax\nsyscall\n";
+    source << "memory_fault_exit:\nmov $13, %edi\nmov $60, %eax\nsyscall\n";
+    source << "mmio_exit:\nmov $14, %edi\nmov $60, %eax\nsyscall\n";
     source << ".text\n";
     source << "print_diag:\n";
     source << "mov $1, %edi\n";
@@ -253,18 +255,49 @@ void write_linux_native_cfg(
         } else if (opcode == 0x0B) {
             source << "movl " << rs * 4 << "(%r12), %eax\ncmpl $" << immediate << ", %eax\nsetb %al\nmovzbl %al, %eax\nmovl %eax, " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 || opcode == 0x24 || opcode == 0x25) {
-            source << "movl " << rs * 4 << "(%r12), %eax\naddl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nandl $0x1FFFFF, %eax\nleaq ram(%rip), %rbx\n";
-            if (opcode == 0x20) source << "movsbl (%rbx,%rax), %edx\n";
-            else if (opcode == 0x21) source << "movswl (%rbx,%rax), %edx\n";
-            else if (opcode == 0x23) source << "movl (%rbx,%rax), %edx\n";
-            else if (opcode == 0x24) source << "movzbl (%rbx,%rax), %edx\n";
-            else source << "movzwl (%rbx,%rax), %edx\n";
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
+            source << "movl %eax, %ecx\n";
+            source << "andl $0x1FFFFFFF, %ecx\n";
+            source << "cmpl $0x1F800000, %ecx\n";
+            source << "jb ram_load_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1F800400, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp scratch_load_" << std::hex << address << std::dec << "\n";
+            source << "ram_load_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x200000, %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq ram(%rip), %rbx\n";
+            source << "scratch_load_" << std::hex << address << std::dec << ": \n";
+            if (opcode == 0x20) source << "movsbl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x21) source << "movswl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x23) source << "movl (%rbx,%rcx), %edx\n";
+            else if (opcode == 0x24) source << "movzbl (%rbx,%rcx), %edx\n";
+            else source << "movzwl (%rbx,%rcx), %edx\n";
             source << "movl %edx, " << rt * 4 << "(%r12)\n";
         } else if (opcode == 0x28 || opcode == 0x29 || opcode == 0x2B) {
-            source << "movl " << rs * 4 << "(%r12), %eax\naddl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\nandl $0x1FFFFF, %eax\nmovl " << rt * 4 << "(%r12), %edx\nleaq ram(%rip), %rbx\n";
-            if (opcode == 0x28) source << "movb %dl, (%rbx,%rax)\n";
-            else if (opcode == 0x29) source << "movw %dx, (%rbx,%rax)\n";
-            else source << "movl %edx, (%rbx,%rax)\n";
+            source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "addl $" << static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) << ", %eax\n";
+            source << "movl %eax, %ecx\n";
+            source << "andl $0x1FFFFFFF, %ecx\n";
+            source << "cmpl $0x1F800000, %ecx\n";
+            source << "jb ram_store_" << std::hex << address << std::dec << "\n";
+            source << "cmpl $0x1F800400, %ecx\n";
+            source << "jae mmio_exit\n";
+            source << "subl $0x1F800000, %ecx\n";
+            source << "leaq scratchpad(%rip), %rbx\n";
+            source << "jmp scratch_store_" << std::hex << address << std::dec << "\n";
+            source << "ram_store_" << std::hex << address << std::dec << ": \n";
+            source << "cmpl $0x200000, %ecx\n";
+            source << "jae memory_fault_exit\n";
+            source << "leaq ram(%rip), %rbx\n";
+            source << "scratch_store_" << std::hex << address << std::dec << ": \n";
+            source << "movl " << rt * 4 << "(%r12), %edx\n";
+            if (opcode == 0x28) source << "movb %dl, (%rbx,%rcx)\n";
+            else if (opcode == 0x29) source << "movw %dx, (%rbx,%rcx)\n";
+            else source << "movl %edx, (%rbx,%rcx)\n";
         } else if (opcode == 0x22 || opcode == 0x26 || opcode == 0x2A || opcode == 0x2E) {
             throw std::runtime_error("unsupported native MIPS unaligned load/store at " + hex32(address));
         } else {
