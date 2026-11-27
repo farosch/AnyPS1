@@ -53,6 +53,11 @@
 - [x] Document native equivalents for file, input, audio, video, and console APIs.
 - [x] Add direct native I/O/exit handling.
 - [x] Do not require BIOS images or external PS-X state.
+- [ ] Implement SDL-mapped PS1 controller input, including analog sticks and
+  triggers.
+- [ ] Implement keyboard and mouse host input mappings.
+- [ ] Add an `anyps1-input.ini` format for configuring controller, keyboard,
+  and mouse mappings.
 
 ## Windows executable conversion
 

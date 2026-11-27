@@ -6,7 +6,14 @@
 
 int main(int argc, char** argv)
 {
-    if (argc == 4 && std::string(argv[1]) == "--target") {
+    if (argc != 4 || std::string(argv[1]) != "--target") {
+        std::cerr
+            << "Usage:\n"
+            << "  anyps1 --target linux <extracted-game-root>\n"
+            << "  anyps1 --target windows <extracted-game-root>\n";
+        return 2;
+    }
+    {
         anyps1::TargetPlatform target;
         const std::string target_name = argv[2];
         if (target_name == "linux") {
@@ -32,25 +39,4 @@ int main(int argc, char** argv)
             return 1;
         }
     }
-
-    if (argc == 2) {
-        anyps1::RelinkOptions options;
-        options.input = argv[1];
-        try {
-            if (!anyps1::relink(options)) {
-                return 1;
-            }
-            return 0;
-        } catch (const std::exception& error) {
-            std::cerr << "Error: " << error.what() << "\n";
-            return 1;
-        }
-    }
-
-    std::cerr
-        << "Usage:\n"
-        << "  anyps1 <extracted-game-root>\n"
-        << "  anyps1 --target linux <extracted-game-root>\n"
-        << "  anyps1 --target windows <extracted-game-root>\n";
-    return 2;
 }

@@ -34,9 +34,24 @@ int main(int argc, char** argv)
         system_cnf << "BOOT=cdrom:\\SCUS_941.63;1\n";
         system_cnf.close();
 
+        {
+            anyps1::RelinkOptions missing_target_options;
+            missing_target_options.input = game_root;
+            try {
+                anyps1::relink(missing_target_options);
+                throw std::runtime_error("relink unexpectedly accepted a missing target");
+            } catch (const std::exception& error) {
+                if (std::string(error.what()).find("target platform must be set explicitly") ==
+                    std::string::npos) {
+                    throw;
+                }
+            }
+        }
+
         if (std::string(fixture_path).find("native-bios-vector.ps-exe") != std::string::npos) {
             anyps1::RelinkOptions bios_options;
             bios_options.input = game_root;
+            bios_options.target = anyps1::TargetPlatform::Linux;
             try {
                 anyps1::relink(bios_options);
                 throw std::runtime_error("PS1 BIOS-vector fixture unexpectedly relinked");
@@ -69,6 +84,7 @@ int main(int argc, char** argv)
             if (malformed) {
                 anyps1::RelinkOptions malformed_options;
                 malformed_options.input = game_root;
+                malformed_options.target = anyps1::TargetPlatform::Linux;
                 try {
                     anyps1::relink(malformed_options);
                     throw std::runtime_error("malformed fixture unexpectedly relinked");
@@ -88,6 +104,7 @@ int main(int argc, char** argv)
 
         anyps1::RelinkOptions options;
         options.input = game_root;
+        options.target = anyps1::TargetPlatform::Linux;
         if (!anyps1::relink(options)) {
             throw std::runtime_error("native relink failed");
         }

@@ -25,13 +25,16 @@ void create_output_parent(const std::string& output)
 bool relink(const RelinkOptions& options)
 {
     if (options.input.empty()) throw std::invalid_argument("input path is empty");
+    if (!options.target.has_value()) {
+        throw std::invalid_argument("target platform must be set explicitly");
+    }
     RelinkOptions resolved = options;
     const std::filesystem::path input_path(options.input);
     resolved.input = resolve_relink_input(options.input).string();
     if (resolved.output.empty()) {
         std::filesystem::path output_root = std::filesystem::is_directory(input_path) ? input_path : input_path.parent_path();
         if (output_root.empty()) output_root = ".";
-        resolved.output = (output_root / (options.target == TargetPlatform::Windows ? "game.exe" : "game.elf")).string();
+        resolved.output = (output_root / (*options.target == TargetPlatform::Windows ? "game.exe" : "game.elf")).string();
     }
     create_output_parent(resolved.output);
 
@@ -49,7 +52,7 @@ bool relink(const RelinkOptions& options)
     if (load_address < 0x80000000 || load_address >= 0x80200000) throw std::runtime_error("PS-X EXE load address is outside PS1 KSEG0");
     if (initial_pc != 0 && (initial_pc < load_address || initial_pc >= load_address + file_size)) throw std::runtime_error("PS-X EXE entry point is outside the executable image");
 
-    if (resolved.target == TargetPlatform::Windows) {
+    if (*resolved.target == TargetPlatform::Windows) {
         write_pe_layout(resolved, data, load_address, file_size);
         return true;
     }
