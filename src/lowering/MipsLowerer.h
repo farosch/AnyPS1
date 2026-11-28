@@ -36,6 +36,7 @@ struct MipsExecutablePlan {
     std::set<std::string> unsupported_family_names;
     std::unordered_map<std::uint32_t, std::vector<std::uint32_t>>
         leader_dispatch;
+    std::vector<std::vector<std::uint32_t>> leader_chunks;
 };
 
 class MipsLowerer {

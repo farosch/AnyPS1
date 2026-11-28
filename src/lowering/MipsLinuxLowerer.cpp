@@ -59,6 +59,15 @@ void MipsLinuxLowerer::lower(
     const bool native_host_loop_required = plan.native_host_loop_required;
 
     const std::filesystem::path assembly = std::filesystem::path(options.output + ".native.s");
+    std::vector<std::filesystem::path> assembly_chunks;
+    for (std::size_t chunk_index = 0;
+         chunk_index < plan.leader_chunks.size();
+         ++chunk_index) {
+        assembly_chunks.push_back(
+            std::filesystem::path(
+                options.output + ".native." +
+                std::to_string(chunk_index) + ".s"));
+    }
     const std::filesystem::path payload = std::filesystem::path(options.output + ".native.bin");
     {
         std::ofstream output(payload, std::ios::binary | std::ios::trunc);

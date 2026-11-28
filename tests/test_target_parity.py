@@ -113,6 +113,11 @@ class LoweringInventoryTest(unittest.TestCase):
             shared,
             "Shared lowering must provide sparse leader dispatch buckets",
         )
+        self.assertIn(
+            "leader_chunks",
+            shared,
+            "Shared lowering must provide bounded native emission chunks",
+        )
         linux_text = (
             ROOT / "src" / "lowering" / "MipsLinuxLowerer.cpp"
         ).read_text(encoding="utf-8")

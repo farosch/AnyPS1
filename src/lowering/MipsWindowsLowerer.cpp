@@ -21,6 +21,11 @@ void MipsWindowsLowerer::lower(
     const std::vector<unsigned char>& data)
 {
     const MipsExecutablePlan plan = build_mips_executable_plan(options, data);
+    if (plan.leader_chunks.size() > 512u) {
+        throw std::runtime_error(
+            "unsupported native Windows lowering: executable requires "
+            "more than 512 emission chunks");
+    }
     const std::uint32_t file_size = plan.file_size;
     const std::uint32_t load_address = plan.load_address;
     const std::uint32_t initial_pc = plan.initial_pc;

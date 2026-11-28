@@ -232,6 +232,22 @@ MipsExecutablePlan build_mips_executable_plan(
             address >> 8u;
         plan.leader_dispatch[bucket].push_back(address);
     }
+    constexpr std::size_t EMISSION_CHUNK_SIZE = 512u;
+    plan.leader_chunks.reserve(
+        (plan.emittable_leaders.size() + EMISSION_CHUNK_SIZE - 1u) /
+        EMISSION_CHUNK_SIZE);
+    std::vector<std::uint32_t> chunk;
+    chunk.reserve(EMISSION_CHUNK_SIZE);
+    for (std::uint32_t address : plan.emittable_leaders) {
+        chunk.push_back(address);
+        if (chunk.size() == EMISSION_CHUNK_SIZE) {
+            plan.leader_chunks.push_back(chunk);
+            chunk.clear();
+        }
+    }
+    if (!chunk.empty()) {
+        plan.leader_chunks.push_back(chunk);
+    }
     return plan;
 }
 

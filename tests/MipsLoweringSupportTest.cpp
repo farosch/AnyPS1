@@ -56,6 +56,17 @@ int main()
             throw std::runtime_error(
                 "sparse leader dispatch did not span address buckets");
         }
+        if (sparse_plan.leader_chunks.empty()) {
+            throw std::runtime_error(
+                "native lowering chunks were not created");
+        }
+        for (const std::vector<std::uint32_t>& chunk :
+             sparse_plan.leader_chunks) {
+            if (chunk.size() > 512u) {
+                throw std::runtime_error(
+                    "native lowering chunk exceeds 512 leaders");
+            }
+        }
         const anyps1::MipsInstructionIr nop =
             anyps1::build_mips_instruction_ir(0x80010000u, 0u);
         if (nop.kind != anyps1::MipsInstructionKind::Nop) {
