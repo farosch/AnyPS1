@@ -36,6 +36,7 @@ add_test(NAME relinker_native_device_timer COMMAND anyps1_relinker_test ${FIXTUR
 add_test(NAME relinker_native_mmio_frame_tick COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-mmio-frame-tick.ps-exe)
 add_test(NAME relinker_native_windows_host_loop COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-windows-host-loop.ps-exe)
 add_test(NAME relinker_native_reserved_special_2d COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-reserved-special-2d.ps-exe)
+add_test(NAME relinker_native_break_continuation COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-break-continuation.ps-exe)
 add_test(NAME relinker_native_bios_vector COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-vector.ps-exe)
 add_test(NAME relinker_native_bios_init_heap COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-init-heap.ps-exe)
 add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-load-delay.ps-exe)
@@ -169,6 +170,10 @@ add_test(NAME pe_reserved_special_2d
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-reserved-special-2d.ps-exe)
+add_test(NAME pe_break_continuation
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-break-continuation.ps-exe)
 add_test(NAME pe_native_bios_init_heap
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>

@@ -233,7 +233,7 @@ void MipsWindowsLowerer::lower(
     source << "return;\n";
     source << "case 22:\n";
     source << "if(special==12u)ExitProcess(0u);\n";
-    source << "if(special==13u){write_windows_trace(\"break_address=\",address);ExitProcess(9u);}\n";
+    source << "if(special==13u){write_windows_trace(\"break_address=\",address);pending_target=address+4u;}\n";
     source << "return;\n";
     source << "default:ExitProcess(16u);\n";
     source << "}\n}\n";

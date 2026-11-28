@@ -313,3 +313,5 @@
   output capture, and typed linker failures.
 - [x] Remove obsolete manual PE layout lowering and duplicate lowering IR
   source storage; keep native executable emission chunk-oriented.
+- [x] Lower real BREAK instructions as continuation traps and add exact
+  BREAK/reserved-SPECIAL fixtures for Linux and Windows.

@@ -679,7 +679,7 @@ void MipsLinuxLowerer::lower(
             } else if (special == 0x0C) {
                 source << "xor %edi, %edi\nmov $60, %eax\nsyscall\n";
             } else if (special == 0x0D) {
-                source << "mov $9, %edi\nmov $60, %eax\nsyscall\n";
+                source << "jmp p" << std::hex << address + 4u << std::dec << "\n";
             } else {
                 emit_unsupported_stub(instruction);
             }
