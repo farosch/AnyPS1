@@ -35,6 +35,9 @@ struct Ps1DeviceRuntime {
     std::uint8_t cd_irq = 0;
     std::uint8_t cd_mode = 0;
     bool frame_irq_due = false;
+    std::uint8_t cd_sector_data[2048]{};
+    std::size_t cd_sector_data_count = 0;
+    std::size_t cd_sector_data_read = 0;
 
     void attach_ram(
         std::uint32_t* ram,
@@ -44,6 +47,10 @@ struct Ps1DeviceRuntime {
     std::uint32_t read(std::uint32_t address);
     int write(std::uint32_t address, std::uint32_t value);
     int tick(std::uint32_t cycles);
+    void set_cd_sector_data(
+        const std::uint8_t* data,
+        std::size_t size);
+    std::uint32_t get_cd_lba() const;
 
 private:
     std::uint32_t& register_at(std::uint32_t address);

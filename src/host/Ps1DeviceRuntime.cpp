@@ -262,6 +262,26 @@ std::uint32_t Ps1DeviceRuntime::read(std::uint32_t address)
         return (controller_rx_count > controller_rx_read ? 0x02u : 0u);
     }
     if (normalized == 0x1F801814u) return gpu_status;
+    if (normalized == 0x1F801802u) {
+        if (cd_sector_data_read < cd_sector_data_count) {
+            std::uint32_t value =
+                cd_sector_data[cd_sector_data_read++];
+            if (cd_sector_data_read < cd_sector_data_count) {
+                value |= static_cast<std::uint32_t>(
+                    cd_sector_data[cd_sector_data_read++]) << 8u;
+            }
+            if (cd_sector_data_read < cd_sector_data_count) {
+                value |= static_cast<std::uint32_t>(
+                    cd_sector_data[cd_sector_data_read++]) << 16u;
+            }
+            if (cd_sector_data_read < cd_sector_data_count) {
+                value |= static_cast<std::uint32_t>(
+                    cd_sector_data[cd_sector_data_read++]) << 24u;
+            }
+            return value;
+        }
+        return 0;
+    }
     if (normalized >= 0x1F801800u &&
         normalized < 0x1F801804u) {
         const std::uint32_t index = cd_status_index & 3u;
@@ -396,6 +416,22 @@ int Ps1DeviceRuntime::tick(std::uint32_t cycles)
         gpu_status &= ~(1u << 26);
     }
     return 0;
+}
+
+void Ps1DeviceRuntime::set_cd_sector_data(
+    const std::uint8_t* data,
+    std::size_t size)
+{
+    cd_sector_data_count = size > 2048u ? 2048u : size;
+    cd_sector_data_read = 0u;
+    for (std::size_t index = 0u; index < cd_sector_data_count; ++index) {
+        cd_sector_data[index] = data[index];
+    }
+}
+
+std::uint32_t Ps1DeviceRuntime::get_cd_lba() const
+{
+    return cd_lba;
 }
 
 

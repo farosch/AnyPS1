@@ -167,6 +167,7 @@ public:
         std::uint8_t* data,
         std::size_t size,
         std::string& error);
+    bool is_open() const;
     void close_disc();
 
 private:
@@ -276,7 +277,7 @@ public:
     std::uint32_t read(std::uint32_t address);
     int write(std::uint32_t address, std::uint32_t value);
     int spu_write(std::uint32_t address, std::uint32_t value);
-    std::uint32_t spu_read(std::uint32_t address) const;
+    std::uint32_t spu_read(std::uint32_t address);
     int gpu_write(std::uint32_t address, std::uint32_t value);
     std::uint32_t mmio_read(std::uint32_t address);
     int mmio_write(std::uint32_t address, std::uint32_t value);

@@ -96,6 +96,18 @@ void MipsWindowsLowerer::lower(
     source << "uint32_t interrupt_status;\n";
     source << "uint32_t interrupt_mask;\n";
     source << "uint32_t native_frame_counter;\n";
+    source << "uint32_t gpu_status_native;\n";
+    source << "uint32_t spu_native[384];\n";
+    source << "uint32_t cd_parameters[16];\n";
+    source << "uint32_t cd_responses[16];\n";
+    source << "uint32_t cd_parameter_count;\n";
+    source << "uint32_t cd_response_count;\n";
+    source << "uint32_t cd_response_read;\n";
+    source << "uint32_t cd_status_index;\n";
+    source << "uint32_t cd_irq;\n";
+    source << "uint32_t controller_rx[8];\n";
+    source << "uint32_t controller_rx_read;\n";
+    source << "uint32_t controller_rx_count;\n";
     source << "uint32_t pc;\n";
     source << "uint32_t next_pc;\n";
     source << "uint32_t pending_target;\n";
@@ -112,9 +124,11 @@ void MipsWindowsLowerer::lower(
     }
     source << "};\n";
     source << "static uint32_t native_mmio_read(uint32_t ea){\n";
-    source << "uint32_t n=ea&0x1FFFFFFFu;if(n>=0x1F801100u&&n<0x1F801130u){uint32_t base=n&~15u;uint32_t off=n-base;if(off==0u){uint32_t timer=(base-0x1F801100u)/16u;return timer_cycles+timer*0x400u;}return mmio[(n-0x1F801000u)>>2u];}if(n==0x1F801070u)return interrupt_status;if(n==0x1F801074u)return interrupt_mask;if(n==0x1F801040u)return 0xFFFFFFFFu;if(n==0x1F801810u||n==0x1F801814u)return 0x14802000u;if(n>=0x1F801000u&&n<0x1F802000u)return mmio[(n-0x1F801000u)>>2u];return 0u;}\n";
+    source << "uint32_t n=ea&0x1FFFFFFFu;if(n>=0x1F801100u&&n<0x1F801130u){uint32_t base=n&~15u;uint32_t off=n-base;if(off==0u){uint32_t timer=(base-0x1F801100u)/16u;return timer_cycles+timer*0x400u;}return mmio[(n-0x1F801000u)>>2u];}if(n==0x1F801070u)return interrupt_status;if(n==0x1F801074u)return interrupt_mask;if(n==0x1F801040u){uint32_t value=controller_rx_read<controller_rx_count?controller_rx[controller_rx_read++]:0xFFu;return value;}if(n==0x1F801044u)return controller_rx_read<controller_rx_count?0x02u:0u;if(n==0x1F801810u||n==0x1F801814u)return gpu_status_native;if(n>=0x1F801800u&&n<0x1F801804u){if(n==0x1F801800u)return cd_status_index|(cd_parameter_count<16u?0x08u:0u)|(cd_response_read<cd_response_count?0x20u:0u)|0x02u;if(n==0x1F801801u&&cd_status_index==1u)return cd_response_read<cd_response_count?cd_responses[cd_response_read++]:0u;if(n==0x1F801803u)return cd_irq|0x10u;return 0u;}if(n>=0x1F801C00u&&n<0x1F801D80u)return spu_native[(n-0x1F801C00u)>>2u];if(n>=0x1F801000u&&n<0x1F802000u)return mmio[(n-0x1F801000u)>>2u];return 0u;}\n";
+    source << "static void native_dma_write(uint32_t n,uint32_t value){\n";
+    source << "uint32_t channel=(n-0x1F801080u)/16u;if(channel>6u)return;uint32_t control=(n&15u)==8u?value:mmio[((n-0x1F801000u)>>2u)];if((n&15u)==8u&&((value&0x01000000u)==0u))return;if((n&15u)==8u&&((value&0x01000000u)!=0u)){uint32_t base=0x1F801080u+channel*16u;uint32_t address=mmio[(base-0x1F801000u)>>2u]&0x00FFFFFFu;uint32_t sync=(value>>9u)&3u;if(sync==2u){uint32_t limit=65536u;while(limit--!=0u&&address<524288u){uint32_t header=ram[address];uint32_t next=header&0x00FFFFFFu;uint32_t size=header>>24u;if(address+1u+size>524288u)break;for(uint32_t index=0u;index<size;++index){uint32_t packet=ram[address+1u+index];uint32_t command=packet>>24u;if(command>=0x20u&&command<=0x7Fu)gpu_status_native|=1u<<26;}if(next==0x00FFFFFFu||next>=524288u)break;address=next;}mmio[(base-0x1F801000u)>>2u]=address;}else{uint32_t block=mmio[((base+4u)-0x1F801000u)>>2u];uint32_t words=block&0xFFFFu;if(words==0u)words=1u;uint32_t blocks=(block>>16u)&0xFFFFu;if(blocks==0u)blocks=1u;uint64_t count=(uint64_t)words*blocks;if(count<=524288u-address/4u){for(uint32_t index=0u;index<count;++index)ram[address/4u+index]=0u;}}mmio[((base+8u)-0x1F801000u)>>2u]=value&~0x01000000u;interrupt_status|=0x8u;}}\n";
     source << "static void native_mmio_write(uint32_t ea,uint32_t value){\n";
-    source << "uint32_t n=ea&0x1FFFFFFFu;if(n==0x1F801070u)interrupt_status &= ~value;if(n==0x1F801074u)interrupt_mask=value;if(n>=0x1F801000u&&n<0x1F802000u)mmio[(n-0x1F801000u)>>2u]=value;}\n";
+    source << "uint32_t n=ea&0x1FFFFFFFu;if(n==0x1F801070u)interrupt_status &= ~value;if(n==0x1F801074u)interrupt_mask=value;if(n==0x1F801040u){controller_rx_read=0u;if(value==0x81u){controller_rx_count=5u;controller_rx[0]=0xFFu;controller_rx[1]=0xFFu;controller_rx[2]=0x5Au;controller_rx[3]=0x5Du;controller_rx[4]=0u;}else{controller_rx_count=5u;controller_rx[0]=0u;controller_rx[1]=0x41u;controller_rx[2]=0x5Au;controller_rx[3]=(uint8_t)value;controller_rx[4]=(uint8_t)(value>>8u);}}if(n>=0x1F801C00u&&n<0x1F801D80u)spu_native[(n-0x1F801C00u)>>2u]=value;if(n==0x1F801810u){uint32_t command=value>>24u;if(command>=0x20u&&command<=0x7Fu)gpu_status_native|=1u<<26u;}if(n==0x1F801814u){if((value>>24u)==0u)gpu_status_native=0x14802000u;if((value>>24u)==0x02u)interrupt_status &= ~0x1u;}if(n>=0x1F801800u&&n<0x1F801804u){if(n==0x1F801800u)cd_status_index=value&3u;else if(n==0x1F801801u){cd_response_read=0u;cd_response_count=1u;if(value==0x01u||value==0x02u||value==0x06u||value==0x08u){cd_responses[0]=0x02u;cd_irq=value==0x06u?1u:3u;}else{cd_responses[0]=0x11u;cd_irq=5u;}interrupt_status|=0x4u;}else if(n==0x1F801802u&&cd_status_index==2u&&cd_parameter_count<16u){cd_parameters[cd_parameter_count++]=value&0xFFu;}else if(n==0x1F801803u){cd_irq=0u;if((value&0x40u)!=0u)cd_parameter_count=0u;}}if(n>=0x1F801080u&&n<0x1F801100u)native_dma_write(n,value);if(n>=0x1F801000u&&n<0x1F802000u)mmio[(n-0x1F801000u)>>2u]=value;}\n";
     source << "static void write_windows_trace(const char* prefix,uint32_t value){\n";
     source << "char text[48];uint32_t position=0;while(prefix[position]){text[position]=prefix[position];++position;}text[position++]='0';text[position++]='x';for(int shift=28;shift>=0;shift-=4){uint32_t digit=(value>>shift)&15u;text[position++]=(char)(digit<10u?'0'+digit:'a'+digit-10u);}text[position++]='\\n';void* handle=GetStdHandle(0xfffffff5u);unsigned long written=0;WriteFile(handle,text,position,&written,0);}\n";
     source << "extern \"C\" void native_execute_ir(uint32_t kind,uint32_t address,uint32_t word,uint32_t rs,uint32_t rt,uint32_t rd,uint32_t shamt,uint32_t immediate,uint32_t target,uint32_t size_value,uint32_t special){\n";
@@ -195,6 +209,9 @@ void MipsWindowsLowerer::lower(
     source << "#endif\n";
     source << "regs[29]=0x801FF000u;\n";
     source << "regs[28]=0x" << std::hex << initial_gp << std::dec << "u;\n";
+    source << "gpu_status_native=0x14802000u;\n";
+    source << "controller_rx_count=0u;controller_rx_read=0u;\n";
+    source << "cd_parameter_count=0u;cd_response_count=0u;cd_response_read=0u;cd_status_index=0u;cd_irq=0u;\n";
     source << "for(uint32_t i=0;i<sizeof(payload)/sizeof(payload[0]);++i) "
                "ram[" << (plan.payload_ram_offset / 4u)
             << "+i]=payload[i];\n";

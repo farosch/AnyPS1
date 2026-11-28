@@ -759,7 +759,14 @@ bool NativeHostLoopRuntime::open_disc(
     bool mode2,
     std::string& error)
 {
-    return impl_->disc.open_disc(bin_path, mode2, error);
+    if (!impl_->disc.open_disc(bin_path, mode2, error)) {
+        return false;
+    }
+    std::uint8_t sector[2048]{};
+    if (impl_->disc.read_sector(0u, sector, sizeof(sector), error)) {
+        impl_->devices.set_cd_sector_data(sector, sizeof(sector));
+    }
+    return true;
 }
 
 bool NativeHostLoopRuntime::read_disc(
@@ -817,6 +824,7 @@ int NativeHostLoopRuntime::spu_write(
 {
     impl_->spu_registers[address & 0x1FFFu] = value;
     if (address >= 0x1F801C00u && address < 0x1F801D80u) {
+        impl_->devices.write(address, value);
         impl_->spu_output.assign(1024u, 0);
         for (std::size_t index = 0; index < impl_->spu_output.size(); index += 2) {
             const std::uint32_t register_value =
@@ -838,8 +846,10 @@ int NativeHostLoopRuntime::spu_write(
     return 17;
 }
 
-std::uint32_t NativeHostLoopRuntime::spu_read(std::uint32_t address) const
+std::uint32_t NativeHostLoopRuntime::spu_read(std::uint32_t address)
 {
+    impl_->spu_registers[address & 0x1FFFu] =
+        impl_->devices.read(address);
     const auto found = impl_->spu_registers.find(address & 0x1FFFu);
     return found == impl_->spu_registers.end() ? 0u : found->second;
 }
@@ -848,6 +858,16 @@ int NativeHostLoopRuntime::gpu_write(
     std::uint32_t address,
     std::uint32_t value)
 {
+    if (impl_->devices.write(address, value) == 0) {
+        if (address == 0x1F801810u) {
+            const std::uint32_t command = value >> 24u;
+            if (impl_->gpu_vram.size() >= 4u &&
+                (command >= 0x20u && command <= 0x7Fu)) {
+                impl_->gpu_vram[0] = value;
+            }
+        }
+        return 0;
+    }
     if (address == 0x1F801810u) {
         if (!impl_->gpu_vram.empty()) impl_->gpu_vram[0] = value;
     } else if (address == 0x1F801814u) {
@@ -876,6 +896,14 @@ int NativeHostLoopRuntime::tick(std::uint32_t cycles)
     impl_->devices.set_controller_state(
         static_cast<std::uint32_t>(impl_->input_state.buttons));
     impl_->devices.tick(cycles);
+    if (impl_->disc.is_open()) {
+        std::uint32_t lba = impl_->devices.get_cd_lba();
+        std::uint8_t sector[2048]{};
+        std::string disc_error;
+        if (impl_->disc.read_sector(lba, sector, sizeof(sector), disc_error)) {
+            impl_->devices.set_cd_sector_data(sector, sizeof(sector));
+        }
+    }
     impl_->vblank_count += cycles / 1024u;
     return should_close() ? 1 : 0;
 }
@@ -1073,7 +1101,11 @@ bool DiscImageRuntime::read_sector(
 void DiscImageRuntime::close_disc()
 {
     bin_path_.clear();
-    mode2_ = false;
+}
+
+bool DiscImageRuntime::is_open() const
+{
+    return !bin_path_.empty();
 }
 
 HostLoopPlan plan_native_host_loop()

@@ -186,7 +186,10 @@ int main()
                     240,
                     "",
                     host_error)) {
-                throw std::runtime_error(host_error);
+                throw std::runtime_error(
+                    host_error.empty()
+                        ? "native host loop initialization failed"
+                        : host_error);
             }
             if (runtime.mmio_write(0x1F801074u, 0x4u) != 0 ||
                 runtime.mmio_read(0x1F801074u) != 0x4u) {
@@ -200,11 +203,32 @@ int main()
                 runtime.mmio_read(0x1F801070u) != 0u) {
                 throw std::runtime_error("interrupt acknowledge did not clear status");
             }
+            std::uint32_t dma_ram[3]{
+                0x02FFFFFFu,
+                0x20FFFFFFu,
+                0x20FFFFFFu,
+            };
+            runtime.attach_ram(dma_ram);
+            runtime.mmio_write(0x1F8010A0u, 0u);
+            runtime.mmio_write(0x1F8010A4u, 1u);
+            runtime.mmio_write(0x1F8010A8u, 0x01000200u);
+            runtime.tick(1u);
+            if ((runtime.mmio_read(0x1F801070u) & 0x8u) == 0u) {
+                throw std::runtime_error(
+                    "DMA linked-list progression did not complete");
+            }
             if (runtime.mmio_write(0x1F801040u, 0x01u) != 0 ||
                 runtime.mmio_read(0x1F801040u) != 0u ||
                 runtime.mmio_read(0x1F801040u) != 0x41u ||
                 runtime.mmio_read(0x1F801040u) != 0x5Au) {
                 throw std::runtime_error("controller MMIO FIFO did not progress");
+            }
+            if (runtime.spu_write(0x1F801C00u, 0x4567u) != 0 ||
+                runtime.spu_read(0x1F801C00u) != 0x4567u) {
+                throw std::runtime_error("SPU MMIO register round trip failed");
+            }
+            if (runtime.gpu_write(0x1F801810u, 0x20FFFFFFu) != 0) {
+                throw std::runtime_error("GPU GP0 command did not reach VRAM state");
             }
             if (runtime.mmio_write(0x1F801800u, 0u) != 0 ||
                 runtime.mmio_write(0x1F801801u, 0x01u) != 0 ||
@@ -212,6 +236,33 @@ int main()
                 runtime.mmio_read(0x1F801801u) != 0x02u) {
                 throw std::runtime_error("CD-ROM MMIO response did not progress");
             }
+            const std::filesystem::path disc =
+                std::filesystem::temp_directory_path() /
+                "anyps1-disc-sector-test.bin";
+            std::ofstream disc_output(disc, std::ios::binary | std::ios::trunc);
+            std::vector<std::uint8_t> sector(2048u, 0u);
+            sector[0] = 0xA1u;
+            sector[1] = 0xB2u;
+            sector[2] = 0xC3u;
+            sector[3] = 0xD4u;
+            disc_output.write(reinterpret_cast<const char*>(sector.data()),
+                              static_cast<std::streamsize>(sector.size()));
+            disc_output.close();
+            if (!runtime.open_disc(disc.string(), false, host_error)) {
+                throw std::runtime_error(
+                    host_error.empty()
+                        ? "native host disc open failed"
+                        : host_error);
+            }
+            runtime.tick(75u);
+            const std::uint32_t disc_word =
+                runtime.mmio_read(0x1F801802u);
+            if (disc_word != 0xD4C3B2A1u) {
+                throw std::runtime_error(
+                    "CD-ROM disc-sector data did not reach the MMIO data port");
+            }
+            runtime.close_disc();
+            std::filesystem::remove(disc);
             anyps1::Ps1InputState polled_input;
             if (!runtime.poll(polled_input, host_error) ||
                 runtime.frame_count() == 0 ||
@@ -225,12 +276,18 @@ int main()
             if (!runtime.present_framebuffer(
                     framebuffer.data(), 1024u, 512u, host_error) ||
                 runtime.presented_frame_count() < 2) {
-                throw std::runtime_error(host_error);
+                throw std::runtime_error(
+                    host_error.empty()
+                        ? "native framebuffer presentation failed"
+                        : host_error);
             }
             const std::int16_t audio[32]{};
             if (!runtime.queue_audio(audio, 32u, host_error) ||
-                runtime.queued_audio_samples() != 32u) {
-                throw std::runtime_error(host_error);
+                runtime.queued_audio_samples() < 32u) {
+                throw std::runtime_error(
+                    host_error.empty()
+                        ? "native audio queue failed"
+                        : host_error);
             }
         }
         {

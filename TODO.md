@@ -215,6 +215,9 @@
 - [x] Remove overly aggressive linear CFG leader closure and add an exact
   fixture for the reserved SPECIAL `0x004236AD` (`reserved_special_2d`)
   gap so unsupported execution exits explicitly.
+- [x] Implement native host-device coupling for GPU/VRAM commands, DMA block
+  and linked-list transfers, CD-ROM sector data, timers/VBlank interrupts,
+  controller FIFO, memory-card storage, and SPU registers.
 
 ## PS1 GPU lowering and Vulkan shaders
 
