@@ -166,9 +166,9 @@
 - [x] Implement the remaining B0/C0 BIOS services reached by real executable
   startup paths beyond A0 byte copy.
 - [x] Advance real-executable conversion past the first unsupported COP2/MMIO
-  family and record the next concrete runtime blocker: DMA chain transfer
-  modes, CD-ROM sector streaming, and controller/CD protocol timing remain
-  beyond the shared MMIO/GTE runtime subset.
+  family and implement DMA linked-list transfers plus generic CD-ROM sector
+  progression. The next concrete runtime blocker is real Windows MIPS native
+  instruction emission rather than a diagnostic-only PE artifact.
 
 ## Windows executable conversion
 

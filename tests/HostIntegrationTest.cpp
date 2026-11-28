@@ -235,8 +235,8 @@ int main()
         }
         {
             anyps1::Ps1DeviceRuntime devices;
-            std::uint32_t ram[2]{};
-            devices.attach_ram(ram, 2u);
+            std::uint32_t ram[3]{};
+            devices.attach_ram(ram, 3u);
             devices.set_controller_state(0x1234u);
             devices.write(0x1F801048u, 1u);
             if (devices.read(0x1F801040u) != 0u ||
@@ -255,6 +255,20 @@ int main()
                 throw std::runtime_error(
                     "CD-ROM command did not produce response and interrupt");
             }
+            devices.write(0x1F801800u, 0u);
+            devices.write(0x1F801800u, 2u);
+            devices.write(0x1F801802u, 0u);
+            devices.write(0x1F801802u, 1u);
+            devices.write(0x1F801802u, 2u);
+            devices.write(0x1F801800u, 0u);
+            devices.write(0x1F801801u, 0x06u);
+            devices.tick(75u);
+            devices.write(0x1F801800u, 1u);
+            if (devices.read(0x1F801801u) != 0x02u ||
+                (devices.read(0x1F801070u) & 0x4u) == 0u) {
+                throw std::runtime_error(
+                    "CD-ROM read did not advance sector state");
+            }
             devices.write(0x1F801C00u, 0x4567u);
             devices.tick(1u);
             if (devices.read(0x1F801C00u) != 0x4567u) {
@@ -272,6 +286,16 @@ int main()
             if ((devices.read(0x1F801070u) & 0x8u) == 0u) {
                 throw std::runtime_error(
                     "GPU DMA progression did not complete");
+            }
+            ram[0] = 0x02FFFFFFu;
+            ram[1] = 0x20FFFFFFu;
+            ram[2] = 0x20FFFFFFu;
+            devices.write(0x1F8010A0u, 0u);
+            devices.write(0x1F8010A8u, 0x01000200u);
+            devices.tick(1u);
+            if ((devices.read(0x1F801070u) & 0x8u) == 0u) {
+                throw std::runtime_error(
+                    "GPU linked-list DMA did not complete");
             }
             devices.write(0x1F801104u, 1u);
             devices.write(0x1F801108u, 1u);

@@ -24,6 +24,8 @@ struct Ps1DeviceRuntime {
     std::uint32_t* ram = nullptr;
     std::uint32_t ram_word_count = 0x80000u;
     std::uint32_t cd_lba = 0;
+    std::uint32_t cd_sector_cycles = 0;
+    bool cd_read_active = false;
     std::size_t cd_parameter_count = 0;
     std::size_t cd_response_read = 0;
     std::size_t cd_response_count = 0;

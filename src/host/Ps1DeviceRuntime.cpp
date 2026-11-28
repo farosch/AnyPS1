@@ -69,17 +69,21 @@ void Ps1DeviceRuntime::execute_cd_command(std::uint8_t command)
         cd_irq = 3u;
     } else if (command == 0x06u) {
         cd_mode |= 0x80u;
+        cd_read_active = true;
+        cd_sector_cycles = 0u;
         cd_response_fifo[0] = 0x02u;
         cd_response_read = 0;
         cd_response_count = 1u;
         cd_irq = 1u;
     } else if (command == 0x08u) {
+        cd_read_active = false;
         cd_response_fifo[0] = 0x02u;
         cd_response_read = 0;
         cd_response_count = 1u;
         cd_irq = 3u;
     } else if (command == 0x09u) {
         cd_mode &= ~0x80u;
+        cd_read_active = false;
         cd_response_fifo[0] = 0x02u;
         cd_response_read = 0;
         cd_response_count = 1u;
@@ -146,6 +150,36 @@ void Ps1DeviceRuntime::execute_dma_channel(std::uint32_t channel)
     const std::uint32_t base = 0x1F801080u + channel * 0x10u;
     std::uint32_t control = register_at(base + 8u);
     if ((control & 0x01000000u) == 0) return;
+    const std::uint32_t sync_mode =
+        (control >> 9u) & 3u;
+    if (channel == 2u && sync_mode == 2u) {
+        std::uint32_t address =
+            register_at(base) & 0x00FFFFFFu;
+        std::uint32_t transferred = 0u;
+        for (std::uint32_t link = 0u; link < 65536u; ++link) {
+            if (address >= ram_word_count) break;
+            const std::uint32_t header = ram[address];
+            const std::uint32_t next = header & 0x00FFFFFFu;
+            const std::uint32_t size = header >> 24u;
+            if (size > ram_word_count - address) break;
+            for (std::uint32_t index = 0u; index < size; ++index) {
+                const std::uint32_t packet_index = address + 1u + index;
+                if (packet_index >= ram_word_count) break;
+                execute_gpu_command(ram[packet_index]);
+            }
+            transferred += size;
+            if (next == 0x00FFFFFFu || next >= ram_word_count) break;
+            address = next;
+        }
+        control &= ~0x01000000u;
+        register_at(base + 8u) = control;
+        register_at(base) = address;
+        interrupt_status |= 0x8u;
+        register_at(0x1F8010F4u) = 0x00800000u |
+            (1u << (16u + channel)) | channel;
+        (void)transferred;
+        return;
+    }
     const std::uint32_t address =
         register_at(base) & 0x001FFFFCu;
     const std::uint32_t block = register_at(base + 4u);
@@ -329,6 +363,23 @@ int Ps1DeviceRuntime::tick(std::uint32_t cycles)
 {
     timer_cycles += cycles;
     frame_cycles += cycles;
+    if (cd_read_active) {
+        cd_sector_cycles += cycles;
+        if (cd_sector_cycles >= 75u) {
+            cd_sector_cycles -= 75u;
+            ++cd_lba;
+            cd_response_fifo[0] = 0x02u;
+            cd_response_fifo[1] =
+                static_cast<std::uint8_t>(cd_lba);
+            cd_response_fifo[2] =
+                static_cast<std::uint8_t>(cd_lba >> 8u);
+            cd_response_fifo[3] =
+                static_cast<std::uint8_t>(cd_lba >> 16u);
+            cd_response_read = 0u;
+            cd_response_count = 4u;
+            cd_irq = 1u;
+        }
+    }
     while (frame_cycles >= 1024u) {
         frame_cycles -= 1024u;
         frame_irq_due = true;
