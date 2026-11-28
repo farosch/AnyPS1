@@ -210,6 +210,8 @@
   complete the remaining MMIO/host-device runtime state reached after startup.
 - [x] Add Windows native in-process MMIO, timer, interrupt, and frame-tick
   progression with a checked-in fixture and PE/source assertions.
+- [x] Replace the Windows 10-million native-step guard with a 100-million
+  bounded startup/runtime budget and test the generated source guard.
 
 ## PS1 GPU lowering and Vulkan shaders
 

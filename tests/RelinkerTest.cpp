@@ -308,7 +308,8 @@ int main(int argc, char** argv)
             std::istreambuf_iterator<char>());
         if (source_text.find("native_mmio_read") == std::string::npos ||
             source_text.find("native_mmio_write") == std::string::npos ||
-            source_text.find("interrupt_status|=1u") == std::string::npos) {
+            source_text.find("interrupt_status|=1u") == std::string::npos ||
+            source_text.find("steps<100000000u") == std::string::npos) {
             throw std::runtime_error(
                 "Windows PE native source lacks MMIO/frame-tick state");
         }

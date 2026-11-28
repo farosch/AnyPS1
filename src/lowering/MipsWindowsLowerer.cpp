@@ -202,7 +202,7 @@ void MipsWindowsLowerer::lower(
     source << "next_pc=pc+4u;\n";
     source << "pending_target=0u;\n";
     source << "delay_remaining=0u;\n";
-    source << "for(uint32_t steps=0;steps<10000000u;++steps){\n";
+    source << "for(uint32_t steps=0;steps<100000000u;++steps){\n";
     source << "++native_frame_counter;++timer_cycles;++frame_cycles;if(frame_cycles>=1024u){frame_cycles-=1024u;interrupt_status|=1u;}\n";
     source << "if(delay_remaining==1u){pc=pending_target;delay_remaining=0u;}\n";
     source << "else if(delay_remaining==2u){pc=next_pc;delay_remaining=1u;}\n";
