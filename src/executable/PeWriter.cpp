@@ -66,7 +66,15 @@ bool run_windows_tool(
             &process)) {
         return false;
     }
-    WaitForSingleObject(process.hProcess, INFINITE);
+    const DWORD wait_result =
+        WaitForSingleObject(process.hProcess, 120000u);
+    if (wait_result == WAIT_TIMEOUT) {
+        TerminateProcess(process.hProcess, 124u);
+        WaitForSingleObject(process.hProcess, INFINITE);
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+        return false;
+    }
     DWORD exit_code = 0;
     GetExitCodeProcess(process.hProcess, &exit_code);
     CloseHandle(process.hThread);

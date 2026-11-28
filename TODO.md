@@ -182,9 +182,11 @@
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
 - [x] Replace the Windows manual PE layout and MASM/link.exe path with the
   shared native lowering IR and Clang/LLD backend.
-- [ ] Implement real Windows native MIPS instruction emission for the shared
-  lowering IR; the PE backend currently reports explicit unsupported/runtime
-  blockers and must not present the placeholder as a converted executable.
+- [x] Implement initial real Windows native MIPS instruction emission for the
+  shared lowering IR, with RAM, scratchpad, arithmetic, branches, loads/stores,
+  HI/LO, and explicit unsupported exits.
+- [ ] Remove the 30,000-leader Windows CFG emission limit and lower large
+  executable CFG regions without generating an oversized switch-based PE source.
 - [x] Generate imports and relocations for real Windows host-native code.
 - [x] Document PE32 support as optional: no PE32-only x86 compatibility target
   is required because the native backend emits AMD64 PE32+.

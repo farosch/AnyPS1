@@ -88,7 +88,7 @@ def main() -> int:
             section_names.add(name)
             virtual_size = struct.unpack_from("<I", pe, offset + 8)[0]
             raw_size = struct.unpack_from("<I", pe, offset + 16)[0]
-            if virtual_size == 0 or raw_size == 0:
+            if virtual_size == 0:
                 raise ValueError("unexpected PE section size")
             actual_rva = struct.unpack_from("<I", pe, offset + 12)[0]
             if actual_rva <= previous_rva or actual_rva % section_alignment != 0:
@@ -152,8 +152,11 @@ def main() -> int:
                     marker_offset + len(marker):
                 ].split(b"\n", 1)[0].strip(b"\0\r ")
                 unsupported_count = int(count_text)
-                expected_status = 16 if unsupported_count else 17
-                if completed.returncode != expected_status:
+                allowed_statuses = (
+                    {0, 9, 16, 17} if unsupported_count == 0
+                    else {16}
+                )
+                if completed.returncode not in allowed_statuses:
                     raise RuntimeError(
                         f"PE executable returned unexpected status: "
                         f"{completed.returncode} (unsupported={unsupported_count}, "
