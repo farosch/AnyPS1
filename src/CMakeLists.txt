@@ -38,7 +38,7 @@ add_library(anyps1_gte
     lowering/GteRuntime.cpp
 )
 target_include_directories(anyps1_gte PUBLIC ${CMAKE_SOURCE_DIR}/src)
-if(MSVC)
+if(MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(anyps1_gte PRIVATE /GS- /Zl /EHs-c- /GR-)
     set_property(TARGET anyps1_gte PROPERTY
         VS_GLOBAL_BasicRuntimeChecks "Default")
@@ -62,7 +62,7 @@ add_library(anyps1_device
     host/Ps1DeviceRuntime.cpp
 )
 target_include_directories(anyps1_device PUBLIC ${CMAKE_SOURCE_DIR}/src)
-if(MSVC)
+if(MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(anyps1_device PRIVATE /GS- /Zl /EHs-c- /GR-)
     set_property(TARGET anyps1_device PROPERTY
         VS_GLOBAL_BasicRuntimeChecks "Default")
@@ -81,7 +81,7 @@ foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1
 endforeach()
 
 if(ANYPS1_STRICT_WARNINGS)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
         foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gte
                         anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory
                         anyps1_relinker anyps1)
@@ -90,7 +90,7 @@ if(ANYPS1_STRICT_WARNINGS)
                     -Wall -Wextra -Wpedantic -Werror)
             endif()
         endforeach()
-    elseif(MSVC)
+    elseif(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         foreach(target anyps1_format anyps1_executable anyps1_lowering
                         anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory
                         anyps1_relinker anyps1)

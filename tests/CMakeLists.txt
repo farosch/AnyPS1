@@ -72,7 +72,8 @@ set_tests_properties(
     relinker_truncated_fixture
     PROPERTIES
         ENVIRONMENT "ANYPS1_TEST_HEADLESS=1"
-        TIMEOUT 15)
+        TIMEOUT 15
+        RUN_SERIAL TRUE)
 
 find_program(SPIRV_VAL_EXECUTABLE NAMES spirv-val)
 find_program(SPIRV_OPT_EXECUTABLE NAMES spirv-opt)
@@ -257,4 +258,9 @@ add_executable(anyps1_gte_runtime_test GteRuntimeTest.cpp)
 target_include_directories(anyps1_gte_runtime_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(anyps1_gte_runtime_test PRIVATE anyps1_gte)
 add_test(NAME gte_runtime COMMAND anyps1_gte_runtime_test)
+
+get_property(ANYPS1_ALL_TESTS DIRECTORY PROPERTY TESTS)
+foreach(test_name IN LISTS ANYPS1_ALL_TESTS)
+    set_property(TEST ${test_name} PROPERTY RUN_SERIAL TRUE)
+endforeach()
 

@@ -28,6 +28,42 @@ int ElfWriter::link(
     throw std::runtime_error(
         "native Linux lowering toolchain is not available on Windows");
 #else
+    const std::filesystem::path object =
+        std::filesystem::path(output.string() + ".native.o");
+
+    const pid_t assembler = fork();
+    if (assembler < 0) {
+        throw std::runtime_error(
+            "cannot start native Linux assembler: " +
+            std::string(std::strerror(errno)));
+    }
+    if (assembler == 0) {
+        std::vector<const char*> assembler_args = {
+            "clang",
+            "-x",
+            "assembler",
+            "-c",
+        };
+        assembler_args.push_back(assembly.c_str());
+        assembler_args.push_back("-o");
+        assembler_args.push_back(object.c_str());
+        assembler_args.push_back(nullptr);
+        execvp(assembler_args[0],
+               const_cast<char* const*>(assembler_args.data()));
+        _exit(127);
+    }
+
+    int assembler_status = 0;
+    if (waitpid(assembler, &assembler_status, 0) < 0) {
+        throw std::runtime_error(
+            "cannot wait for native Linux assembler: " +
+            std::string(std::strerror(errno)));
+    }
+    if (!WIFEXITED(assembler_status) ||
+        WEXITSTATUS(assembler_status) != 0) {
+        return 1;
+    }
+
     const pid_t child = fork();
     if (child < 0) {
         throw std::runtime_error(
@@ -36,14 +72,15 @@ int ElfWriter::link(
     }
     if (child == 0) {
         std::vector<const char*> linker_args = {
-            "gcc",
+            "clang++",
             "-nostdlib",
             "-no-pie",
+            "-fuse-ld=lld",
             "-Wl,-e,_start,-z,noexecstack,-z,relro,-z,now,-z,notext,--build-id=none",
         };
         linker_args.push_back("-o");
         linker_args.push_back(output.c_str());
-        linker_args.push_back(assembly.c_str());
+        linker_args.push_back(object.c_str());
         const std::string build_dir = ANYPS1_BUILD_DIR;
         const std::string gte_library = build_dir + "/src/libanyps1_gte.a";
         const std::string device_library =
@@ -64,8 +101,6 @@ int ElfWriter::link(
             "-Wl,-rpath," + build_dir + "/3rdparty/SDL";
         linker_args.push_back(sdl_rpath.c_str());
         linker_args.push_back("-lc");
-        linker_args.push_back("-lgcc_s");
-        linker_args.push_back("-lgcc");
         linker_args.push_back("-lm");
         linker_args.push_back("-ldl");
         linker_args.push_back("-lpthread");
@@ -82,27 +117,9 @@ int ElfWriter::link(
     }
     if (!WIFEXITED(status)) return -1;
     if (WEXITSTATUS(status) != 0) return WEXITSTATUS(status);
-
-    const pid_t strip_child = fork();
-    if (strip_child < 0) {
-        throw std::runtime_error(
-            "cannot start symbol stripper: " +
-            std::string(std::strerror(errno)));
-    }
-    if (strip_child == 0) {
-        execlp("strip", "strip", "-s", output.c_str(),
-               static_cast<char*>(nullptr));
-        _exit(127);
-    }
-
-    int strip_status = 0;
-    if (waitpid(strip_child, &strip_status, 0) < 0) {
-        throw std::runtime_error(
-            "cannot wait for symbol stripper: " +
-            std::string(std::strerror(errno)));
-    }
-    if (!WIFEXITED(strip_status)) return -1;
-    return WEXITSTATUS(strip_status);
+    std::error_code remove_error;
+    std::filesystem::remove(object, remove_error);
+    return 0;
 #endif
 }
 

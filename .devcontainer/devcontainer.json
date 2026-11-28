@@ -1,0 +1,15 @@
+{
+  "name": "AnyPS1 Clang + LLD",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  },
+  "postCreateCommand": "cmake --preset linux-clang-lld"
+}

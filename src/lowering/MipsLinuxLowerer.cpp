@@ -25,14 +25,6 @@ namespace anyps1 {
 
 namespace {
 
-constexpr std::uint32_t PS1_RAM_BASE = 0x00000000u;
-constexpr std::uint32_t PS1_RAM_SIZE = 0x00200000u;
-constexpr std::uint32_t PS1_SCRATCHPAD_BASE = 0x1F800000u;
-constexpr std::uint32_t PS1_SCRATCHPAD_SIZE = 0x400u;
-constexpr std::uint32_t PS1_MMIO_BASE = 0x1F801000u;
-constexpr std::uint32_t PS1_BIOS_BASE = 0x1FC00000u;
-constexpr std::uint32_t PS1_BIOS_SIZE = 0x00080000u;
-
 }
 
 void MipsLinuxLowerer::lower(

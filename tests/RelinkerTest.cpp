@@ -322,7 +322,7 @@ int main(int argc, char** argv)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 17]) << 8)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 18]) << 16)
             | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 19]) << 24);
-        if (entry_rva < 0x1000 || entry_rva >= 0x3000) {
+        if (entry_rva < 0x1000) {
             throw std::runtime_error("Windows PE output has invalid entry RVA");
         }
         const std::uint32_t number_of_rva =
@@ -333,18 +333,10 @@ int main(int argc, char** argv)
         if (number_of_rva != 16) {
             throw std::runtime_error("Windows PE output has invalid RVA directory count");
         }
-        const std::uint32_t import_directory =
-            static_cast<std::uint32_t>(pe_bytes[optional_offset + 120])
-            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 121]) << 8)
-            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 122]) << 16)
-            | (static_cast<std::uint32_t>(pe_bytes[optional_offset + 123]) << 24);
-        if (import_directory == 0) {
-            throw std::runtime_error("Windows PE output has invalid import directory");
-        }
         const std::uint16_t section_count =
             static_cast<std::uint16_t>(pe_bytes[pe_offset + 6])
             | (static_cast<std::uint16_t>(pe_bytes[pe_offset + 7]) << 8);
-        if (section_count != 4 && section_count != 5) {
+        if (section_count < 2 || section_count > 32) {
             throw std::runtime_error("Windows PE output has invalid section count");
         }
 

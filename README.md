@@ -27,6 +27,14 @@ artifacts automatically.
 
 ## Relinking
 
+### Reproducible toolchain
+
+The repository provides a pinned Clang 18 + LLD 18 development container for
+Linux builds in `.devcontainer/`. Open the repository in the Dev Container or
+use the Dockerfile directly. LLVM compiler and linker binaries are not vendored
+as Git submodules because platform-specific binaries would make the repository
+architecture-dependent.
+
 ### Building the relinker
 
 Clone the repository with all dependencies, or initialize every submodule in an
@@ -40,13 +48,25 @@ git submodule update --init --recursive
 Configure and build the project with CMake and Ninja:
 
 ```sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+cmake --preset linux-clang-lld -DCMAKE_BUILD_TYPE=Release
+cmake --build --preset linux-clang-lld --parallel
 ```
 
-On Windows, open a Visual Studio Developer Command Prompt and run the same
-commands. CMake builds `anyps1.exe` for the Windows target and the test binaries
-under `build/tests`.
+AnyPS1 requires Clang and LLD for both builds:
+
+- Linux: Clang, `clang++`, `ld.lld`, `llvm-ar`, and `llvm-ranlib`.
+- Windows: clang-cl with `lld-link`.
+
+On Windows, open a Visual Studio Developer Command Prompt for the Windows SDK
+and MSVC libraries, then configure with:
+
+```sh
+cmake --preset windows-clang-lld -DCMAKE_BUILD_TYPE=Release
+cmake --build --preset windows-clang-lld --parallel
+```
+
+CMake builds `anyps1.exe` for the Windows target and the test binaries under
+`build/tests`.
 
 Prepare an extracted disc in this layout:
 
@@ -108,8 +128,8 @@ or emulating the PS1 executable.
 ## Testing
 
 ```sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+cmake --preset linux-clang-lld -DCMAKE_BUILD_TYPE=Release
+cmake --build --preset linux-clang-lld --parallel
 ctest --test-dir build --output-on-failure
 ```
 

@@ -3,6 +3,21 @@ cmake_minimum_required(VERSION 3.20)
 project(AnyPS1 LANGUAGES CXX)
 include(GNUInstallDirs)
 
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang|MSVC")
+    message(FATAL_ERROR
+        "AnyPS1 requires Clang. Configure with cmake/toolchains/linux-clang-lld.cmake "
+        "or cmake/toolchains/windows-clang-lld.cmake.")
+endif()
+
+if(WIN32)
+    find_program(ANYPS1_LINKER lld-link REQUIRED)
+else()
+    find_program(ANYPS1_ASSEMBLER clang REQUIRED)
+    find_program(ANYPS1_LINKER ld.lld REQUIRED)
+    find_program(ANYPS1_ARCHIVER llvm-ar REQUIRED)
+    find_program(ANYPS1_RANLIB llvm-ranlib REQUIRED)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

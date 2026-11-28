@@ -69,26 +69,16 @@ class LoweringInventoryTest(unittest.TestCase):
                 linux,
                 f"Linux MIPS lowerer does not contain {name}",
             )
-            self.assertIn(
-                pattern[1],
-                windows,
-                f"Windows MIPS lowerer does not contain {name}",
-            )
+        self.assertIn(
+            "NativeLoweringIr",
+            windows,
+            "Windows MIPS lowering does not use the shared native lowering IR",
+        )
 
-        for pattern in (
-            "resolve_static_indirect_target",
-            "call_edges=",
-            "unresolved_indirect_transfers=",
-        ):
-            self.assertIn(
-                pattern,
-                windows,
-                f"Windows lowerer is missing host/CFG parity feature {pattern}",
-            )
-        self.assertEqual(
-            windows.count('source << "indirect_jump PROC\\n";'),
-            1,
-            "Windows indirect dispatch must use one shared leader table",
+        self.assertIn(
+            "write_pe_ir",
+            windows,
+            "Windows lowering must emit through the shared LLD PE backend",
         )
         self.assertNotIn(
             "for (std::uint32_t target : leaders)",

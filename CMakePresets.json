@@ -1,0 +1,53 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "linux-clang-lld",
+      "displayName": "Linux Clang + LLD",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/linux-clang-lld.cmake",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ANYPS1_STRICT_WARNINGS": "ON"
+      }
+    },
+    {
+      "name": "windows-clang-lld",
+      "displayName": "Windows Clang + LLD",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/windows-clang-lld.cmake",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ANYPS1_STRICT_WARNINGS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "linux-clang-lld",
+      "configurePreset": "linux-clang-lld"
+    },
+    {
+      "name": "windows-clang-lld",
+      "configurePreset": "windows-clang-lld"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-clang-lld",
+      "configurePreset": "linux-clang-lld",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows-clang-lld",
+      "configurePreset": "windows-clang-lld",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

@@ -70,7 +70,7 @@
 - [x] Generate ELF64 x86-64 executables with a native `_start` entrypoint.
 - [x] Emit valid ELF entry, program-header, section-header, text, rodata,
   and BSS metadata.
-- [x] Link with `gcc -nostdlib -no-pie`, including host SDL3/C++ runtime
+- [x] Link Linux generated executables with Clang + `ld.lld`, including host SDL3/C++ runtime
   dependencies required by generated executable host-loop calls.
 - [x] Add no-exec-stack, RELRO, now, notext, and build-ID linker options.
 - [x] Validate ELF signature, ELF64 class, little-endian encoding, x86-64
@@ -180,7 +180,8 @@
 - [x] Add `objdump`/`llvm-readobj` format-inspector support.
 - [x] Add a shared semantic parity fixture that executes on Linux and Windows.
 - [x] Use explicit Windows lowering diagnostics rather than silent success.
-- [x] Implement native Windows MIPS lowering equivalent to Linux lowering.
+- [x] Replace the Windows manual PE layout and MASM/link.exe path with the
+  shared native lowering IR and Clang/LLD backend.
 - [x] Generate imports and relocations for real Windows host-native code.
 - [x] Document PE32 support as optional: no PE32-only x86 compatibility target
   is required because the native backend emits AMD64 PE32+.
