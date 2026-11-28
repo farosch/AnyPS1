@@ -315,6 +315,8 @@
   source storage; keep native executable emission chunk-oriented.
 - [x] Lower real BREAK instructions as continuation traps and add exact
   BREAK/reserved-SPECIAL fixtures for Linux and Windows.
+- [x] Implement generic A0/B0/C0 BIOS JR dispatch with address+8 return
+  semantics and cross-target fixtures.
 - [x] Implement A0/B0/C0 BIOS JR dispatch with address+8 continuation
   and a checked-in Windows/ELF fixture.
 - [x] Implement A0/B0/C0 BIOS JR dispatch with address+8 return semantics
