@@ -35,6 +35,11 @@ int main()
         if (init_heap_call.kind != anyps1::Ps1BiosCallKind::InitHeap) {
             throw std::runtime_error("A0 InitHeap BIOS call mapping failed");
         }
+        const anyps1::Ps1BiosCallPlan set_mem_size =
+            anyps1::map_ps1_bios_call(0xA0u, 0x9Fu);
+        if (set_mem_size.kind != anyps1::Ps1BiosCallKind::A0SetMemSize) {
+            throw std::runtime_error("A0 SetMemSize BIOS call mapping failed");
+        }
         const anyps1::Ps1BiosCallPlan stop_card_call =
             anyps1::map_ps1_bios_call(0xB0u, 0x35u);
         if (stop_card_call.kind != anyps1::Ps1BiosCallKind::B0StopCard) {
@@ -264,6 +269,12 @@ int main()
             }
             if (runtime.gpu_write(0x1F801810u, 0x20FFFFFFu) != 0) {
                 throw std::runtime_error("GPU GP0 command did not reach VRAM state");
+            }
+            if (runtime.gpu_command_count() != 1u ||
+                runtime.gpu_vram_write_count() != 0u ||
+                runtime.spu_write_count() != 1u) {
+                throw std::runtime_error(
+                    "GPU/SPU media activity counters did not progress");
             }
             if (runtime.mmio_write(0x1F801800u, 0u) != 0 ||
                 runtime.mmio_write(0x1F801801u, 0x01u) != 0 ||

@@ -543,12 +543,17 @@ void MipsLinuxLowerer::lower(
     source << "cmpl $" << init_heap_call.function << ", 36(%r12)\n";
     source << "je bios_a0_init_heap\n";
     source << "cmpl $0x70, 36(%r12)\n";
+    source << "cmpl $0x9F, 36(%r12)\n";
     source << "jne unsupported_bios_exit\n";
     source << "movl $0, 8(%r12)\n";
     source << "jmp bios_a0_return\n";
     source << "bios_a0_init_heap:\n";
     source << "movl $0, 8(%r12)\n";
     source << "bios_a0_return:\n";
+    source << "movl 124(%r12), %eax\n";
+    source << "jmp indirect_jump\n";
+    source << "bios_a0_init_heap:\n";
+    source << "movl $0, 8(%r12)\n";
     source << "movl 124(%r12), %eax\n";
     source << "jmp indirect_jump\n";
     source << "bios_b0_c0_dispatch:\n";
@@ -1771,10 +1776,46 @@ void MipsLinuxLowerer::lower(
                 source << "ret\n";
             } else {
                 source << "movl " << rs * 4 << "(%r12), %eax\n";
+                source << "pushq %rax\n";
+                if (address + 4u >= load_address &&
+                    address + 4u < load_address + file_size) {
+                    const std::uint32_t delay_offset =
+                        address + 4u - load_address;
+                    if (delay_offset + 4u <= file_size) {
+                        const std::uint32_t delay_instruction =
+                            read_psx32(data, PSX_HEADER_SIZE + delay_offset);
+                        if (emitted_addresses.insert(address + 4u).second) {
+                            source << ".globl p" << std::hex << address + 4u
+                                   << std::dec << "\n";
+                            source << "p" << std::hex << address + 4u
+                                   << std::dec << ": \n";
+                            emit_normal(address + 4u, delay_instruction);
+                        }
+                    }
+                }
+                source << "popq %rax\n";
                 source << "jmp indirect_jump\n";
             }
         } else if (jalr) {
             source << "movl " << rs * 4 << "(%r12), %eax\n";
+            source << "pushq %rax\n";
+            if (address + 4u >= load_address &&
+                address + 4u < load_address + file_size) {
+                const std::uint32_t delay_offset =
+                    address + 4u - load_address;
+                if (delay_offset + 4u <= file_size) {
+                    const std::uint32_t delay_instruction =
+                        read_psx32(data, PSX_HEADER_SIZE + delay_offset);
+                    if (emitted_addresses.insert(address + 4u).second) {
+                        source << ".globl p" << std::hex << address + 4u
+                               << std::dec << "\n";
+                        source << "p" << std::hex << address + 4u
+                               << std::dec << ": \n";
+                        emit_normal(address + 4u, delay_instruction);
+                    }
+                }
+            }
+            source << "popq %rax\n";
             source << "movl $" << address + 8 << ", " << rd * 4 << "(%r12)\n";
             const std::uint32_t resolved_target =
                 resolve_static_indirect_target(

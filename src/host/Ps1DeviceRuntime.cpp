@@ -134,9 +134,50 @@ void Ps1DeviceRuntime::execute_controller_transfer()
 
 void Ps1DeviceRuntime::execute_gpu_command(std::uint32_t word)
 {
+    ++gpu_command_count;
+    if (gpu_transfer_phase != 0u) {
+        if (gpu_transfer_phase == 1u) {
+            gpu_transfer_x = word & 0xFFFFu;
+            gpu_transfer_y = (word >> 16u) & 0xFFFFu;
+            gpu_transfer_phase = 2u;
+            return;
+        }
+        if (gpu_transfer_phase == 2u) {
+            gpu_transfer_width = word & 0xFFFFu;
+            gpu_transfer_height = (word >> 16u) & 0xFFFFu;
+            gpu_transfer_remaining =
+                gpu_transfer_width * gpu_transfer_height;
+            gpu_transfer_offset = 0u;
+            gpu_transfer_phase =
+                gpu_transfer_remaining == 0u ? 0u : 3u;
+            return;
+        }
+        if (gpu_transfer_phase == 3u) {
+            for (std::uint32_t half = 0u; half < 2u && gpu_transfer_remaining != 0u; ++half) {
+                const std::uint32_t texel =
+                    (word >> (half * 16u)) & 0xFFFFu;
+                const std::uint32_t row =
+                    gpu_transfer_offset / gpu_transfer_width;
+                const std::uint32_t column =
+                    gpu_transfer_offset % gpu_transfer_width;
+                const std::uint32_t index =
+                    (gpu_transfer_y + row) * GPU_VRAM_WIDTH +
+                    gpu_transfer_x + column;
+                if (index < GPU_VRAM_WORDS) gpu_vram[index] =
+                    static_cast<std::uint16_t>(texel);
+                ++gpu_vram_write_count;
+                --gpu_transfer_remaining;
+                ++gpu_transfer_offset;
+            }
+            if (gpu_transfer_remaining == 0u) gpu_transfer_phase = 0u;
+            return;
+        }
+    }
     const std::uint32_t command = word >> 24;
     if (command == 0x00u || command == 0x01u) {
         gpu_status = 0x14802000u;
+    } else if (command == 0xA0u) {
+        gpu_transfer_phase = 1u;
     } else if (command == 0xE6u) {
         gpu_status |= 1u << 26;
     } else if (command >= 0x20u && command <= 0x7Fu) {
@@ -147,6 +188,7 @@ void Ps1DeviceRuntime::execute_gpu_command(std::uint32_t word)
 void Ps1DeviceRuntime::execute_dma_channel(std::uint32_t channel)
 {
     if (ram == nullptr || channel > 6u) return;
+    ++gpu_dma_count;
     const std::uint32_t base = 0x1F801080u + channel * 0x10u;
     std::uint32_t control = register_at(base + 8u);
     if ((control & 0x01000000u) == 0) return;
@@ -250,6 +292,7 @@ std::uint32_t Ps1DeviceRuntime::read(std::uint32_t address)
     }
     if (normalized >= 0x1F801C00u &&
         normalized < 0x1F801C00u + SPU_WORDS * 2u) {
+        ++spu_write_count;
         return spu[(normalized - 0x1F801C00u) / 2u];
     }
     if (normalized == 0x1F801040u) {
@@ -432,6 +475,31 @@ void Ps1DeviceRuntime::set_cd_sector_data(
 std::uint32_t Ps1DeviceRuntime::get_cd_lba() const
 {
     return cd_lba;
+}
+
+const std::uint16_t* Ps1DeviceRuntime::gpu_vram_data() const
+{
+    return gpu_vram;
+}
+
+std::uint32_t Ps1DeviceRuntime::gpu_vram_write_count_value() const
+{
+    return gpu_vram_write_count;
+}
+
+std::uint32_t Ps1DeviceRuntime::gpu_command_count_value() const
+{
+    return gpu_command_count;
+}
+
+std::uint32_t Ps1DeviceRuntime::gpu_dma_count_value() const
+{
+    return gpu_dma_count;
+}
+
+std::uint32_t Ps1DeviceRuntime::spu_write_count_value() const
+{
+    return spu_write_count;
 }
 
 

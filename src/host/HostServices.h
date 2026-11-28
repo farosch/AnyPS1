@@ -65,6 +65,7 @@ Ps1FileCallPlan map_ps1_file_call(std::uint32_t vector);
 enum class Ps1BiosCallKind {
     Unsupported,
     InitHeap,
+    A0SetMemSize,
     B0Alloc,
     B0Free,
     B0InitHeap,
@@ -301,6 +302,10 @@ public:
     std::uint32_t presented_frame_count() const;
     std::uint32_t vblank_count() const;
     std::uint64_t queued_audio_samples() const;
+    std::uint32_t gpu_command_count() const;
+    std::uint32_t gpu_dma_count() const;
+    std::uint32_t gpu_vram_write_count() const;
+    std::uint32_t spu_write_count() const;
     int vulkan_init(
         const std::string& title,
         std::uint32_t width,
@@ -342,6 +347,10 @@ std::uint32_t anyps1_host_loop_frame_count();
 std::uint32_t anyps1_host_loop_presented_frame_count();
 std::uint32_t anyps1_host_loop_vblank_count();
 std::uint64_t anyps1_host_loop_queued_audio_samples();
+std::uint32_t anyps1_host_loop_gpu_command_count();
+std::uint32_t anyps1_host_loop_gpu_dma_count();
+std::uint32_t anyps1_host_loop_gpu_vram_write_count();
+std::uint32_t anyps1_host_loop_spu_write_count();
 int anyps1_host_loop_memory_card_open(
     int slot,
     const char* path);

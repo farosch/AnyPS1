@@ -39,6 +39,7 @@ add_test(NAME relinker_native_reserved_special_2d COMMAND anyps1_relinker_test $
 add_test(NAME relinker_native_break_continuation COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-break-continuation.ps-exe)
 add_test(NAME relinker_native_bios_vector COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-vector.ps-exe)
 add_test(NAME relinker_native_bios_jr_a0 COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-jr-a0.ps-exe)
+add_test(NAME relinker_native_bios_set_mem_size COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-set-mem-size.ps-exe)
 add_test(NAME relinker_native_startup_loop COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-startup-loop.ps-exe)
 add_test(NAME relinker_native_bios_init_heap COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-init-heap.ps-exe)
 add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-load-delay.ps-exe)
@@ -67,6 +68,7 @@ set_tests_properties(
     relinker_native_reserved_special_2d
     relinker_native_bios_vector
     relinker_native_bios_jr_a0
+    relinker_native_bios_set_mem_size
     relinker_native_startup_loop
     relinker_native_bios_init_heap
     relinker_native_load_delay
@@ -186,6 +188,10 @@ add_test(NAME pe_bios_jr_a0
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-bios-jr-a0.ps-exe)
+add_test(NAME pe_bios_set_mem_size
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-bios-set-mem-size.ps-exe)
 add_test(NAME pe_startup_loop
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>

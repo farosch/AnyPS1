@@ -8,6 +8,10 @@ namespace anyps1 {
 struct Ps1DeviceRuntime {
     static constexpr std::size_t MMIO_WORDS = 0x800u;
     static constexpr std::size_t SPU_WORDS = 0xC0u;
+    static constexpr std::size_t GPU_VRAM_WIDTH = 1024u;
+    static constexpr std::size_t GPU_VRAM_HEIGHT = 512u;
+    static constexpr std::size_t GPU_VRAM_WORDS =
+        GPU_VRAM_WIDTH * GPU_VRAM_HEIGHT;
 
     std::uint32_t mmio[MMIO_WORDS]{};
     std::uint16_t spu[SPU_WORDS]{};
@@ -21,6 +25,7 @@ struct Ps1DeviceRuntime {
     std::uint32_t interrupt_mask = 0;
     std::uint32_t controller_buttons = 0xFFFFu;
     std::uint32_t gpu_status = 0x14802000u;
+    std::uint16_t gpu_vram[GPU_VRAM_WORDS]{};
     std::uint32_t* ram = nullptr;
     std::uint32_t ram_word_count = 0x80000u;
     std::uint32_t cd_lba = 0;
@@ -38,6 +43,20 @@ struct Ps1DeviceRuntime {
     std::uint8_t cd_sector_data[2048]{};
     std::size_t cd_sector_data_count = 0;
     std::size_t cd_sector_data_read = 0;
+    std::uint32_t gpu_command_count = 0;
+    std::uint32_t gpu_dma_count = 0;
+    std::uint32_t gpu_vram_write_count = 0;
+    std::uint32_t spu_write_count = 0;
+    std::uint32_t gpu_transfer_phase = 0;
+    std::uint32_t gpu_transfer_x = 0;
+    std::uint32_t gpu_transfer_y = 0;
+    std::uint32_t gpu_transfer_width = 0;
+    std::uint32_t gpu_transfer_height = 0;
+    std::uint32_t gpu_transfer_remaining = 0;
+    std::uint32_t gpu_transfer_offset = 0;
+    std::uint32_t gpu_draw_phase = 0;
+    std::uint32_t gpu_draw_color = 0;
+    std::uint32_t gpu_draw_payload[8]{};
 
     void attach_ram(
         std::uint32_t* ram,
@@ -51,6 +70,11 @@ struct Ps1DeviceRuntime {
         const std::uint8_t* data,
         std::size_t size);
     std::uint32_t get_cd_lba() const;
+    const std::uint16_t* gpu_vram_data() const;
+    std::uint32_t gpu_vram_write_count_value() const;
+    std::uint32_t gpu_command_count_value() const;
+    std::uint32_t gpu_dma_count_value() const;
+    std::uint32_t spu_write_count_value() const;
 
 private:
     std::uint32_t& register_at(std::uint32_t address);

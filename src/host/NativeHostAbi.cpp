@@ -148,6 +148,34 @@ std::uint64_t anyps1_host_loop_queued_audio_samples()
         : native_host_loop->queued_audio_samples();
 }
 
+std::uint32_t anyps1_host_loop_gpu_command_count()
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->gpu_command_count();
+}
+
+std::uint32_t anyps1_host_loop_gpu_dma_count()
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->gpu_dma_count();
+}
+
+std::uint32_t anyps1_host_loop_gpu_vram_write_count()
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->gpu_vram_write_count();
+}
+
+std::uint32_t anyps1_host_loop_spu_write_count()
+{
+    return native_host_loop == nullptr
+        ? 0u
+        : native_host_loop->spu_write_count();
+}
+
 int anyps1_host_loop_vulkan_init(
     const char* title,
     std::uint32_t width,

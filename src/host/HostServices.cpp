@@ -86,6 +86,9 @@ Ps1BiosCallPlan map_ps1_bios_call(
     if (vector_id == 0xA0u && function == 0x39u) {
         return {Ps1BiosCallKind::InitHeap, vector, function};
     }
+    if (vector_id == 0xA0u && function == 0x9Fu) {
+        return {Ps1BiosCallKind::A0SetMemSize, vector, function};
+    }
     if (vector_id == 0xB0u) {
         switch (function) {
         case 0x00u: return {Ps1BiosCallKind::B0Alloc, vector, function};
@@ -628,6 +631,12 @@ bool NativeHostLoopRuntime::initialize(
     impl_->gpu_vram.assign(1024u * 512u, 0u);
     impl_->initialized = true;
     impl_->last_frame_time = std::chrono::steady_clock::now();
+    std::string presentation_error;
+    (void)impl_->host.present_framebuffer(
+        impl_->gpu_vram.data(),
+        1024u,
+        512u,
+        presentation_error);
     error.clear();
     return true;
 }
@@ -656,6 +665,15 @@ bool NativeHostLoopRuntime::poll(Ps1InputState& input, std::string& error)
     }
     if (!impl_->input.poll(input, error)) return false;
     impl_->input_state = input;
+    const std::uint16_t* gpu_vram = impl_->devices.gpu_vram_data();
+    for (std::size_t index = 0u; index < impl_->gpu_vram.size(); ++index) {
+        const std::uint16_t texel = gpu_vram[index];
+        const std::uint32_t red = ((texel & 31u) * 255u + 15u) / 31u;
+        const std::uint32_t green = (((texel >> 5u) & 31u) * 255u + 15u) / 31u;
+        const std::uint32_t blue = (((texel >> 10u) & 31u) * 255u + 15u) / 31u;
+        impl_->gpu_vram[index] =
+            (0xFFu << 24u) | (blue << 16u) | (green << 8u) | red;
+    }
     const auto now = std::chrono::steady_clock::now();
     const auto elapsed =
         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -912,6 +930,45 @@ int NativeHostLoopRuntime::tick(std::uint32_t cycles)
     impl_->devices.set_controller_state(
         static_cast<std::uint32_t>(impl_->input_state.buttons));
     impl_->devices.tick(cycles);
+    const std::uint16_t* gpu_vram = impl_->devices.gpu_vram_data();
+    for (std::size_t index = 0u;
+         index < impl_->gpu_vram.size();
+         ++index) {
+        const std::uint16_t texel = gpu_vram[index];
+        const std::uint32_t red =
+            ((texel & 31u) * 255u + 15u) / 31u;
+        const std::uint32_t green =
+            (((texel >> 5u) & 31u) * 255u + 15u) / 31u;
+        const std::uint32_t blue =
+            (((texel >> 10u) & 31u) * 255u + 15u) / 31u;
+        impl_->gpu_vram[index] =
+            (0xFFu << 24u) |
+            (blue << 16u) |
+            (green << 8u) |
+            red;
+    }
+    if (impl_->headless) {
+        ++impl_->frame_count;
+        ++impl_->presented_frames;
+    } else {
+        std::string host_error;
+        if (!impl_->host.poll_events(host_error)) return 18;
+        Ps1InputState input;
+        if (!impl_->input.poll(input, host_error)) return 18;
+        impl_->input_state = input;
+        impl_->devices.set_controller_state(
+            static_cast<std::uint32_t>(impl_->input_state.buttons));
+        std::string presentation_error;
+        if (!impl_->host.present_framebuffer(
+                impl_->gpu_vram.data(),
+                1024u,
+                512u,
+                presentation_error)) {
+            return 18;
+        }
+        ++impl_->frame_count;
+        ++impl_->presented_frames;
+    }
     if (impl_->disc.is_open()) {
         std::uint32_t lba = impl_->devices.get_cd_lba();
         std::uint8_t sector[2048]{};
@@ -942,6 +999,26 @@ std::uint32_t NativeHostLoopRuntime::vblank_count() const
 std::uint64_t NativeHostLoopRuntime::queued_audio_samples() const
 {
     return impl_->queued_audio_samples;
+}
+
+std::uint32_t NativeHostLoopRuntime::gpu_command_count() const
+{
+    return impl_->devices.gpu_command_count_value();
+}
+
+std::uint32_t NativeHostLoopRuntime::gpu_dma_count() const
+{
+    return impl_->devices.gpu_dma_count_value();
+}
+
+std::uint32_t NativeHostLoopRuntime::gpu_vram_write_count() const
+{
+    return impl_->devices.gpu_vram_write_count_value();
+}
+
+std::uint32_t NativeHostLoopRuntime::spu_write_count() const
+{
+    return impl_->devices.spu_write_count_value();
 }
 
 int NativeHostLoopRuntime::vulkan_init(
