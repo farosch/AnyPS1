@@ -25,6 +25,307 @@ namespace anyps1 {
 
 namespace {
 
+bool is_leader_line(const std::string& line)
+{
+    if (line.size() < 3u ||
+        line[0] != 'p') return false;
+    if (line.find(':') != line.size() - 1u) return false;
+    for (std::size_t index = 1u; index + 1u < line.size(); ++index) {
+        const char character = line[index];
+        if (!((character >= '0' && character <= '9') ||
+              (character >= 'a' && character <= 'f') ||
+              (character >= 'A' && character <= 'F'))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool is_shared_runtime_symbol(const std::string& line)
+{
+    static const char* symbols[] = {
+        "regs:", "ram:", "scratchpad:", "cop0:", "cop3_data:",
+        "mmio_state:", "gte_data:", "gte_ctrl:", "fregs:", "fpcsr:",
+        "pending_load_valid:", "pending_load_register:",
+        "pending_load_value:", "previous_load_valid:",
+        "previous_load_register:", "previous_load_value:",
+        "host_frame_counter:",
+        "overflow_exit:", "divide_zero_exit:", "memory_fault_exit:",
+        "mmio_exit:", "unsupported_jump_exit:",
+        "unsupported_bios_exit:", "unsupported_instruction_exit:",
+        "host_runtime_exit:", "host_shutdown_exit:",
+        "indirect_jump:", "print_diag:",
+        "native_completion_exit:"
+    };
+    for (const char* symbol : symbols) {
+        if (line == symbol) return true;
+    }
+    if (line.size() > 12u &&
+        line.compare(0u, 11u, "unsupported") == 0 &&
+        line.back() == ':') {
+        return true;
+    }
+    if (line.size() > 2u && line.front() == 'p' &&
+        line.back() == ':' &&
+        is_leader_line(line)) {
+        return true;
+    }
+    return false;
+}
+
+void replace_unresolved_leader_targets(
+    std::string& line,
+    const std::set<std::string>& leader_labels)
+{
+    const std::string::size_type stub_position =
+        line.find("unsupported_");
+    if (stub_position != std::string::npos &&
+        line.find("_stub", stub_position) != std::string::npos) {
+        const std::string::size_type stub_end =
+            line.find_first_of(" \t\r\n", stub_position);
+        if (stub_end != std::string::npos) {
+            line.replace(
+                stub_position,
+                stub_end - stub_position,
+                "unsupported_instruction_exit");
+        } else {
+            line.replace(
+                stub_position,
+                line.size() - stub_position,
+                "unsupported_instruction_exit");
+        }
+    }
+    for (std::size_t position = 0;
+         position < line.size();
+         ) {
+        if (line[position] != 'p') {
+            ++position;
+            continue;
+        }
+        if (position + 9u > line.size()) break;
+        bool hexadecimal = true;
+        for (std::size_t index = position + 1u;
+             index < position + 9u;
+             ++index) {
+            const char character = line[index];
+            if (!((character >= '0' && character <= '9') ||
+                  (character >= 'a' && character <= 'f') ||
+                  (character >= 'A' && character <= 'F'))) {
+                hexadecimal = false;
+                break;
+            }
+        }
+        if (!hexadecimal) {
+            ++position;
+            continue;
+        }
+        const std::string label =
+            line.substr(position, 9u);
+        if (leader_labels.find(label) == leader_labels.end()) {
+            line.replace(position, 9u,
+                         "unsupported_jump_exit");
+            position += 22u;
+        } else {
+            position += 9u;
+        }
+    }
+}
+
+void split_leader_assembly(
+    const std::filesystem::path& assembly,
+    const std::filesystem::path& output,
+    std::vector<std::filesystem::path>& chunk_assemblies,
+    const std::set<std::string>& unsupported_family_names)
+{
+    std::ifstream input(assembly);
+    if (!input) {
+        throw std::runtime_error(
+            "cannot open Linux lowering assembly for chunking");
+    }
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(input, line)) lines.push_back(line);
+
+    std::size_t leader_start = lines.size();
+    std::size_t leader_end = lines.size();
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        if (is_leader_line(lines[index])) {
+            leader_start = index;
+            break;
+        }
+    }
+    for (std::size_t index = leader_start;
+         index < lines.size();
+         ++index) {
+        if (lines[index].find("leaq diag_completed") !=
+            std::string::npos) {
+            leader_end = index;
+            break;
+        }
+    }
+    std::set<std::string> leader_labels;
+    std::set<std::string> unsupported_stub_names;
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        if (is_leader_line(lines[index])) {
+            leader_labels.insert(lines[index].substr(
+                0u, lines[index].size() - 1u));
+        }
+    }
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        const std::string::size_type jmp_position =
+            lines[index].find("jmp unsupported_");
+        if (jmp_position != std::string::npos) {
+            std::string stub =
+                lines[index].substr(jmp_position + 4u);
+            const std::string::size_type stub_end =
+                stub.find_first_of(" \t");
+            if (stub_end != std::string::npos) {
+                stub.resize(stub_end);
+            }
+            if (!stub.empty()) {
+                if (!is_shared_runtime_symbol(stub + ":")) {
+                    unsupported_stub_names.insert(stub);
+                }
+            }
+        }
+        replace_unresolved_leader_targets(
+            lines[index], leader_labels);
+    }
+    if (leader_start == lines.size() ||
+        leader_end == lines.size()) {
+        chunk_assemblies.push_back(assembly);
+        return;
+    }
+
+    std::ofstream base(assembly, std::ios::trunc);
+    if (!base) {
+        throw std::runtime_error(
+            "cannot rewrite Linux lowering assembly chunk");
+    }
+    for (std::size_t index = 0; index < leader_start; ++index) {
+        if (is_shared_runtime_symbol(lines[index])) {
+            base << ".globl " << lines[index].substr(
+                0u, lines[index].size() - 1u) << "\n";
+        }
+        base << lines[index] << "\n";
+    }
+    for (std::size_t index = leader_start; index < leader_end; ++index) {
+        if (lines[index].size() > 12u &&
+            lines[index].compare(0u, 11u, "unsupported") == 0 &&
+            lines[index].back() == ':') {
+            base << ".globl " << lines[index].substr(
+                0u, lines[index].size() - 1u) << "\n";
+            base << lines[index] << "\n";
+            if (index + 1u < leader_end) {
+                base << lines[index + 1u] << "\n";
+            }
+        }
+    }
+    for (std::size_t index = leader_end; index < lines.size(); ++index) {
+        if (index == leader_end) {
+            base << ".globl native_completion_exit\n";
+            base << "native_completion_exit:\n";
+        }
+        base << lines[index] << "\n";
+    }
+    for (const std::string& stub_name : unsupported_stub_names) {
+        base << ".globl " << stub_name << "\n";
+        base << stub_name << ":\n";
+        base << "jmp unsupported_instruction_exit\n";
+    }
+    for (const std::string& family : unsupported_family_names) {
+        const std::string stub_name =
+            instruction_family_source_name(family);
+        if (unsupported_stub_names.find(stub_name) ==
+            unsupported_stub_names.end()) {
+            base << ".globl " << stub_name << "\n";
+            base << stub_name << ":\n";
+            base << "jmp unsupported_instruction_exit\n";
+        }
+    }
+    base.close();
+
+    std::size_t leader_count = 0;
+    std::vector<std::string> chunk_lines;
+    std::size_t chunk_index = 0;
+    std::string last_leader_address;
+    for (std::size_t index = leader_start; index < leader_end;) {
+        if (!is_leader_line(lines[index])) {
+            ++index;
+            continue;
+        }
+        if (!chunk_lines.empty() &&
+            leader_count >= 512u) {
+            if (!last_leader_address.empty()) {
+                if (index < leader_end && is_leader_line(lines[index])) {
+                    const std::string next_address =
+                        lines[index].substr(0u, lines[index].size() - 1u);
+                    chunk_lines.push_back(
+                        "jmp " + next_address);
+                } else {
+                    chunk_lines.push_back(
+                        "jmp native_completion_exit");
+                }
+            }
+            const std::filesystem::path chunk =
+                std::filesystem::path(
+                    output.string() + ".chunk." +
+                    std::to_string(chunk_index++) + ".s");
+            std::ofstream chunk_output(chunk, std::ios::trunc);
+            if (!chunk_output) {
+                throw std::runtime_error(
+                    "cannot create Linux lowering assembly chunk");
+            }
+            chunk_output << ".text\n";
+            chunk_output << ".globl native_completion_exit\n";
+            for (const std::string& chunk_line : chunk_lines) {
+                chunk_output << chunk_line << "\n";
+            }
+            chunk_output.close();
+            chunk_assemblies.push_back(chunk);
+            chunk_lines.clear();
+            leader_count = 0u;
+        }
+        const std::size_t block_start = index;
+        std::size_t block_end = index + 1u;
+        while (block_end < leader_end &&
+               !is_leader_line(lines[block_end])) {
+            ++block_end;
+        }
+        chunk_lines.push_back(".globl " + lines[index].substr(
+            0u, lines[index].size() - 1u));
+        for (std::size_t block_index = block_start;
+             block_index < block_end;
+             ++block_index) {
+            chunk_lines.push_back(lines[block_index]);
+        }
+        last_leader_address =
+            lines[block_start].substr(
+                0u, lines[block_start].size() - 1u);
+        ++leader_count;
+        index = block_end;
+    }
+    if (!chunk_lines.empty()) {
+        chunk_lines.push_back("jmp native_completion_exit");
+        const std::filesystem::path chunk =
+            std::filesystem::path(
+                output.string() + ".chunk." +
+                std::to_string(chunk_index) + ".s");
+        std::ofstream chunk_output(chunk, std::ios::trunc);
+        if (!chunk_output) {
+            throw std::runtime_error(
+                "cannot create Linux lowering assembly chunk");
+        }
+        chunk_output << ".text\n";
+        chunk_output << ".globl native_completion_exit\n";
+        for (const std::string& chunk_line : chunk_lines) {
+            chunk_output << chunk_line << "\n";
+        }
+        chunk_output.close();
+        chunk_assemblies.push_back(chunk);
+    }
+}
+
 }
 
 void MipsLinuxLowerer::lower(
@@ -59,15 +360,6 @@ void MipsLinuxLowerer::lower(
     const bool native_host_loop_required = plan.native_host_loop_required;
 
     const std::filesystem::path assembly = std::filesystem::path(options.output + ".native.s");
-    std::vector<std::filesystem::path> assembly_chunks;
-    for (std::size_t chunk_index = 0;
-         chunk_index < plan.leader_chunks.size();
-         ++chunk_index) {
-        assembly_chunks.push_back(
-            std::filesystem::path(
-                options.output + ".native." +
-                std::to_string(chunk_index) + ".s"));
-    }
     const std::filesystem::path payload = std::filesystem::path(options.output + ".native.bin");
     {
         std::ofstream output(payload, std::ios::binary | std::ios::trunc);
@@ -1469,7 +1761,35 @@ void MipsLinuxLowerer::lower(
 
     source.flush();
     source.close();
-    ElfWriter::write(assembly, options.output);
+    std::vector<std::filesystem::path> assembly_chunks;
+    split_leader_assembly(
+        assembly,
+        std::filesystem::path(options.output),
+        assembly_chunks,
+        unsupported_family_names);
+    assembly_chunks.insert(assembly_chunks.begin(), assembly);
+    ElfWriter::write(assembly_chunks, options.output);
+    bool keep_assembly = false;
+#ifdef _WIN32
+    char* keep_environment = nullptr;
+    size_t keep_environment_length = 0;
+    if (_dupenv_s(&keep_environment,
+                  &keep_environment_length,
+                  "ANYPS1_KEEP_ASSEMBLY") == 0 &&
+        keep_environment != nullptr) {
+        keep_assembly = true;
+        std::free(keep_environment);
+    }
+#else
+    keep_assembly = std::getenv("ANYPS1_KEEP_ASSEMBLY") != nullptr;
+#endif
+    if (!keep_assembly) {
+        for (std::size_t index = 1u;
+             index < assembly_chunks.size();
+             ++index) {
+            std::filesystem::remove(assembly_chunks[index]);
+        }
+    }
     std::filesystem::remove(payload);
 }
 

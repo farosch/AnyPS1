@@ -221,6 +221,36 @@ void write_pe_ir(
             "native Windows lowering LLD link failed");
     }
 #else
+    const std::filesystem::path kernel32_def =
+        std::filesystem::path(options.output + ".kernel32.def");
+    const std::filesystem::path kernel32_import =
+        std::filesystem::path(options.output + ".kernel32.lib");
+    {
+        std::ofstream def_output(kernel32_def, std::ios::trunc);
+        if (!def_output) {
+            throw std::runtime_error(
+                "cannot create kernel32 import definition");
+        }
+        def_output << "LIBRARY kernel32.dll\n";
+        def_output << "EXPORTS\n";
+        def_output << "GetStdHandle\n";
+        def_output << "WriteFile\n";
+        def_output << "ExitProcess\n";
+        def_output.close();
+    }
+    if (!run_posix_tool(
+            "llvm-dlltool",
+            {
+                "-m",
+                "i386:x86-64",
+                "-d",
+                kernel32_def.string(),
+                "-l",
+                kernel32_import.string(),
+            })) {
+        throw std::runtime_error(
+            "cannot create kernel32 import library");
+    }
     for (std::size_t index = 0; index < sources.size(); ++index) {
         if (!run_posix_tool(
                 "clang++",
@@ -247,6 +277,7 @@ void write_pe_ir(
     for (const std::filesystem::path& object : objects) {
         posix_link_arguments.push_back(object.string());
     }
+    posix_link_arguments.push_back(kernel32_import.string());
     if (!run_posix_tool("lld-link", posix_link_arguments)) {
         throw std::runtime_error(
             "native Windows lowering LLD link failed");
@@ -269,6 +300,12 @@ void write_pe_ir(
         for (const std::filesystem::path& object_path : objects) {
             std::filesystem::remove(object_path, remove_error);
         }
+        std::filesystem::remove(
+            std::filesystem::path(options.output + ".kernel32.def"),
+            remove_error);
+        std::filesystem::remove(
+            std::filesystem::path(options.output + ".kernel32.lib"),
+            remove_error);
     }
 }
 

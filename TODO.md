@@ -192,10 +192,10 @@
   plan and link separate Windows C/PE chunks with shared runtime state.
 - [x] Verify chunked Windows relinking and execution across Spyro, THPS,
   Tekken 3, Castlevania, Final Fantasy VII, and Metal Gear Solid.
-- [ ] Emit and link separate Linux assembly chunks with shared runtime state;
-  Linux currently uses the bounded shared plan and separate timeout guards.
-- [x] Apply the 30,000-leader CFG emission limit and a two-minute
-  assembler/linker timeout explicitly to Linux lowering; Linux no longer hangs
+- [x] Emit and link separate Linux assembly chunks with shared runtime state;
+  Linux chunks compile into separate objects and share global runtime symbols.
+- [x] Apply two-minute assembler/linker timeout explicitly to Linux lowering;
+  Linux no longer hangs
   on oversized assembly or a stalled native toolchain.
 - [x] Generate imports and relocations for real Windows host-native code.
 - [x] Document PE32 support as optional: no PE32-only x86 compatibility target
