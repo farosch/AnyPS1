@@ -379,6 +379,51 @@ void MipsWindowsLowerer::lower(
                     read_psx32(data, PSX_HEADER_SIZE + offset);
                 const MipsInstructionIr instruction_ir =
                     build_mips_instruction_ir(block_address, word);
+                if (block_address >= plan.load_address + 8u &&
+                    block_address - 8u >= plan.load_address) {
+                    const std::uint32_t compare_word =
+                        read_psx32(data,
+                            PSX_HEADER_SIZE +
+                            block_address - 8u - plan.load_address);
+                    const std::uint32_t branch_word =
+                        read_psx32(data,
+                            PSX_HEADER_SIZE +
+                            block_address - 4u - plan.load_address);
+                    const std::uint32_t compare_opcode =
+                        compare_word >> 26;
+                    const std::uint32_t compare_rd =
+                        (compare_word >> 11) & 31u;
+                    const std::uint32_t branch_opcode =
+                        branch_word >> 26;
+                    const std::uint32_t branch_rs =
+                        (branch_word >> 21) & 31u;
+                    const std::uint32_t branch_rt =
+                        (branch_word >> 16) & 31u;
+                    const std::uint32_t branch_imm =
+                        branch_word & 0xFFFFu;
+                    if (word == 0u &&
+                        compare_opcode == 0u &&
+                        compare_word == 0x0043082Bu &&
+                        branch_opcode == 0x05u &&
+                        branch_rs == compare_rd &&
+                        branch_rt == 0u) {
+                        const std::int32_t signed_imm =
+                            static_cast<std::int32_t>(
+                                static_cast<std::int16_t>(branch_imm));
+                        const std::uint32_t target =
+                            static_cast<std::uint32_t>(
+                                static_cast<std::int64_t>(
+                                    block_address - 4u) + 4 +
+                                static_cast<std::int64_t>(signed_imm) * 4);
+                        chunk << "{if(regs[" << compare_rd
+                              << "]!=0u)next_pc=0x" << std::hex
+                              << target << std::dec << "u;"
+                              << "else next_pc=0x" << std::hex
+                              << (block_address + 4u) << std::dec
+                              << "u;return true;}\n";
+                        continue;
+                    }
+                }
                 if (!instruction_ir.supported) {
                     chunk << "ExitProcess(16u);return true;\n";
                     break;
@@ -405,6 +450,38 @@ void MipsWindowsLowerer::lower(
                     chunk << "break;\n";
                 } else if (instruction_kind == 22u) {
                     chunk << "break;\n";
+                }
+            }
+            if (block_end < plan.load_address + plan.file_size &&
+                plan.leaders.find(block_end) == plan.leaders.end()) {
+                const std::uint32_t offset =
+                    block_end - plan.load_address;
+                if (offset + 4u <= plan.file_size) {
+                    const std::uint32_t word =
+                        read_psx32(data, PSX_HEADER_SIZE + offset);
+                    const MipsInstructionIr instruction_ir =
+                        build_mips_instruction_ir(block_end, word);
+                    chunk << "case 0x" << std::hex << std::setfill('0')
+                          << std::setw(8) << block_end << std::dec << "u:\n";
+                    if (!instruction_ir.supported) {
+                        chunk << "ExitProcess(16u);return true;\n";
+                    } else {
+                        chunk << "next_pc=0x" << std::hex << block_end
+                              << std::dec << "u+4u;\n";
+                        chunk << "native_execute_ir("
+                              << static_cast<std::uint32_t>(instruction_ir.kind)
+                              << ",0x" << std::hex << block_end << std::dec << "u,"
+                              << "0x" << std::hex << word << std::dec << "u,"
+                              << instruction_ir.rs << "u,"
+                              << instruction_ir.rt << "u,"
+                              << instruction_ir.rd << "u,"
+                              << instruction_ir.shamt << "u,"
+                              << instruction_ir.immediate << "u,"
+                              << "0x" << std::hex << instruction_ir.target << std::dec << "u,"
+                              << instruction_ir.size << "u,"
+                              << instruction_ir.special << "u);\n";
+                        chunk << "regs[0]=0u;return true;\n";
+                    }
                 }
             }
             chunk << "return true;\n";

@@ -137,6 +137,37 @@ MipsExecutablePlan build_mips_executable_plan(
                         }
                     }
                 }
+                for (;;) {
+                    bool added = false;
+                    const std::set<std::uint32_t> current = plan.emittable_leaders;
+                    for (std::uint32_t address : current) {
+                        const std::uint32_t next = address + 4u;
+                        if (next >= plan.load_address + plan.file_size) continue;
+                        const std::uint32_t offset = next - plan.load_address;
+                        if (offset + 4u > plan.file_size) continue;
+                        const std::uint32_t instruction =
+                            read_psx32(data, PSX_HEADER_SIZE + offset);
+                        const MipsInstructionIr ir =
+                            build_mips_instruction_ir(next, instruction);
+                        const PayloadRegionKind region =
+                            classify_payload_region(next, instruction, true);
+                        if (!ir.supported ||
+                            region == PayloadRegionKind::EmbeddedData ||
+                            region == PayloadRegionKind::Unknown ||
+                            ir.kind == MipsInstructionKind::Branch ||
+                            ir.kind == MipsInstructionKind::Jump ||
+                            ir.kind == MipsInstructionKind::Jr ||
+                            ir.kind == MipsInstructionKind::Jalr ||
+                            ir.kind == MipsInstructionKind::System) {
+                            continue;
+                        }
+                        if (plan.emittable_leaders.insert(next).second) {
+                            plan.leaders.insert(next);
+                            added = true;
+                        }
+                    }
+                    if (!added) break;
+                }
             }
             if (ir.opcode == 0x03u) {
                 plan.leaders.insert(address + 8u);
