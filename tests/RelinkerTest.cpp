@@ -305,9 +305,14 @@ int main(int argc, char** argv)
         if (source_text.find("native_mmio_read") == std::string::npos ||
             source_text.find("native_mmio_write") == std::string::npos ||
             source_text.find("interrupt_status|=1u") == std::string::npos ||
-            source_text.find("steps<100000000u") == std::string::npos) {
+            source_text.find("steps<100000000u") == std::string::npos ||
+            source_text.find("anyps1_host_loop_init") == std::string::npos ||
+            source_text.find("anyps1_host_loop_attach_ram") == std::string::npos ||
+            source_text.find("anyps1_host_loop_poll") == std::string::npos ||
+            source_text.find("anyps1_host_loop_tick") == std::string::npos ||
+            source_text.find("anyps1_host_loop_present") == std::string::npos) {
             throw std::runtime_error(
-                "Windows PE native source lacks MMIO/frame-tick state");
+                "Windows PE native source lacks MMIO/frame-tick/host-loop state");
         }
         std::ifstream pe(windows_output_path, std::ios::binary);
         std::vector<unsigned char> pe_bytes{

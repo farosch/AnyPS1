@@ -306,6 +306,9 @@
 - [x] Beautify generated executable diagnostics with shared summary, verbose,
   and JSON report formats; preserve key=value compatibility lines and add
   coverage, leader/chunk, runtime-counter, and result sections.
+- [x] Integrate Windows native host-loop initialization, RAM attachment,
+  polling, tick, and framebuffer presentation calls; add a checked-in
+  cross-target host-loop fixture and PE/source assertions.
 - [x] Centralize ELF/PE native tool process execution, timeout handling,
   output capture, and typed linker failures.
 - [x] Remove obsolete manual PE layout lowering and duplicate lowering IR

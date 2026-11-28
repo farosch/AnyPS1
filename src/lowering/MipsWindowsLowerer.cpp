@@ -226,7 +226,7 @@ void MipsWindowsLowerer::lower(
     source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else if(ea>=0x1F801000u&&ea<0x1F802000u)native_mmio_write(ea,regs[rt]);else{write_windows_trace(\"mmio_store_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 20:\n";
-    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x33u)cop3_data[cop_rd]=ram[ea>>2u];else if(opcode==0x32u)gte_data[cop_rd]=ram[ea>>2u];else if(opcode==0x31u){}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u];else{write_windows_trace(\"cop_load_address=\",ea);ExitProcess(17u);}}\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x33u)cop3_data[cop_rd]=ram[ea>>2u];else if(opcode==0x32u)gte_data[cop_rd]=ram[ea>>2u];else if(ea>=0x1F800000u&&ea<0x1F800400u){}else{write_windows_trace(\"cop_load_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 21:\n";
     source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x3Bu)ram[ea>>2u]=cop3_data[cop_rd];else if(opcode==0x3Au)ram[ea>>2u]=gte_data[cop_rd];else if(ea<0x00200000u)ram[ea>>2u]=gte_data[cop_rd];else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=gte_data[cop_rd];else{write_windows_trace(\"cop_store_address=\",ea);ExitProcess(17u);}}\n";
@@ -240,6 +240,13 @@ void MipsWindowsLowerer::lower(
     for (std::size_t chunk_index = 0; chunk_index < plan.leader_chunks.size(); ++chunk_index) {
         source << "extern \"C\" bool native_chunk_" << chunk_index << "(void);\n";
     }
+    source << "#ifdef _WIN32\n";
+    source << "extern \"C\" int anyps1_host_loop_init(const char*){return 0;}\n";
+    source << "extern \"C\" int anyps1_host_loop_attach_ram(uint32_t*){return 0;}\n";
+    source << "extern \"C\" int anyps1_host_loop_poll(void){return 0;}\n";
+    source << "extern \"C\" int anyps1_host_loop_tick(uint32_t){return 0;}\n";
+    source << "extern \"C\" int anyps1_host_loop_present(const uint32_t*,uint32_t,uint32_t){return 0;}\n";
+    source << "#endif\n";
     source << "int main(void) {\n";
     source << "#ifdef _WIN32\n";
     source << "void* handle = GetStdHandle(0xfffffff5u);\n";
@@ -254,12 +261,21 @@ void MipsWindowsLowerer::lower(
     source << "for(uint32_t i=0;i<sizeof(payload)/sizeof(payload[0]);++i) "
                "ram[" << (plan.payload_ram_offset / 4u)
             << "+i]=payload[i];\n";
+    source << "if(anyps1_host_loop_init(\"AnyPS1\")!=0)ExitProcess(18u);\n";
+    source << "if(anyps1_host_loop_attach_ram(ram)!=0)ExitProcess(18u);\n";
     source << "pc=0x" << std::hex << initial_pc << std::dec << "u;\n";
     source << "next_pc=pc+4u;\n";
     source << "pending_target=0u;\n";
     source << "delay_remaining=0u;\n";
     source << "for(uint32_t steps=0;steps<100000000u;++steps){\n";
     source << "++native_frame_counter;++timer_cycles;++frame_cycles;if(frame_cycles>=1024u){frame_cycles-=1024u;interrupt_status|=1u;}\n";
+    source << "#ifdef _WIN32\n";
+    source << "if((native_frame_counter&1023u)==0u){\n";
+    source << "if(anyps1_host_loop_poll()!=0)ExitProcess(0u);\n";
+    source << "if(anyps1_host_loop_tick(1024u)!=0)ExitProcess(18u);\n";
+    source << "if(anyps1_host_loop_present(ram,1024u,512u)!=0)ExitProcess(18u);\n";
+    source << "}\n";
+    source << "#endif\n";
     source << "if(delay_remaining==1u){pc=pending_target;delay_remaining=0u;}\n";
     source << "else if(delay_remaining==2u){pc=next_pc;delay_remaining=1u;}\n";
     source << "bool dispatched=false;\n";
