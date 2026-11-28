@@ -2,10 +2,6 @@
 
 #include <cstdint>
 
-#ifdef _MSC_VER
-extern "C" void _RTC_CheckStackVars(void*, void*) {}
-#endif
-
 namespace {
 
 anyps1::Ps1DeviceRuntime device_runtime;
@@ -43,25 +39,13 @@ void Ps1DeviceRuntime::assert_interrupt(std::uint32_t bit)
     interrupt_status |= bit;
 }
 
-void Ps1DeviceRuntime::queue_cd_response(
-    const std::uint8_t* values,
-    std::size_t count)
-{
-    if (count > 16u) count = 16u;
-    for (std::size_t index = 0; index < count; ++index) {
-        cd_response_fifo[index] = values[index];
-    }
-    cd_response_read = 0;
-    cd_response_count = count;
-}
-
 void Ps1DeviceRuntime::execute_cd_command(std::uint8_t command)
 {
     if (command == 0x01u) {
-        const std::uint8_t response[] = {
-            static_cast<std::uint8_t>(cd_mode | 0x02u)
-        };
-        queue_cd_response(response, 1u);
+        cd_response_fifo[0] =
+            static_cast<std::uint8_t>(cd_mode | 0x02u);
+        cd_response_read = 0;
+        cd_response_count = 1u;
         cd_irq = 3u;
     } else if (command == 0x02u) {
         if (cd_parameter_count >= 3u) {
@@ -79,35 +63,44 @@ void Ps1DeviceRuntime::execute_cd_command(std::uint8_t command)
         } else {
             cd_lba = 0u;
         }
-        const std::uint8_t response[] = {0x02u};
-        queue_cd_response(response, 1u);
+        cd_response_fifo[0] = 0x02u;
+        cd_response_read = 0;
+        cd_response_count = 1u;
         cd_irq = 3u;
     } else if (command == 0x06u) {
         cd_mode |= 0x80u;
-        const std::uint8_t response[] = {0x02u};
-        queue_cd_response(response, 1u);
+        cd_response_fifo[0] = 0x02u;
+        cd_response_read = 0;
+        cd_response_count = 1u;
         cd_irq = 1u;
     } else if (command == 0x08u) {
-        const std::uint8_t response[] = {0x02u};
-        queue_cd_response(response, 1u);
+        cd_response_fifo[0] = 0x02u;
+        cd_response_read = 0;
+        cd_response_count = 1u;
         cd_irq = 3u;
     } else if (command == 0x09u) {
         cd_mode &= ~0x80u;
-        const std::uint8_t response[] = {0x02u};
-        queue_cd_response(response, 1u);
+        cd_response_fifo[0] = 0x02u;
+        cd_response_read = 0;
+        cd_response_count = 1u;
         cd_irq = 3u;
     } else if (command == 0x0Au) {
-        const std::uint8_t response[] = {0x02u};
-        queue_cd_response(response, 1u);
+        cd_response_fifo[0] = 0x02u;
+        cd_response_read = 0;
+        cd_response_count = 1u;
         cd_irq = 3u;
     } else if (command == 0x19u && cd_parameter_count > 0u &&
                cd_parameter_fifo[0] == 0x20u) {
-        const std::uint8_t response[] = {0x95u, 0x03u, 0x00u};
-        queue_cd_response(response, 3u);
+        cd_response_fifo[0] = 0x95u;
+        cd_response_fifo[1] = 0x03u;
+        cd_response_fifo[2] = 0x00u;
+        cd_response_read = 0;
+        cd_response_count = 3u;
         cd_irq = 3u;
     } else {
-        const std::uint8_t response[] = {0x11u};
-        queue_cd_response(response, 1u);
+        cd_response_fifo[0] = 0x11u;
+        cd_response_read = 0;
+        cd_response_count = 1u;
         cd_irq = 5u;
     }
     cd_parameter_count = 0;

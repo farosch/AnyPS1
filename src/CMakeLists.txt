@@ -63,7 +63,7 @@ add_library(anyps1_device
 )
 target_include_directories(anyps1_device PUBLIC ${CMAKE_SOURCE_DIR}/src)
 if(MSVC)
-    target_compile_options(anyps1_device PRIVATE /GS- /RTC- /Zl /EHs-c- /GR-)
+    target_compile_options(anyps1_device PRIVATE /GS- /Zl /EHs-c- /GR-)
     set_property(TARGET anyps1_device PROPERTY
         VS_GLOBAL_BasicRuntimeChecks "Default")
 endif()

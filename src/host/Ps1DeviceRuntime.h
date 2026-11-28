@@ -45,7 +45,6 @@ struct Ps1DeviceRuntime {
 
 private:
     std::uint32_t& register_at(std::uint32_t address);
-    void queue_cd_response(const std::uint8_t* values, std::size_t count);
     void execute_cd_command(std::uint8_t command);
     void execute_controller_transfer();
     void execute_gpu_command(std::uint32_t word);
