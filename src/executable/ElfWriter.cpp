@@ -3,11 +3,14 @@
 #include <array>
 #include <cerrno>
 #include <cstdint>
+#include <csignal>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <chrono>
+#include <thread>
 #include <vector>
 
 #ifndef _WIN32
@@ -28,6 +31,25 @@ int ElfWriter::link(
     throw std::runtime_error(
         "native Linux lowering toolchain is not available on Windows");
 #else
+    const auto wait_with_timeout =
+        [](pid_t child, int& status, std::chrono::minutes timeout) -> int {
+            const auto deadline =
+                std::chrono::steady_clock::now() + timeout;
+            for (;;) {
+                const pid_t waited =
+                    waitpid(child, &status, WNOHANG);
+                if (waited == child) return 0;
+                if (waited < 0) return -1;
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    kill(child, SIGKILL);
+                    waitpid(child, &status, 0);
+                    return 124;
+                }
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(10));
+            }
+        };
+
     const std::filesystem::path object =
         std::filesystem::path(output.string() + ".native.o");
 
@@ -54,11 +76,15 @@ int ElfWriter::link(
     }
 
     int assembler_status = 0;
-    if (waitpid(assembler, &assembler_status, 0) < 0) {
+    const int assembler_wait =
+        wait_with_timeout(assembler, assembler_status,
+                          std::chrono::minutes(2));
+    if (assembler_wait == -1) {
         throw std::runtime_error(
             "cannot wait for native Linux assembler: " +
             std::string(std::strerror(errno)));
     }
+    if (assembler_wait == 124) return 124;
     if (!WIFEXITED(assembler_status) ||
         WEXITSTATUS(assembler_status) != 0) {
         return 1;
@@ -101,6 +127,8 @@ int ElfWriter::link(
             "-Wl,-rpath," + build_dir + "/3rdparty/SDL";
         linker_args.push_back(sdl_rpath.c_str());
         linker_args.push_back("-lc");
+        linker_args.push_back("-lgcc_s");
+        linker_args.push_back("-lgcc");
         linker_args.push_back("-lm");
         linker_args.push_back("-ldl");
         linker_args.push_back("-lpthread");
@@ -110,11 +138,14 @@ int ElfWriter::link(
     }
 
     int status = 0;
-    if (waitpid(child, &status, 0) < 0) {
+    const int linker_wait =
+        wait_with_timeout(child, status, std::chrono::minutes(2));
+    if (linker_wait == -1) {
         throw std::runtime_error(
             "cannot wait for native Linux linker: " +
             std::string(std::strerror(errno)));
     }
+    if (linker_wait == 124) return 124;
     if (!WIFEXITED(status)) return -1;
     if (WEXITSTATUS(status) != 0) return WEXITSTATUS(status);
     std::error_code remove_error;

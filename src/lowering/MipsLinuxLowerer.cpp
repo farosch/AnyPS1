@@ -33,6 +33,11 @@ void MipsLinuxLowerer::lower(
 )
 {
     const MipsExecutablePlan plan = build_mips_executable_plan(options, data);
+    if (plan.emittable_leaders.size() > 30000u) {
+        throw std::runtime_error(
+            "unsupported native Linux lowering: executable CFG exceeds "
+            "the current native IR emission limit");
+    }
     const std::uint32_t file_size = plan.file_size;
     const std::uint32_t load_address = plan.load_address;
     const std::uint32_t initial_pc = plan.initial_pc;

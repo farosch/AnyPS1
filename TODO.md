@@ -187,6 +187,9 @@
   HI/LO, and explicit unsupported exits.
 - [ ] Remove the 30,000-leader Windows CFG emission limit and lower large
   executable CFG regions without generating an oversized switch-based PE source.
+- [x] Apply the 30,000-leader CFG emission limit and a two-minute
+  assembler/linker timeout explicitly to Linux lowering; Linux no longer hangs
+  on oversized assembly or a stalled native toolchain.
 - [x] Generate imports and relocations for real Windows host-native code.
 - [x] Document PE32 support as optional: no PE32-only x86 compatibility target
   is required because the native backend emits AMD64 PE32+.

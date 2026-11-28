@@ -38,7 +38,7 @@ add_library(anyps1_gte
     lowering/GteRuntime.cpp
 )
 target_include_directories(anyps1_gte PUBLIC ${CMAKE_SOURCE_DIR}/src)
-if(MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     target_compile_options(anyps1_gte PRIVATE /GS- /Zl /EHs-c- /GR-)
     set_property(TARGET anyps1_gte PROPERTY
         VS_GLOBAL_BasicRuntimeChecks "Default")
@@ -62,7 +62,7 @@ add_library(anyps1_device
     host/Ps1DeviceRuntime.cpp
 )
 target_include_directories(anyps1_device PUBLIC ${CMAKE_SOURCE_DIR}/src)
-if(MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     target_compile_options(anyps1_device PRIVATE /GS- /Zl /EHs-c- /GR-)
     set_property(TARGET anyps1_device PROPERTY
         VS_GLOBAL_BasicRuntimeChecks "Default")
