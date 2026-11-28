@@ -125,6 +125,9 @@ void MipsWindowsLowerer::lower(
     source << "uint32_t next_pc;\n";
     source << "uint32_t pending_target;\n";
     source << "uint32_t delay_remaining;\n";
+    source << "uint32_t native_call_ra[256];\n";
+    source << "uint32_t native_call_sp[256];\n";
+    source << "uint32_t native_call_depth;\n";
     source << "static uint32_t payload[] = {";
     bool payload_first = true;
     for (std::uint32_t offset = 0; offset < plan.file_size; offset += 4u) {
@@ -213,13 +216,13 @@ void MipsWindowsLowerer::lower(
     source << "{uint32_t take=0;if((word>>26)==4)take=regs[rs]==regs[rt];else if((word>>26)==5)take=regs[rs]!=regs[rt];else if((word>>26)==6)take=(int32_t)regs[rs]<=0;else if((word>>26)==7)take=(int32_t)regs[rs]>0;if(take){pending_target=target;delay_remaining=2u;}}\n";
     source << "return;\n";
     source << "case 15:\n";
-    source << "pending_target=target;if((word>>26)==3)regs[31]=address+8u;delay_remaining=2u;\n";
+    source << "if(native_call_depth<256u){native_call_ra[native_call_depth]=address+8u;native_call_sp[native_call_depth]=regs[29];++native_call_depth;}pending_target=target;if((word>>26)==3)regs[31]=address+8u;delay_remaining=2u;\n";
     source << "return;\n";
     source << "case 16:\n";
-    source << "{uint32_t target=regs[rs];uint32_t vector=(target&0xFF000000u)>>24u;if(target<0x100u)vector=target;bool bios=(vector==0xA0u||vector==0xB0u||vector==0xC0u);if(bios){write_windows_trace(\"bios_pc=\",address);write_windows_trace(\"bios_vector=\",vector);write_windows_trace(\"bios_function=\",regs[9]);if(vector==0xA0u){if(regs[9]==0x39u)regs[2]=0x80100000u;else if(regs[9]==0x06u)ExitProcess(0u);else if(regs[9]==0x03u)regs[2]=regs[6];else if(regs[9]==0x70u)regs[2]=0u;else if(regs[9]>=0x32u&&regs[9]<=0x36u)regs[2]=0u;else regs[2]=0xffffffffu;}        else if(vector==0xB0u){if(regs[9]==0x17u||regs[9]==0x18u){}else if(regs[9]<=0x18u)regs[2]=1u;else if(regs[9]==0x32u||regs[9]==0x33u||regs[9]==0x34u||regs[9]==0x35u)regs[2]=0u;    else if(regs[9]==0x36u||regs[9]==0x37u)regs[2]=1u;else if(regs[9]==0x40u||regs[9]==0x42u||regs[9]==0x43u)regs[2]=1u;    else if(regs[9]==0x41u)regs[2]=timer_cycles+(regs[4]&3u)*0x400u;    else if(regs[9]==0x45u)regs[2]=0xffffffffu;else if(regs[9]==0x50u||regs[9]==0x51u||regs[9]==0x53u)regs[2]=0u;else if(regs[9]==0x54u||regs[9]==0x55u)regs[2]=0xffffffffu;else if(regs[9]==0x56u)regs[2]=0x80000674u;else if(regs[9]==0x57u)regs[2]=0x80000874u;else if(regs[9]==0x70u)regs[2]=0u;else{write_windows_trace(\"unsupported_b0_function=\",regs[9]);ExitProcess(17u);}}else{if(regs[9]==0x10u||regs[9]==0x13u)regs[2]=0u;else if(regs[9]<=0x13u)regs[2]=1u;else{write_windows_trace(\"unsupported_c0_function=\",regs[9]);ExitProcess(17u);}}pending_target=address+8u;}else{pending_target=target;delay_remaining=2u;}}\n";
+    source << "{uint32_t target=regs[rs];uint32_t vector=(target&0xFF000000u)>>24u;if(target<0x100u)vector=target;bool bios=(vector==0xA0u||vector==0xB0u||vector==0xC0u);if(rs==31u&&native_call_depth>0u){--native_call_depth;target=native_call_ra[native_call_depth];regs[29]=native_call_sp[native_call_depth];bios=false;}if(bios){write_windows_trace(\"bios_pc=\",address);write_windows_trace(\"bios_vector=\",vector);write_windows_trace(\"bios_function=\",regs[9]);if(vector==0xA0u){if(regs[9]==0x39u)regs[2]=0x80100000u;else if(regs[9]==0x06u)ExitProcess(0u);else if(regs[9]==0x03u)regs[2]=regs[6];else if(regs[9]==0x70u)regs[2]=0u;else if(regs[9]>=0x32u&&regs[9]<=0x36u)regs[2]=0u;else regs[2]=0xffffffffu;}else if(vector==0xB0u){if(regs[9]==0x17u||regs[9]==0x18u){}else if(regs[9]<=0x18u)regs[2]=1u;else if(regs[9]==0x32u||regs[9]==0x33u||regs[9]==0x34u||regs[9]==0x35u)regs[2]=0u;else if(regs[9]==0x36u||regs[9]==0x37u)regs[2]=1u;else if(regs[9]==0x40u||regs[9]==0x42u||regs[9]==0x43u)regs[2]=1u;else if(regs[9]==0x41u)regs[2]=timer_cycles+(regs[4]&3u)*0x400u;else if(regs[9]==0x45u)regs[2]=0xffffffffu;else if(regs[9]==0x50u||regs[9]==0x51u||regs[9]==0x53u)regs[2]=0u;else if(regs[9]==0x54u||regs[9]==0x55u)regs[2]=0xffffffffu;else if(regs[9]==0x56u)regs[2]=0x80000674u;else if(regs[9]==0x57u)regs[2]=0x80000874u;else if(regs[9]==0x70u)regs[2]=0u;else{write_windows_trace(\"unsupported_b0_function=\",regs[9]);ExitProcess(17u);}}else{if(regs[9]==0x10u||regs[9]==0x13u)regs[2]=0u;else if(regs[9]<=0x13u)regs[2]=1u;else{write_windows_trace(\"unsupported_c0_function=\",regs[9]);ExitProcess(17u);}}pending_target=address+8u;}else{pending_target=target;delay_remaining=2u;}return;}\n";
     source << "return;\n";
     source << "case 17:\n";
-    source << "regs[rd]=address+8u;pending_target=regs[rs];delay_remaining=2u;\n";
+    source << "if(native_call_depth<256u){native_call_ra[native_call_depth]=address+8u;native_call_sp[native_call_depth]=regs[29];++native_call_depth;}regs[rd]=address+8u;pending_target=regs[rs];delay_remaining=2u;\n";
     source << "return;\n";
     source << "case 18:\n";
     source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t opcode=(word>>26)&63u;if(opcode==0x22u||opcode==0x26u){uint32_t align=ea&3u;uint32_t aligned=ea&~3u;uint32_t value=0;if(aligned<0x00200000u)value=ram[aligned>>2u];else if(aligned>=0x1F800000u&&aligned<0x1F800400u)value=scratchpad[(aligned&0x3FFu)>>2u];else{write_windows_trace(\"unaligned_load_address=\",ea);ExitProcess(17u);}if(opcode==0x22u){if(align==0u)regs[rt]=(regs[rt]&0x00FFFFFFu)|(value<<24u);else if(align==1u)regs[rt]=(regs[rt]&0x0000FFFFu)|(value<<16u);else if(align==2u)regs[rt]=(regs[rt]&0x000000FFu)|(value<<8u);else regs[rt]=value;}else{if(align==0u)regs[rt]=value;else if(align==1u)regs[rt]=(regs[rt]&0xFF000000u)|(value>>8u);else if(align==2u)regs[rt]=(regs[rt]&0xFFFF0000u)|(value>>16u);else regs[rt]=(regs[rt]&0xFFFFFF00u)|(value>>24u);}}else if(ea<0x00200000u){if(size_value==1)regs[rt]=(uint32_t)*((uint8_t*)ram+ea);else if(size_value==2)regs[rt]=(uint32_t)*((uint16_t*)((uint8_t*)ram+ea));else regs[rt]=ram[ea>>2u];}else if(ea>=0x1F800000u&&ea<0x1F800400u)regs[rt]=scratchpad[(ea&0x3FFu)>>2u];else if(ea>=0x1F801000u&&ea<0x1F802000u){if(size_value==1)regs[rt]=(uint8_t)native_mmio_read(ea);else if(size_value==2)regs[rt]=(uint16_t)native_mmio_read(ea);else regs[rt]=native_mmio_read(ea);}else{write_windows_trace(\"mmio_load_address=\",ea);ExitProcess(17u);}}\n";
@@ -269,6 +272,7 @@ void MipsWindowsLowerer::lower(
     source << "next_pc=pc+4u;\n";
     source << "pending_target=0u;\n";
     source << "delay_remaining=0u;\n";
+    source << "native_call_depth=0u;\n";
     source << "for(uint64_t steps=0;steps<1000000000u;++steps){\n";
     source << "++native_frame_counter;++timer_cycles;++frame_cycles;if(frame_cycles>=1024u){frame_cycles-=1024u;interrupt_status|=1u;}\n";
     source << "#ifdef _WIN32\n";
