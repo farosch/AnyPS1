@@ -198,6 +198,24 @@ int main()
             throw std::runtime_error(
                 "contiguous payload pointer table was not discovered");
         }
+        write_word(data, 8, load_address + 32u);
+        write_word(data, 9, load_address + 48u);
+        write_word(data, 10, 0xE2F5F4A0u);
+        write_word(data, 11, 0u);
+        write_word(data, 12, 0x01000008u);
+        const std::vector<std::uint32_t> filtered_targets =
+            anyps1::discover_indirect_table_targets(
+                data,
+                load_address,
+                file_size,
+                load_address + 12u,
+                8u);
+        if (filtered_targets.size() != 2u ||
+            filtered_targets[0] != load_address + 32u ||
+            filtered_targets[1] != load_address + 48u) {
+            throw std::runtime_error(
+                "indirect jump table retained unsupported target words");
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "MIPS lowering support test failed: "

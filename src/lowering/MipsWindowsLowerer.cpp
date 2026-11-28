@@ -97,6 +97,7 @@ void MipsWindowsLowerer::lower(
     source << "uint32_t regs[32];\n";
     source << "uint32_t gte_data[32];\n";
     source << "uint32_t gte_ctrl[32];\n";
+    source << "uint32_t cop0[32];\n";
     source << "uint32_t cop3_data[32];\n";
     source << "uint32_t ram[524288];\n";
     source << "uint32_t scratchpad[256];\n";
@@ -229,7 +230,7 @@ void MipsWindowsLowerer::lower(
     source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x33u)cop3_data[cop_rd]=ram[ea>>2u];else if(opcode==0x32u)gte_data[cop_rd]=ram[ea>>2u];else if(ea>=0x1F800000u&&ea<0x1F800400u){}else{write_windows_trace(\"cop_load_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 21:\n";
-    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x3Bu)ram[ea>>2u]=cop3_data[cop_rd];else if(opcode==0x3Au)ram[ea>>2u]=gte_data[cop_rd];else if(ea<0x00200000u)ram[ea>>2u]=gte_data[cop_rd];else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=gte_data[cop_rd];else{write_windows_trace(\"cop_store_address=\",ea);ExitProcess(17u);}}\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x38u)ram[ea>>2u]=cop0[cop_rd];else if(opcode==0x39u){}else if(opcode==0x3Au)ram[ea>>2u]=gte_data[cop_rd];else if(opcode==0x3Bu)ram[ea>>2u]=cop3_data[cop_rd];else if(ea<0x00200000u)ram[ea>>2u]=gte_data[cop_rd];else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=gte_data[cop_rd];else{write_windows_trace(\"cop_store_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 22:\n";
     source << "if(special==12u)ExitProcess(0u);\n";

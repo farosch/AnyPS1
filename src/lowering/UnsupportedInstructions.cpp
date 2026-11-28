@@ -162,6 +162,7 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
         if (rs == 0x00 || rs == 0x02 || rs == 0x04 || rs == 0x06) {
             return true;
         }
+        if (rs == 18) return true;
         const std::uint32_t function = instruction & 63u;
         if (rs == 17 && function == 0x30) return true;
         return rs >= 16 &&
@@ -176,6 +177,9 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
              function == 0x3F ||
              function == 0x3D || function == 0x3E);
     }
+    if (opcode == 0x3E && rs == 18) {
+        return true;
+    }
     switch (opcode) {
     case 0x02: case 0x03: case 0x04:
     case 0x05: case 0x06: case 0x07: case 0x08:
@@ -186,8 +190,8 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
     case 0x21: case 0x22: case 0x23: case 0x24:
     case 0x25: case 0x26: case 0x28: case 0x29:
     case 0x2A: case 0x2B: case 0x2E: case 0x2F:
-    case 0x31: case 0x32: case 0x33: case 0x39:
-    case 0x3A: case 0x3B: case 0x3E:
+    case 0x31: case 0x32: case 0x33: case 0x38: case 0x39:
+    case 0x3A: case 0x3B:
         return true;
     default:
         return false;

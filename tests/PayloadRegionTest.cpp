@@ -30,7 +30,7 @@ int main()
                 0xF8000000u,
                 true) != anyps1::PayloadRegionKind::Instruction) {
             throw std::runtime_error(
-                "reserved coprocessor opcode was not classified for explicit lowering");
+                "COP3 64-bit transfer was not classified as unsupported");
         }
         if (anyps1::classify_payload_region(
                 0x80010010u,
@@ -80,6 +80,27 @@ int main()
                 true) != anyps1::PayloadRegionKind::EmbeddedData) {
             throw std::runtime_error(
                 "printable COP2-shaped table word was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x80010024u,
+                0x43CF0002u,
+                true) != anyps1::PayloadRegionKind::Unknown) {
+            throw std::runtime_error(
+                "invalid COP0 table word was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x80010028u,
+                0xD6640D15u,
+                true) != anyps1::PayloadRegionKind::Unknown) {
+            throw std::runtime_error(
+                "64-bit coprocessor table word was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x8001002Cu,
+                0xF8000000u,
+                true) != anyps1::PayloadRegionKind::Instruction) {
+            throw std::runtime_error(
+                "COP3 64-bit store fixture was not classified as unsupported code");
         }
         return 0;
     } catch (const std::exception& error) {

@@ -1,6 +1,7 @@
 #include "MipsLoweringSupport.h"
 #include "format/PsExe.h"
 #include "UnsupportedInstructions.h"
+#include "PayloadRegion.h"
 
 #include <cstdint>
 #include <vector>
@@ -309,6 +310,18 @@ std::vector<std::uint32_t> discover_indirect_table_targets(
             (target & 3u) != 0) {
             break;
         }
+        const std::uint32_t target_offset = target - load_address;
+        if (target_offset + 4u > file_size) break;
+        const std::uint32_t target_instruction =
+            read_psx32(data, PSX_HEADER_SIZE + target_offset);
+        if (classify_payload_region(
+                target, target_instruction, true) !=
+            PayloadRegionKind::Instruction) {
+            break;
+        }
+        if (!is_supported_mips_instruction(target_instruction)) {
+            continue;
+        }
         targets.insert(target);
     }
     return {targets.begin(), targets.end()};
@@ -335,6 +348,18 @@ std::vector<std::uint32_t> discover_payload_pointer_targets(
         if (target_index + 4u > word_count) continue;
         std::size_t nonzero = 0;
         bool supported = true;
+        const std::uint32_t target_instruction = read_psx32(
+            data,
+            PSX_HEADER_SIZE + target_index * 4u);
+        if (!is_supported_mips_instruction(target_instruction) ||
+            classify_payload_region(
+                target, target_instruction, true) ==
+                PayloadRegionKind::EmbeddedData ||
+            classify_payload_region(
+                target, target_instruction, true) ==
+                PayloadRegionKind::Unknown) {
+            continue;
+        }
         for (std::uint32_t offset = 0; offset < 4u; ++offset) {
             const std::uint32_t instruction = read_psx32(
                 data,

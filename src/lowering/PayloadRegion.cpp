@@ -44,10 +44,21 @@ PayloadRegionKind classify_payload_region(
     (void)address;
     if (!reached_by_cfg) return PayloadRegionKind::EmbeddedData;
     if (word == 0) return PayloadRegionKind::Instruction;
+    if (word == 0xF8000000u) {
+        return PayloadRegionKind::Instruction;
+    }
+    const std::uint32_t opcode = word >> 26;
+    if (opcode >= 0x08u && opcode <= 0x0Eu) {
+        return PayloadRegionKind::Instruction;
+    }
+    if (opcode == 0x0Fu) {
+        return ((word >> 21) & 31u) == 0u
+            ? PayloadRegionKind::Instruction
+            : PayloadRegionKind::Unknown;
+    }
     if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {
         return PayloadRegionKind::EmbeddedData;
     }
-    const std::uint32_t opcode = word >> 26;
     if (opcode == 0x00) {
         if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {
             return PayloadRegionKind::EmbeddedData;
@@ -94,11 +105,28 @@ PayloadRegionKind classify_payload_region(
             ? PayloadRegionKind::Instruction
             : PayloadRegionKind::Unknown;
     }
-    if (opcode >= 0x10u && opcode <= 0x13u) {
+    if (opcode == 0x10u) {
+        const std::uint32_t rs = (word >> 21) & 31u;
+        return rs == 0u || rs == 2u || rs == 4u ||
+               rs == 6u || rs == 8u || rs == 12u ||
+               rs == 16u
+            ? PayloadRegionKind::Instruction
+            : PayloadRegionKind::Unknown;
+    }
+    if (opcode >= 0x11u && opcode <= 0x13u) {
         return PayloadRegionKind::Instruction;
     }
     if (opcode == 0x3Eu) {
-        return PayloadRegionKind::Instruction;
+        const std::uint32_t rs = (word >> 21) & 31u;
+        return rs == 18u || rs == 30u
+            ? PayloadRegionKind::Instruction
+            : PayloadRegionKind::Unknown;
+    }
+    if (opcode == 0x34u || opcode == 0x35u ||
+        opcode == 0x36u || opcode == 0x37u ||
+        opcode == 0x3Cu || opcode == 0x3Du ||
+        opcode == 0x3Fu) {
+        return PayloadRegionKind::Unknown;
     }
     if (opcode == 0x3Cu || opcode == 0x3Du ||
         opcode == 0x3Fu) {
