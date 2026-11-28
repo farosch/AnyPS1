@@ -67,6 +67,20 @@ int main()
             throw std::runtime_error(
                 "reserved SPECIAL fixture was not classified as instruction");
         }
+        if (anyps1::classify_payload_region(
+                0x8001F950u,
+                0xFE43FE49u,
+                true) != anyps1::PayloadRegionKind::Unknown) {
+            throw std::runtime_error(
+                "reserved opcode 0x3F table word was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x80022330u,
+                0x4B43414Au,
+                true) != anyps1::PayloadRegionKind::EmbeddedData) {
+            throw std::runtime_error(
+                "printable COP2-shaped table word was classified as code");
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Payload region test failed: " << error.what() << "\n";

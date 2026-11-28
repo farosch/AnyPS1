@@ -42,7 +42,7 @@ SUPPORTED_OPS = {
     0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26,
     0x28, 0x29, 0x2A, 0x2B, 0x2E,
     0x31, 0x32, 0x39, 0x3A,
-    0x30, 0x33, 0x38, 0x3B, 0x3E,
+    0x30, 0x33, 0x3B, 0x3E,
     0x13, 0x35, 0x36, 0x37, 0x3D, 0x3E, 0x3F,
 }
 
@@ -64,10 +64,12 @@ def supported(word: int) -> bool:
         rs = (word >> 21) & 0x1F
         if rs in (0x00, 0x02, 0x04, 0x06):
             return True
-        return word in {
-            0x48C0C000, 0x48C0C800, 0x48C8D000,
-            0x48C8D800, 0x48C8E000, 0x48C8E800,
-            0x48C8F000,
+        function = word & 0x3F
+        return rs >= 16 and function in {
+            0x01, 0x06, 0x0C, 0x10, 0x11, 0x12,
+            0x13, 0x14, 0x16, 0x1B, 0x1C, 0x1E,
+            0x20, 0x28, 0x29, 0x2A, 0x2D, 0x2E,
+            0x30, 0x3D, 0x3E, 0x3F,
         }
     return opcode in SUPPORTED_OPS
 
@@ -85,7 +87,9 @@ def classify_payload_region(word: int) -> str:
     if len(set(bytes_)) == 1 or word in (0x77777777, 0x77770700):
         return "embedded-data"
     opcode = word >> 26
-    if opcode == 0 or 1 <= opcode <= 15 or 32 <= opcode <= 46:
+    if opcode in (0x3C, 0x3D, 0x3F):
+        return "unknown"
+    if opcode == 0 or 1 <= opcode <= 15 or 32 <= opcode <= 59:
         return "instruction"
     return "unknown"
 
@@ -272,6 +276,8 @@ def inventory(path: Path, previous_report: dict | None = None) -> dict:
         region = classify_payload_region(word)
         region_counts[region] += 1
         if region == "embedded-data":
+            continue
+        if region == "unknown":
             continue
         if supported(word):
             continue

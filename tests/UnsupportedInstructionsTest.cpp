@@ -87,11 +87,17 @@ int main()
             throw std::runtime_error(
                 "COP2 load/store instruction was classified as unsupported");
         }
+        if (!anyps1::is_supported_mips_instruction(0xFB25FB2Bu)) {
+            throw std::runtime_error(
+                "COP2 SDC2 instruction was classified as unsupported");
+        }
         const std::uint32_t cop3_load_store_words[] = {
             0x4C000000u,
             0x4C400000u,
             0x4C800000u,
             0x4CC00000u,
+            0xCC000000u,
+            0xEC000000u,
         };
         for (const std::uint32_t word : cop3_load_store_words) {
             if (!anyps1::is_supported_mips_instruction(word)) {
@@ -106,10 +112,7 @@ int main()
         }
         const std::uint32_t unsupported_coprocessor_words[] = {
             0xC0000000u,
-            0xCC000000u,
             0xE0000000u,
-            0xEC000000u,
-            0xF8000000u,
         };
         for (const std::uint32_t word : unsupported_coprocessor_words) {
             if (anyps1::is_supported_mips_instruction(word)) {
@@ -122,7 +125,6 @@ int main()
                     0xD8200000u,
                     0xDC200000u,
                     0xF4200000u,
-                    0xF8200000u,
                     0xFC200000u
         };
         for (const std::uint32_t word : ldc_sdc_words) {

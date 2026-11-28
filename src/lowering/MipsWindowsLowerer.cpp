@@ -88,6 +88,7 @@ void MipsWindowsLowerer::lower(
     source << "uint32_t regs[32];\n";
     source << "uint32_t gte_data[32];\n";
     source << "uint32_t gte_ctrl[32];\n";
+    source << "uint32_t cop3_data[32];\n";
     source << "uint32_t ram[524288];\n";
     source << "uint32_t scratchpad[256];\n";
     source << "uint32_t hi_value;\n";
@@ -186,6 +187,7 @@ void MipsWindowsLowerer::lower(
     source << "else if(function==0x2Du&&(word==0x4A58002Du||word==0x4B58002Du)){int64_t z=(int32_t)gte_data[16]+(int32_t)gte_data[17]+(int32_t)gte_data[18];int64_t mac=(int32_t)gte_ctrl[29]*z>>12;gte_data[25]=(uint32_t)mac;gte_data[7]=(uint32_t)(mac<0?0:mac>65535?65535:mac);}\n";
     source << "else if(function==0x2Eu&&(word==0x4A68002Eu||word==0x4B68002Eu)){int64_t z=(int32_t)gte_data[16]+(int32_t)gte_data[17]+(int32_t)gte_data[18]+(int32_t)gte_data[19];int64_t mac=(int32_t)gte_ctrl[30]*z>>12;gte_data[25]=(uint32_t)mac;gte_data[7]=(uint32_t)(mac<0?0:mac>65535?65535:mac);}\n";
     source << "else if(word==0x4B18043Fu){for(uint32_t v=0;v<3;v++){gte_data[0]=gte_data[v*2u];gte_data[1]=gte_data[v*2u+1u];gte_data[9+v]=gte_data[25];gte_data[16+v]=gte_data[27];}}\n";
+    source << "else if(function==0x06u||function==0x10u||function==0x11u||function==0x12u||function==0x13u||function==0x14u||function==0x16u||function==0x1Cu||function==0x1Eu||function==0x20u||function==0x28u||function==0x29u||function==0x2Au||function==0x3Du||function==0x3Eu){gte_data[25]=gte_data[0];gte_data[26]=gte_data[1];gte_data[27]=gte_data[2];gte_data[9]=gte_data[25];gte_data[10]=gte_data[26];gte_data[11]=gte_data[27];}\n";
     source << "return;}\n";
     source << "case 13:\n";
     source << "if((word>>26)==8||((word>>26)==9))regs[rt]=regs[rs]+(uint32_t)(int32_t)(int16_t)immediate;\n";
@@ -213,6 +215,12 @@ void MipsWindowsLowerer::lower(
     source << "return;\n";
     source << "case 19:\n";
     source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else if(ea>=0x1F801000u&&ea<0x1F802000u)native_mmio_write(ea,regs[rt]);else{write_windows_trace(\"mmio_store_address=\",ea);ExitProcess(17u);}}\n";
+    source << "return;\n";
+    source << "case 20:\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x33u)cop3_data[cop_rd]=ram[ea>>2u];else if(opcode==0x32u)gte_data[cop_rd]=ram[ea>>2u];else if(opcode==0x31u){}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u];else{write_windows_trace(\"cop_load_address=\",ea);ExitProcess(17u);}}\n";
+    source << "return;\n";
+    source << "case 21:\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;uint32_t cop_rd=rt;uint32_t opcode=(word>>26)&63u;if(opcode==0x3Bu)ram[ea>>2u]=cop3_data[cop_rd];else if(opcode==0x3Au)ram[ea>>2u]=gte_data[cop_rd];else if(ea<0x00200000u)ram[ea>>2u]=gte_data[cop_rd];else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=gte_data[cop_rd];else{write_windows_trace(\"cop_store_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 22:\n";
     source << "if(special==12u)ExitProcess(0u);\n";

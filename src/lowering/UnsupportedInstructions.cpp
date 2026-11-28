@@ -170,6 +170,9 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
              function == 0x11 || function == 0x12 ||
              function == 0x1B || function == 0x1C || function == 0x28 ||
              function == 0x2D || function == 0x2E ||
+             function == 0x13 || function == 0x14 || function == 0x16 ||
+             function == 0x1E || function == 0x20 || function == 0x29 ||
+             function == 0x2A || function == 0x3D || function == 0x3E ||
              function == 0x3F ||
              function == 0x3D || function == 0x3E);
     }
@@ -183,7 +186,8 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
     case 0x21: case 0x22: case 0x23: case 0x24:
     case 0x25: case 0x26: case 0x28: case 0x29:
     case 0x2A: case 0x2B: case 0x2E: case 0x2F:
-    case 0x31: case 0x32: case 0x39: case 0x3A:
+    case 0x31: case 0x32: case 0x33: case 0x39:
+    case 0x3A: case 0x3B: case 0x3E:
         return true;
     default:
         return false;

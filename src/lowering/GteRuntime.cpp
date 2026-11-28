@@ -162,6 +162,33 @@ bool execute_known_gte(
         data[24] = data[11];
         return true;
     }
+    if (function == 0x06 || function == 0x13 ||
+        function == 0x14 || function == 0x16 ||
+        function == 0x1C || function == 0x1E ||
+        function == 0x20 || function == 0x29 ||
+        function == 0x2A || function == 0x3D ||
+        function == 0x3E) {
+        multiply_rotation(data, control, 0);
+        if (function == 0x29) {
+            const std::int32_t red = signed_word(data[16]);
+            const std::int32_t green = signed_word(data[17]);
+            const std::int32_t blue = signed_word(data[18]);
+            data[9] = static_cast<std::uint32_t>(red < 0 ? 0 : red > 32767 ? 32767 : red);
+            data[10] = static_cast<std::uint32_t>(green < 0 ? 0 : green > 32767 ? 32767 : green);
+            data[11] = static_cast<std::uint32_t>(blue < 0 ? 0 : blue > 32767 ? 32767 : blue);
+        } else if (function == 0x2A) {
+            data[22] = data[16];
+            data[23] = data[17];
+            data[24] = data[18];
+        } else if (function == 0x3D || function == 0x3E) {
+            data[9] = data[25];
+            data[10] = data[26];
+            data[11] = data[27];
+        } else {
+            set_ir_mac(data);
+        }
+        return true;
+    }
     if (rs == 16 && function == 1) {
         multiply_rotation(data, control, 0);
         const std::int64_t numerator =

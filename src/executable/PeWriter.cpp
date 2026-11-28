@@ -67,6 +67,15 @@ bool run_posix_tool(
         tool,
         arguments,
         std::chrono::minutes(2));
+    if (!result.started) {
+        error = "tool could not be started";
+    } else if (result.timed_out) {
+        error = "tool timed out";
+    } else if (!result.stderr_text.empty()) {
+        error = result.stderr_text;
+    } else if (!result.stdout_text.empty()) {
+        error = result.stdout_text;
+    }
     return result.started &&
         !result.timed_out &&
         result.exit_code == 0;
@@ -131,7 +140,7 @@ void write_pe_ir(
             L"/Fo:" + objects[index].wstring(),
             sources[index].wstring(),
         };
-        std::string tool_error;
+        tool_error.clear();
         if (!run_windows_tool(clang, compile_arguments, tool_error)) {
             throw std::runtime_error(
                 "native Windows lowering Clang compilation failed" +
@@ -229,7 +238,7 @@ void write_pe_ir(
         posix_link_arguments.push_back(object.string());
     }
     posix_link_arguments.push_back(kernel32_import.string());
-    std::string tool_error;
+    tool_error.clear();
     if (!run_posix_tool("lld-link", posix_link_arguments, tool_error)) {
         throw std::runtime_error(
             "native Windows lowering LLD link failed" +

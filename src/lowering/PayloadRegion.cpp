@@ -44,6 +44,9 @@ PayloadRegionKind classify_payload_region(
     (void)address;
     if (!reached_by_cfg) return PayloadRegionKind::EmbeddedData;
     if (word == 0) return PayloadRegionKind::Instruction;
+    if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {
+        return PayloadRegionKind::EmbeddedData;
+    }
     const std::uint32_t opcode = word >> 26;
     if (opcode == 0x00) {
         if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {
@@ -94,12 +97,19 @@ PayloadRegionKind classify_payload_region(
     if (opcode >= 0x10u && opcode <= 0x13u) {
         return PayloadRegionKind::Instruction;
     }
+    if (opcode == 0x3Eu) {
+        return PayloadRegionKind::Instruction;
+    }
+    if (opcode == 0x3Cu || opcode == 0x3Du ||
+        opcode == 0x3Fu) {
+        return PayloadRegionKind::Unknown;
+    }
     if (opcode == 0x02 || opcode == 0x03 ||
         opcode == 0x04 || opcode == 0x05 ||
         (opcode >= 0x08 && opcode <= 0x0Eu) ||
         opcode == 0x14 || opcode == 0x15 ||
         (opcode >= 0x20 && opcode <= 0x2Eu) ||
-        (opcode >= 0x30u && opcode <= 0x3Fu)) {
+        (opcode >= 0x30u && opcode <= 0x3Bu)) {
         return PayloadRegionKind::Instruction;
     }
     if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {
