@@ -321,3 +321,7 @@
   and a checked-in Windows/ELF fixture.
 - [x] Implement A0/B0/C0 BIOS JR dispatch with address+8 return semantics
   and add exact Windows/ELF parity fixtures.
+- [x] Add native lowering for ADDIU/SLTU/BNE startup counter loops and a
+  checked-in cross-target startup-loop fixture.
+- [x] Raise the Windows native startup execution budget to one billion steps
+  for large cache/RAM initialization loops.

@@ -319,17 +319,42 @@ int main(int argc, char** argv)
         std::string source_text(
             (std::istreambuf_iterator<char>(source)),
             std::istreambuf_iterator<char>());
+        if (std::string(fixture_path).find("native-startup-loop.ps-exe") !=
+            std::string::npos) {
+            std::error_code directory_error;
+            for (std::filesystem::directory_iterator
+                     iterator(
+                         std::filesystem::path(windows_output_path).parent_path(),
+                         directory_error),
+                 end;
+                 iterator != end;
+                 iterator.increment(directory_error)) {
+                const std::string chunk_name =
+                    iterator->path().filename().string();
+                if (chunk_name.find(".native-pe.") != std::string::npos &&
+                    chunk_name.find(".cpp") != std::string::npos) {
+                    std::ifstream chunk_source(iterator->path());
+                    source_text.append(
+                        std::string(
+                            (std::istreambuf_iterator<char>(chunk_source)),
+                            std::istreambuf_iterator<char>()));
+                }
+            }
+        }
         if (source_text.find("native_mmio_read") == std::string::npos ||
             source_text.find("native_mmio_write") == std::string::npos ||
             source_text.find("interrupt_status|=1u") == std::string::npos ||
-            source_text.find("steps<100000000u") == std::string::npos ||
+            source_text.find("steps<1000000000u") == std::string::npos ||
             source_text.find("anyps1_host_loop_init") == std::string::npos ||
             source_text.find("anyps1_host_loop_attach_ram") == std::string::npos ||
             source_text.find("anyps1_host_loop_poll") == std::string::npos ||
             source_text.find("anyps1_host_loop_tick") == std::string::npos ||
             source_text.find("anyps1_host_loop_present") == std::string::npos ||
             source_text.find("bios_vector") == std::string::npos ||
-            source_text.find("pending_target=address+8u") == std::string::npos) {
+            source_text.find("pending_target=address+8u") == std::string::npos ||
+            (std::string(fixture_path).find("native-startup-loop.ps-exe") !=
+                 std::string::npos &&
+             source_text.find("while(ea<end") == std::string::npos)) {
             throw std::runtime_error(
                 "Windows PE native source lacks MMIO/frame-tick/host-loop state");
         }

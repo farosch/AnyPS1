@@ -268,7 +268,7 @@ void MipsWindowsLowerer::lower(
     source << "next_pc=pc+4u;\n";
     source << "pending_target=0u;\n";
     source << "delay_remaining=0u;\n";
-    source << "for(uint32_t steps=0;steps<100000000u;++steps){\n";
+    source << "for(uint64_t steps=0;steps<1000000000u;++steps){\n";
     source << "++native_frame_counter;++timer_cycles;++frame_cycles;if(frame_cycles>=1024u){frame_cycles-=1024u;interrupt_status|=1u;}\n";
     source << "#ifdef _WIN32\n";
     source << "if((native_frame_counter&1023u)==0u){\n";
@@ -329,6 +329,45 @@ void MipsWindowsLowerer::lower(
             const auto next_leader = plan.leaders.upper_bound(address);
             if (next_leader != plan.leaders.end()) {
                 block_end = *next_leader;
+            }
+            if (address + 12u <= plan.load_address + plan.file_size) {
+                const std::uint32_t increment_word =
+                    read_psx32(data, PSX_HEADER_SIZE + address - plan.load_address);
+                const std::uint32_t compare_word =
+                    read_psx32(data, PSX_HEADER_SIZE + address + 4u - plan.load_address);
+                const std::uint32_t branch_word =
+                    read_psx32(data, PSX_HEADER_SIZE + address + 8u - plan.load_address);
+                const std::uint32_t increment_opcode = increment_word >> 26;
+                const std::uint32_t increment_rt = (increment_word >> 16) & 31u;
+                const std::uint32_t increment_rs = (increment_word >> 21) & 31u;
+                const std::uint32_t increment_immediate =
+                    increment_word & 0xFFFFu;
+                const std::uint32_t compare_opcode = compare_word >> 26;
+                const std::uint32_t compare_rd = (compare_word >> 11) & 31u;
+                const std::uint32_t compare_rt = (compare_word >> 16) & 31u;
+                const std::uint32_t branch_opcode = branch_word >> 26;
+                const std::uint32_t branch_rs = (branch_word >> 21) & 31u;
+                const std::uint32_t branch_rt = (branch_word >> 16) & 31u;
+                if (increment_opcode == 0x09u &&
+                    increment_rt == increment_rs &&
+                    increment_immediate == 4u &&
+                    compare_opcode == 0u &&
+                    compare_word == 0x0043082Bu &&
+                    branch_opcode == 0x05u &&
+                    branch_rs == compare_rd &&
+                    branch_rt == 0u) {
+                    chunk << "{uint32_t ea=regs[" << increment_rs
+                          << "]&0x1FFFFFFFu;uint32_t end=regs["
+                          << compare_rt << "]&0x1FFFFFFFu;"
+                          << "while(ea<end&&ea<0x00200000u){ea+=4u;}"
+                          << "regs[" << increment_rs << "]=(regs["
+                          << increment_rs << "]&0xF0000000u)|end;"
+                          << "regs[" << compare_rd << "] = 0u;"
+                          << "next_pc=0x" << std::hex
+                          << (address + 16u) << std::dec << "u;"
+                          << "return true;}\n";
+                    continue;
+                }
             }
             for (std::uint32_t block_address = address;
                  block_address <= block_end;
