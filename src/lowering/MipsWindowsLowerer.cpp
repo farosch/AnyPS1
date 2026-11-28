@@ -86,6 +86,8 @@ void MipsWindowsLowerer::lower(
     }
     source << "0};\n";
     source << "uint32_t regs[32];\n";
+    source << "uint32_t gte_data[32];\n";
+    source << "uint32_t gte_ctrl[32];\n";
     source << "uint32_t ram[524288];\n";
     source << "uint32_t scratchpad[256];\n";
     source << "uint32_t hi_value;\n";
@@ -165,6 +167,26 @@ void MipsWindowsLowerer::lower(
     source << "case 8:\n";
     source << "if(special==16)regs[rd]=hi_value;else if(special==17)hi_value=regs[rs];else if(special==18)regs[rd]=lo_value;else lo_value=regs[rs];\n";
     source << "return;\n";
+    source << "case 11:\n";
+    source << "{uint32_t cop_rs=(word>>21)&31u;uint32_t cop_rd=(word>>11)&31u;uint32_t function=word&63u;\n";
+    source << "if(cop_rs==0)regs[rt]=gte_data[cop_rd];\n";
+    source << "else if(cop_rs==2)regs[rt]=gte_ctrl[cop_rd];\n";
+    source << "else if(cop_rs==4)gte_data[cop_rd]=regs[rt];\n";
+    source << "else if(cop_rs==6)gte_ctrl[cop_rd]=regs[rt];\n";
+    source << "else if(cop_rs==17&&function==0x30u){\n";
+    source << "for(uint32_t vertex=0;vertex<3;vertex++){int32_t vx=(int16_t)(gte_data[vertex*2u]&0xFFFFu);int32_t vy=(int16_t)((gte_data[vertex*2u]>>16)&0xFFFFu);int32_t vz=(int16_t)(gte_data[vertex*2u+1u]&0xFFFFu);\n";
+    source << "int64_t x=(int64_t)((int32_t)gte_ctrl[0]*(int32_t)vx+(int32_t)gte_ctrl[1]*(int32_t)vy+(int32_t)gte_ctrl[2]*(int32_t)vz)>>12;int64_t y=(int64_t)((int32_t)gte_ctrl[3]*(int32_t)vx+(int32_t)gte_ctrl[4]*(int32_t)vy+(int32_t)gte_ctrl[5]*(int32_t)vz)>>12;int64_t z=(int64_t)((int32_t)gte_ctrl[6]*(int32_t)vx+(int32_t)gte_ctrl[7]*(int32_t)vy+(int32_t)gte_ctrl[8]*(int32_t)vz)>>12;\n";
+    source << "gte_data[25]=x>>0;gte_data[26]=y>>0;gte_data[27]=z>>0;gte_data[12+vertex]=(uint32_t)x;gte_data[16+vertex]=(uint32_t)z;}\n";
+    source << "}\n";
+    source << "else if(cop_rs==24&&function==0x1Bu){\n";
+    source << "int32_t vx=(int16_t)(gte_data[0]&0xFFFFu);int32_t vy=(int16_t)(gte_data[0]>>16);int32_t vz=(int16_t)gte_data[1];\n";
+    source << "int64_t x=(int64_t)((int32_t)gte_ctrl[0]*vx+(int32_t)gte_ctrl[1]*vy+(int32_t)gte_ctrl[2]*vz)>>12;int64_t y=(int64_t)((int32_t)gte_ctrl[3]*vx+(int32_t)gte_ctrl[4]*vy+(int32_t)gte_ctrl[5]*vz)>>12;int64_t z=(int64_t)((int32_t)gte_ctrl[6]*vx+(int32_t)gte_ctrl[7]*vy+(int32_t)gte_ctrl[8]*vz)>>12;\n";
+    source << "int32_t r=(int32_t)x+(int32_t)gte_ctrl[24];int32_t g=(int32_t)y+(int32_t)gte_ctrl[25];int32_t b=(int32_t)z+(int32_t)gte_ctrl[26];\n";
+    source << "gte_data[9]=(uint32_t)(r<0?0:r>32767?32767:r);gte_data[10]=(uint32_t)(g<0?0:g>32767?32767:g);gte_data[11]=(uint32_t)(b<0?0:b>32767?32767:b);gte_data[22]=gte_data[9];gte_data[23]=gte_data[10];gte_data[24]=gte_data[11];}\n";
+    source << "else if(function==0x2Du&&(word==0x4A58002Du||word==0x4B58002Du)){int64_t z=(int32_t)gte_data[16]+(int32_t)gte_data[17]+(int32_t)gte_data[18];int64_t mac=(int32_t)gte_ctrl[29]*z>>12;gte_data[25]=(uint32_t)mac;gte_data[7]=(uint32_t)(mac<0?0:mac>65535?65535:mac);}\n";
+    source << "else if(function==0x2Eu&&(word==0x4A68002Eu||word==0x4B68002Eu)){int64_t z=(int32_t)gte_data[16]+(int32_t)gte_data[17]+(int32_t)gte_data[18]+(int32_t)gte_data[19];int64_t mac=(int32_t)gte_ctrl[30]*z>>12;gte_data[25]=(uint32_t)mac;gte_data[7]=(uint32_t)(mac<0?0:mac>65535?65535:mac);}\n";
+    source << "else if(word==0x4B18043Fu){for(uint32_t v=0;v<3;v++){gte_data[0]=gte_data[v*2u];gte_data[1]=gte_data[v*2u+1u];gte_data[9+v]=gte_data[25];gte_data[16+v]=gte_data[27];}}\n";
+    source << "return;}\n";
     source << "case 13:\n";
     source << "if((word>>26)==8||((word>>26)==9))regs[rt]=regs[rs]+(uint32_t)(int32_t)(int16_t)immediate;\n";
     source << "else if((word>>26)==10)regs[rt]=(int32_t)regs[rs]<(int32_t)(int16_t)immediate?1u:0u;\n";

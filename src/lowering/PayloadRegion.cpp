@@ -59,6 +59,12 @@ PayloadRegionKind classify_payload_region(
         case 0x22u: case 0x23u: case 0x24u: case 0x25u:
         case 0x26u: case 0x27u: case 0x2Au: case 0x2Bu:
             return PayloadRegionKind::Instruction;
+        case 0x01u: case 0x17u: case 0x3Fu:
+            return PayloadRegionKind::Unknown;
+        case 0x2Du:
+            return word == 0x004236ADu
+                ? PayloadRegionKind::Instruction
+                : PayloadRegionKind::Unknown;
         default:
             return PayloadRegionKind::Unknown;
         }

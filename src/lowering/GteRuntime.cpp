@@ -74,6 +74,94 @@ bool execute_known_gte(
 {
     const std::uint32_t rs = (instruction >> 21) & 31u;
     const std::uint32_t function = instruction & 63u;
+    if (instruction == 0x4B18043Fu) {
+        for (std::uint32_t vertex = 0; vertex < 3; ++vertex) {
+            const std::uint32_t packed = data[vertex * 2u];
+            data[0] = packed;
+            data[1] = data[vertex * 2u + 1u];
+            multiply_rotation(data, control, 0);
+            data[9 + vertex] = data[25];
+            data[16 + vertex] = data[27];
+        }
+        return true;
+    }
+    if (function == 0x2D && (instruction == 0x4A58002Du ||
+                             instruction == 0x4B58002Du)) {
+        const std::int64_t zsum =
+            static_cast<std::int64_t>(signed_word(data[16])) +
+            signed_word(data[17]) +
+            signed_word(data[18]);
+        const std::int64_t mac0 =
+            static_cast<std::int64_t>(signed_word(control[29])) * zsum;
+        data[25] = static_cast<std::uint32_t>(mac0);
+        data[7] = static_cast<std::uint32_t>(
+            mac0 >> 12 < 0 ? 0 :
+            mac0 >> 12 > 65535 ? 65535 : mac0 >> 12);
+        return true;
+    }
+    if (function == 0x2E && (instruction == 0x4A68002Eu ||
+                             instruction == 0x4B68002Eu)) {
+        const std::int64_t zsum =
+            static_cast<std::int64_t>(signed_word(data[16])) +
+            signed_word(data[17]) +
+            signed_word(data[18]) +
+            signed_word(data[19]);
+        const std::int64_t mac0 =
+            static_cast<std::int64_t>(signed_word(control[30])) * zsum;
+        data[25] = static_cast<std::uint32_t>(mac0);
+        data[7] = static_cast<std::uint32_t>(
+            mac0 >> 12 < 0 ? 0 :
+            mac0 >> 12 > 65535 ? 65535 : mac0 >> 12);
+        return true;
+    }
+    if (rs == 17 && function == 0x30) {
+        for (std::uint32_t vertex = 0; vertex < 3; ++vertex) {
+            const std::uint32_t packed = data[vertex * 2u];
+            const std::int32_t vx =
+                static_cast<std::int16_t>(packed & 0xFFFFu);
+            const std::int32_t vy =
+                static_cast<std::int16_t>((packed >> 16) & 0xFFFFu);
+            const std::int32_t vz =
+                static_cast<std::int16_t>(data[vertex * 2u + 1u] & 0xFFFFu);
+            data[0] = static_cast<std::uint32_t>(
+                static_cast<std::uint16_t>(vx) |
+                (static_cast<std::uint32_t>(static_cast<std::uint16_t>(vy)) << 16));
+            data[1] = static_cast<std::uint32_t>(vz);
+            multiply_rotation(data, control, 0);
+            const std::int64_t numerator =
+                static_cast<std::int64_t>(signed_word(control[26])) << 16;
+            const std::int32_t depth = signed_word(data[18]);
+            const std::int64_t factor =
+                depth == 0 ? numerator : numerator / depth;
+            data[12 + vertex] = static_cast<std::uint32_t>(
+                clamp32((signed_word(data[9]) * factor) >> 16));
+            data[16 + vertex] = static_cast<std::uint32_t>(
+                clamp32(signed_word(data[27])));
+        }
+        return true;
+    }
+    if (rs == 24 && function == 0x1B) {
+        multiply_rotation(data, control, 0);
+        const std::int64_t r =
+            static_cast<std::int64_t>(signed_word(data[25])) +
+            signed_word(control[24]);
+        const std::int64_t g =
+            static_cast<std::int64_t>(signed_word(data[26])) +
+            signed_word(control[25]);
+        const std::int64_t b =
+            static_cast<std::int64_t>(signed_word(data[27])) +
+            signed_word(control[26]);
+        data[9] = static_cast<std::uint32_t>(
+            r < 0 ? 0 : r > 32767 ? 32767 : r);
+        data[10] = static_cast<std::uint32_t>(
+            g < 0 ? 0 : g > 32767 ? 32767 : g);
+        data[11] = static_cast<std::uint32_t>(
+            b < 0 ? 0 : b > 32767 ? 32767 : b);
+        data[22] = data[9];
+        data[23] = data[10];
+        data[24] = data[11];
+        return true;
+    }
     if (rs == 16 && function == 1) {
         multiply_rotation(data, control, 0);
         const std::int64_t numerator =

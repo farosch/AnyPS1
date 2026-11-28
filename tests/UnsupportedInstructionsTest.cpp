@@ -64,12 +64,22 @@ int main()
             0x48C8D800u,
             0x48C8E000u,
             0x48C8E800u,
-            0x48C8F000u
+            0x48C8F000u,
+            0x4A280030u,
+            0x4B08041Bu,
+            0x4A58002Du,
+            0x4B58002Du,
+            0x4A68002Eu,
+            0x4B68002Eu,
+            0x4B18043Fu
         };
         for (const std::uint32_t operation : gte_operations) {
             if (!anyps1::is_supported_mips_instruction(operation)) {
-                throw std::runtime_error(
-                    "shared COP2/GTE operation was classified as unsupported");
+                char message[128]{};
+                std::snprintf(message, sizeof(message),
+                              "COP2/GTE operation 0x%08X was classified as unsupported",
+                              operation);
+                throw std::runtime_error(message);
             }
         }
         if (!anyps1::is_supported_mips_instruction(0xC8200000u) ||

@@ -193,7 +193,6 @@ void split_leader_assembly(
     }
     if (leader_start == lines.size() ||
         leader_end == lines.size()) {
-        chunk_assemblies.push_back(assembly);
         return;
     }
 

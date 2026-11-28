@@ -60,6 +60,13 @@ int main()
             throw std::runtime_error(
                 "reserved SPECIAL encoding was classified as code");
         }
+        if (anyps1::classify_payload_region(
+                0x80010020u,
+                0x004236ADu,
+                true) != anyps1::PayloadRegionKind::Instruction) {
+            throw std::runtime_error(
+                "reserved SPECIAL fixture was not classified as instruction");
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Payload region test failed: " << error.what() << "\n";
