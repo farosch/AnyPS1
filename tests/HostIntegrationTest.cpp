@@ -377,6 +377,21 @@ int main()
             if (devices.read(0x1F801C00u) != 0x4567u) {
                 throw std::runtime_error("SPU register did not persist across ticks");
             }
+            devices.spu_ram[0] = 0x00u;
+            devices.spu_ram[1] = 0x00u;
+            devices.spu_ram[2] = 0x88u;
+            devices.write(0x1F801C00u, 0x4000u);
+            devices.write(0x1F801C02u, 0x4000u);
+            devices.write(0x1F801C04u, 0x1000u);
+            devices.write(0x1F801C0Cu, 0u);
+            devices.write(0x1F801D88u, 1u);
+            std::int16_t left[735]{};
+            std::int16_t right[735]{};
+            if (devices.mix_spu(left, right, 735u) == 0u ||
+                left[0] == 0 || right[0] == 0) {
+                throw std::runtime_error(
+                    "SPU voice did not produce stereo audio");
+            }
             ram[0] = 0x20FFFFFFu;
             devices.write(0x1F8010A0u, 0u);
             devices.write(0x1F8010A4u, 1u);

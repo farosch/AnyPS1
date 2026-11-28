@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -57,6 +58,22 @@ struct Ps1DeviceRuntime {
     std::uint32_t gpu_draw_phase = 0;
     std::uint32_t gpu_draw_color = 0;
     std::uint32_t gpu_draw_payload[8]{};
+    std::array<std::uint8_t, 512u * 1024u> spu_ram{};
+
+    struct SpuVoice {
+        bool active = false;
+        std::uint32_t start_address = 0;
+        std::uint32_t repeat_address = 0;
+        std::uint32_t current_address = 0;
+        std::uint32_t phase = 0;
+        std::uint32_t pitch = 0x1000u;
+        std::uint32_t block_offset = 0;
+        std::int32_t previous_left = 0;
+        std::int32_t previous_right = 0;
+        std::uint16_t volume_left = 0;
+        std::uint16_t volume_right = 0;
+    };
+    std::array<SpuVoice, 24u> voices{};
 
     void attach_ram(
         std::uint32_t* ram,
@@ -75,6 +92,10 @@ struct Ps1DeviceRuntime {
     std::uint32_t gpu_command_count_value() const;
     std::uint32_t gpu_dma_count_value() const;
     std::uint32_t spu_write_count_value() const;
+    std::uint32_t mix_spu(
+        std::int16_t* left,
+        std::int16_t* right,
+        std::size_t frame_count);
 
 private:
     std::uint32_t& register_at(std::uint32_t address);

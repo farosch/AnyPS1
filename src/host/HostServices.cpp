@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -858,26 +859,14 @@ int NativeHostLoopRuntime::spu_write(
 {
     impl_->spu_registers[address & 0x1FFFu] = value;
     if (address >= 0x1F801C00u && address < 0x1F801D80u) {
-        impl_->devices.write(address, value);
-        impl_->spu_output.assign(1024u, 0);
-        for (std::size_t index = 0; index < impl_->spu_output.size(); index += 2) {
-            const std::uint32_t register_value =
-                impl_->spu_registers[address & 0x1FFFu];
-            const std::int16_t sample =
-                static_cast<std::int16_t>((register_value * 0x1041u) >> 16u);
-            impl_->spu_output[index] = sample;
-            impl_->spu_output[index + 1u] = sample;
-        }
-        std::string error;
-        if (!queue_audio(
-                impl_->spu_output.data(),
-                impl_->spu_output.size(),
-                error)) {
-            return 18;
-        }
-        return 0;
+        return impl_->devices.write(address, value);
     }
-    return 17;
+    if (address == 0x1F801D88u ||
+        address == 0x1F801D8Cu ||
+        (address >= 0x1F801D80u && address < 0x1F801DA0u)) {
+        return impl_->devices.write(address, value);
+    }
+    return impl_->devices.write(address, value) == 0 ? 0 : 17;
 }
 
 std::uint32_t NativeHostLoopRuntime::spu_read(std::uint32_t address)
@@ -930,6 +919,28 @@ int NativeHostLoopRuntime::tick(std::uint32_t cycles)
     impl_->devices.set_controller_state(
         static_cast<std::uint32_t>(impl_->input_state.buttons));
     impl_->devices.tick(cycles);
+    constexpr std::size_t audio_frames = 735u;
+    std::array<std::int16_t, audio_frames> left_samples{};
+    std::array<std::int16_t, audio_frames> right_samples{};
+    const std::uint32_t audio_peak =
+        impl_->devices.mix_spu(
+            left_samples.data(),
+            right_samples.data(),
+            audio_frames);
+    if (audio_peak != 0u) {
+        impl_->spu_output.assign(audio_frames * 2u, 0);
+        for (std::size_t frame = 0; frame < audio_frames; ++frame) {
+            impl_->spu_output[frame * 2u] = left_samples[frame];
+            impl_->spu_output[frame * 2u + 1u] = right_samples[frame];
+        }
+        std::string audio_error;
+        if (!queue_audio(
+                impl_->spu_output.data(),
+                impl_->spu_output.size(),
+                audio_error)) {
+            return 18;
+        }
+    }
     const std::uint16_t* gpu_vram = impl_->devices.gpu_vram_data();
     for (std::size_t index = 0u;
          index < impl_->gpu_vram.size();

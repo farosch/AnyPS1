@@ -145,6 +145,8 @@
   generated executable loop.
 - [x] Integrate native audio lowering for PS1 SPU operations into generated
   executable loops.
+- [ ] Implement full PS1 SPU ADSR envelopes, reverb, XA/CD-DA decoding, and
+  sample-rate/timing synchronization.
 - [x] Integrate native video framebuffer presentation into generated executable
   loops.
 - [x] Integrate native Vulkan swapchain, image, sampler, pipeline, and

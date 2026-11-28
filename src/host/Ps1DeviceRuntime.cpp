@@ -1,5 +1,6 @@
 #include "host/Ps1DeviceRuntime.h"
 
+#include <algorithm>
 #include <cstdint>
 
 namespace {
@@ -254,15 +255,35 @@ void Ps1DeviceRuntime::execute_dma_channel(std::uint32_t channel)
     for (std::uint32_t index = 0; index < count; ++index) {
         const std::uint32_t ram_index =
             address / 4u + index;
-        if (to_ram) {
+        if (channel == 4u) {
+            const std::uint32_t transfer_address =
+                register_at(0x1F801DA6u) & 0xFFFFu;
+            const std::uint32_t spu_base =
+                transfer_address * 8u;
+            if ((control & 1u) == 0u) {
+                if (spu_base + index * 4u + 3u < spu_ram.size()) {
+                    spu_ram[spu_base + index * 4u] =
+                        static_cast<std::uint8_t>(ram[ram_index]);
+                    spu_ram[spu_base + index * 4u + 1u] =
+                        static_cast<std::uint8_t>(ram[ram_index] >> 8u);
+                    spu_ram[spu_base + index * 4u + 2u] =
+                        static_cast<std::uint8_t>(ram[ram_index] >> 16u);
+                    spu_ram[spu_base + index * 4u + 3u] =
+                        static_cast<std::uint8_t>(ram[ram_index] >> 24u);
+                }
+            } else {
+                if (spu_base + index * 4u + 3u < spu_ram.size()) {
+                    ram[ram_index] =
+                        static_cast<std::uint32_t>(spu_ram[spu_base + index * 4u]) |
+                        (static_cast<std::uint32_t>(spu_ram[spu_base + index * 4u + 1u]) << 8u) |
+                        (static_cast<std::uint32_t>(spu_ram[spu_base + index * 4u + 2u]) << 16u) |
+                        (static_cast<std::uint32_t>(spu_ram[spu_base + index * 4u + 3u]) << 24u);
+                }
+            }
+        } else if (to_ram) {
             ram[ram_index] = 0;
         } else if (channel == 2u) {
             execute_gpu_command(ram[ram_index]);
-        } else if (channel == 4u) {
-            const std::uint32_t spu_address =
-                (index * 2u) % SPU_WORDS;
-            spu[spu_address] =
-                static_cast<std::uint16_t>(ram[ram_index]);
         }
     }
     control &= ~0x01000000u;
@@ -281,6 +302,14 @@ std::uint32_t Ps1DeviceRuntime::read(std::uint32_t address)
     }
     if (normalized == 0x1F801070u) return interrupt_status;
     if (normalized == 0x1F801074u) return interrupt_mask;
+    if (normalized == 0x1F801D88u ||
+        normalized == 0x1F801D8Cu) {
+        std::uint32_t status = 0;
+        for (std::size_t voice = 0; voice < voices.size(); ++voice) {
+            if (voices[voice].active) status |= 1u << voice;
+        }
+        return status;
+    }
     if (normalized >= 0x1F801100u &&
         normalized < 0x1F801130u) {
         const std::uint32_t timer =
@@ -363,10 +392,54 @@ int Ps1DeviceRuntime::write(
         interrupt_mask = value;
         return 0;
     }
+    if (normalized == 0x1F801D88u) {
+        for (std::size_t voice = 0; voice < voices.size(); ++voice) {
+            if ((value & (1u << voice)) == 0) continue;
+            SpuVoice& state = voices[voice];
+            const std::size_t base = voice * 8u;
+            state.active = true;
+            state.start_address =
+                static_cast<std::uint32_t>(spu[base + 6u]) * 8u;
+            state.repeat_address =
+                static_cast<std::uint32_t>(spu[base + 6u]) * 8u;
+            state.current_address = state.start_address;
+            state.phase = 0;
+            state.block_offset = 0;
+            state.previous_left = 0;
+            state.previous_right = 0;
+            state.pitch = spu[base + 2u];
+            if (state.pitch < 0x40u) state.pitch = 0x40u;
+            state.volume_left = spu[base];
+            state.volume_right = spu[base + 1u];
+        }
+        register_at(normalized) = value;
+        return 0;
+    }
+    if (normalized == 0x1F801D8Cu) {
+        for (std::size_t voice = 0; voice < voices.size(); ++voice) {
+            if ((value & (1u << voice)) != 0) voices[voice].active = false;
+        }
+        register_at(normalized) = value;
+        return 0;
+    }
     if (normalized >= 0x1F801C00u &&
         normalized < 0x1F801C00u + SPU_WORDS * 2u) {
         spu[(normalized - 0x1F801C00u) / 2u] =
             static_cast<std::uint16_t>(value);
+        const std::uint32_t offset =
+            normalized - 0x1F801C00u;
+        if ((offset & 15u) < 14u) {
+            const std::size_t voice = offset / 16u;
+            if (voice < voices.size()) {
+                const std::uint32_t field = (offset / 2u) & 7u;
+                if (field == 0u) voices[voice].volume_left =
+                    static_cast<std::uint16_t>(value);
+                if (field == 1u) voices[voice].volume_right =
+                    static_cast<std::uint16_t>(value);
+                if (field == 2u) voices[voice].pitch =
+                    value < 0x40u ? 0x40u : static_cast<std::uint32_t>(value);
+            }
+        }
         return 0;
     }
     if (normalized == 0x1F801040u) {
@@ -500,6 +573,110 @@ std::uint32_t Ps1DeviceRuntime::gpu_dma_count_value() const
 std::uint32_t Ps1DeviceRuntime::spu_write_count_value() const
 {
     return spu_write_count;
+}
+
+std::uint32_t Ps1DeviceRuntime::mix_spu(
+    std::int16_t* left,
+    std::int16_t* right,
+    std::size_t frame_count)
+{
+    if (left == nullptr || right == nullptr) return 0;
+    std::uint32_t peak = 0;
+    static constexpr std::int32_t filter_first[5] =
+        {0, 60, 115, 98, 122};
+    static constexpr std::int32_t filter_second[5] =
+        {0, 0, -52, -55, -60};
+
+    for (std::size_t frame = 0; frame < frame_count; ++frame) {
+        std::int32_t left_sample = 0;
+        std::int32_t right_sample = 0;
+        for (std::size_t voice_index = 0;
+             voice_index < voices.size();
+             ++voice_index) {
+            SpuVoice& voice = voices[voice_index];
+            if (!voice.active) continue;
+            if (voice.current_address + 16u > spu_ram.size()) {
+                voice.active = false;
+                continue;
+            }
+            const std::uint32_t block_address =
+                voice.current_address & ~15u;
+            const std::uint8_t header =
+                spu_ram[block_address];
+            const std::uint32_t shift =
+                std::min<std::uint32_t>(header & 15u, 12u);
+            const std::uint32_t filter =
+                std::min<std::uint32_t>((header >> 4u) & 7u, 4u);
+            const std::uint32_t nibble_index = voice.block_offset;
+            const std::uint32_t data_address =
+                block_address + 2u + nibble_index / 2u;
+            std::uint32_t nibble =
+                (nibble_index & 1u) != 0u
+                    ? (spu_ram[data_address] >> 4u) & 15u
+                    : spu_ram[data_address] & 15u;
+            std::int32_t signed_nibble =
+                nibble >= 8u
+                    ? static_cast<std::int32_t>(nibble) - 16
+                    : static_cast<std::int32_t>(nibble);
+            std::int32_t decoded =
+                (signed_nibble * (1 << shift) * 2048);
+            decoded +=
+                (voice.previous_left * filter_first[filter]) / 64 +
+                (voice.previous_right * filter_second[filter]) / 64;
+            decoded = std::max(-32768, std::min(32767, decoded));
+            voice.previous_right = voice.previous_left;
+            voice.previous_left = decoded;
+
+            const std::uint32_t left_volume =
+                voice.volume_left & 0x7FFFu;
+            const std::uint32_t right_volume =
+                voice.volume_right & 0x7FFFu;
+            left_sample +=
+                (decoded * static_cast<std::int32_t>(left_volume)) / 0x4000;
+            right_sample +=
+                (decoded * static_cast<std::int32_t>(right_volume)) / 0x4000;
+
+            voice.phase +=
+                std::max<std::uint32_t>(voice.pitch, 0x40u) << 4u;
+            const std::uint32_t samples =
+                voice.phase >> 16u;
+            if (samples != 0u) {
+                voice.phase &= 0xFFFFu;
+                voice.block_offset += samples;
+            }
+            while (voice.block_offset >= 28u) {
+                voice.block_offset -= 28u;
+                voice.current_address = block_address + 16u;
+                if (voice.current_address >= spu_ram.size()) {
+                    voice.active = false;
+                    break;
+                }
+                const std::uint8_t flags =
+                    spu_ram[block_address + 1u];
+                if ((flags & 1u) != 0u) {
+                    if ((flags & 2u) != 0u) {
+                        voice.current_address =
+                            voice.repeat_address;
+                        voice.previous_left = 0;
+                        voice.previous_right = 0;
+                    } else {
+                        voice.active = false;
+                    }
+                }
+            }
+        }
+        left_sample = std::max(-32768, std::min(32767, left_sample));
+        right_sample = std::max(-32768, std::min(32767, right_sample));
+        left[frame] = static_cast<std::int16_t>(left_sample);
+        right[frame] = static_cast<std::int16_t>(right_sample);
+        peak = std::max(
+            peak,
+            static_cast<std::uint32_t>(
+                std::max(
+                    std::abs(left_sample),
+                    std::abs(right_sample))));
+    }
+    return peak;
 }
 
 
