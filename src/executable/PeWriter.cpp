@@ -146,17 +146,36 @@ void write_pe_ir(
             "native Windows lowering IR has no source");
     }
 
-    const std::filesystem::path source =
-        std::filesystem::path(options.output + ".native-pe.cpp");
-    const std::filesystem::path object =
-        std::filesystem::path(options.output + ".native-pe.obj");
-    std::ofstream source_output(source, std::ios::trunc);
-    if (!source_output) {
-        throw std::runtime_error(
-            "cannot create native Windows lowering source");
+    std::vector<std::filesystem::path> sources;
+    std::vector<std::filesystem::path> objects;
+    if (ir.chunks.empty()) {
+        sources.push_back(
+            std::filesystem::path(options.output + ".native-pe.cpp"));
+        objects.push_back(
+            std::filesystem::path(options.output + ".native-pe.obj"));
+    } else {
+        sources.reserve(ir.chunks.size());
+        objects.reserve(ir.chunks.size());
+        for (std::size_t index = 0; index < ir.chunks.size(); ++index) {
+            sources.push_back(std::filesystem::path(
+                options.output + ".native-pe." +
+                std::to_string(index) + ".cpp"));
+            objects.push_back(std::filesystem::path(
+                options.output + ".native-pe." +
+                std::to_string(index) + ".obj"));
+        }
     }
-    source_output << ir.source;
-    source_output.close();
+    for (std::size_t index = 0; index < sources.size(); ++index) {
+        std::ofstream source_output(sources[index], std::ios::trunc);
+        if (!source_output) {
+            throw std::runtime_error(
+                "cannot create native Windows lowering source");
+        }
+        source_output << (ir.chunks.empty()
+                              ? ir.source
+                              : ir.chunks[index]);
+        source_output.close();
+    }
 
 #ifdef _WIN32
     const std::string clang_environment = environment_value("ANYPS1_CLANG_CL");
@@ -168,19 +187,21 @@ void write_pe_ir(
         std::filesystem::path(
             lld_environment.empty() ? "lld-link" : lld_environment);
 
-    std::vector<std::wstring> compile_arguments{
-        L"/nologo",
-        L"/c",
-        L"/O2",
-        L"/GS-",
-        L"/GR-",
-        L"/EHs-c-",
-        L"/Fo:" + object.wstring(),
-        source.wstring(),
-    };
-    if (!run_windows_tool(clang, compile_arguments)) {
-        throw std::runtime_error(
-            "native Windows lowering Clang compilation failed");
+    for (std::size_t index = 0; index < sources.size(); ++index) {
+        std::vector<std::wstring> compile_arguments{
+            L"/nologo",
+            L"/c",
+            L"/O2",
+            L"/GS-",
+            L"/GR-",
+            L"/EHs-c-",
+            L"/Fo:" + objects[index].wstring(),
+            sources[index].wstring(),
+        };
+        if (!run_windows_tool(clang, compile_arguments)) {
+            throw std::runtime_error(
+                "native Windows lowering Clang compilation failed");
+        }
     }
 
     std::vector<std::wstring> link_arguments{
@@ -190,38 +211,43 @@ void write_pe_ir(
         L"/ENTRY:" + std::wstring(ir.entry_symbol.begin(), ir.entry_symbol.end()),
         L"/BASE:0x140000000",
         L"/OUT:" + std::filesystem::path(options.output).wstring(),
-        object.wstring(),
-        L"kernel32.lib",
     };
+    for (const std::filesystem::path& object : objects) {
+        link_arguments.push_back(object.wstring());
+    }
+    link_arguments.push_back(L"kernel32.lib");
     if (!run_windows_tool(lld, link_arguments)) {
         throw std::runtime_error(
             "native Windows lowering LLD link failed");
     }
 #else
-    if (!run_posix_tool(
-            "clang++",
-            {
-                "--target=x86_64-pc-windows-msvc",
-                "-c",
-                "-O2",
-                "-o",
-                object.string(),
-                source.string(),
-            })) {
-        throw std::runtime_error(
-            "native Windows lowering Clang compilation failed");
+    for (std::size_t index = 0; index < sources.size(); ++index) {
+        if (!run_posix_tool(
+                "clang++",
+                {
+                    "--target=x86_64-pc-windows-msvc",
+                    "-c",
+                    "-O2",
+                    "-o",
+                    objects[index].string(),
+                    sources[index].string(),
+                })) {
+            throw std::runtime_error(
+                "native Windows lowering Clang compilation failed");
+        }
     }
-    if (!run_posix_tool(
-            "lld-link",
-            {
-                "/nologo",
-                "/NODEFAULTLIB",
-                "/SUBSYSTEM:CONSOLE",
-                "/ENTRY:" + ir.entry_symbol,
-                "/BASE:0x140000000",
-                "/OUT:" + options.output,
-                object.string(),
-            })) {
+    std::vector<std::string> posix_link_arguments{
+        "/nologo",
+        "/NODEFAULTLIB",
+        "/SUBSYSTEM:CONSOLE",
+        "/ENTRY:" + ir.entry_symbol,
+        "/BASE:0x140000000",
+        "/OUT:" + options.output,
+    };
+    for (const std::filesystem::path& object : objects) {
+        posix_link_arguments.push_back(object.string());
+    }
+    if (!run_posix_tool("lld-link", posix_link_arguments)) {
         throw std::runtime_error(
             "native Windows lowering LLD link failed");
     }
@@ -237,8 +263,12 @@ void write_pe_ir(
 #endif
     if (keep_value.empty()) {
         std::error_code remove_error;
-        std::filesystem::remove(source, remove_error);
-        std::filesystem::remove(object, remove_error);
+        for (const std::filesystem::path& source_path : sources) {
+            std::filesystem::remove(source_path, remove_error);
+        }
+        for (const std::filesystem::path& object_path : objects) {
+            std::filesystem::remove(object_path, remove_error);
+        }
     }
 }
 

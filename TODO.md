@@ -188,10 +188,12 @@
 - [x] Replace hard target-source size rejection with shared sparse leader
   dispatch for Linux and Windows; bounded assembler/Clang jobs remain explicit
   and large executable behavior is verified across multiple reference games.
-- [ ] Complete chunked native lowering sources instead of one sparse
-  translation unit: link every Linux assembly/Windows C chunk, and share
-  runtime state across chunk boundaries. The shared plan now exposes bounded
-  512-leader emission chunks on every target.
+- [x] Add bounded 512-leader native emission chunks to the shared lowering
+  plan and link separate Windows C/PE chunks with shared runtime state.
+- [x] Verify chunked Windows relinking and execution across Spyro, THPS,
+  Tekken 3, Castlevania, Final Fantasy VII, and Metal Gear Solid.
+- [ ] Emit and link separate Linux assembly chunks with shared runtime state;
+  Linux currently uses the bounded shared plan and separate timeout guards.
 - [x] Apply the 30,000-leader CFG emission limit and a two-minute
   assembler/linker timeout explicitly to Linux lowering; Linux no longer hangs
   on oversized assembly or a stalled native toolchain.

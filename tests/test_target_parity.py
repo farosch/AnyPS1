@@ -125,9 +125,9 @@ class LoweringInventoryTest(unittest.TestCase):
             ROOT / "src" / "lowering" / "MipsWindowsLowerer.cpp"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "leader_dispatch",
+            "leader_chunks",
             windows_text,
-            "Windows lowering must consume sparse leader dispatch",
+            "Windows lowering must consume bounded leader chunks",
         )
         self.assertIn(
             "indirect_leader_dispatch",

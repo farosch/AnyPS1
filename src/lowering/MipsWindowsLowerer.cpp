@@ -85,11 +85,15 @@ void MipsWindowsLowerer::lower(
         source << static_cast<unsigned int>(byte) << ",";
     }
     source << "0};\n";
-    source << "static uint32_t regs[32];\n";
-    source << "static uint32_t ram[524288];\n";
-    source << "static uint32_t scratchpad[256];\n";
-    source << "static uint32_t hi_value;\n";
-    source << "static uint32_t lo_value;\n";
+    source << "uint32_t regs[32];\n";
+    source << "uint32_t ram[524288];\n";
+    source << "uint32_t scratchpad[256];\n";
+    source << "uint32_t hi_value;\n";
+    source << "uint32_t lo_value;\n";
+    source << "uint32_t pc;\n";
+    source << "uint32_t next_pc;\n";
+    source << "uint32_t pending_target;\n";
+    source << "uint32_t delay_remaining;\n";
     source << "static uint32_t payload[] = {";
     bool payload_first = true;
     for (std::uint32_t offset = 0; offset < plan.file_size; offset += 4u) {
@@ -101,6 +105,75 @@ void MipsWindowsLowerer::lower(
                << word << std::dec;
     }
     source << "};\n";
+    source << "extern \"C\" void native_execute_ir(uint32_t kind,uint32_t address,uint32_t word,uint32_t rs,uint32_t rt,uint32_t rd,uint32_t shamt,uint32_t immediate,uint32_t target,uint32_t size_value,uint32_t special){\n";
+    source << "switch(kind){\n";
+    source << "case 1:return;\n";
+    source << "case 2:\n";
+    source << "if(special==0)regs[rd]=regs[rt]<<shamt;\n";
+    source << "else if(special==2)regs[rd]=regs[rt]>>shamt;\n";
+    source << "else if(special==3)regs[rd]=(uint32_t)((int32_t)regs[rt]>>shamt);\n";
+    source << "else if(special==4)regs[rd]=regs[rt]<<(regs[rs]&31u);\n";
+    source << "else if(special==6)regs[rd]=regs[rt]>>(regs[rs]&31u);\n";
+    source << "else regs[rd]=(uint32_t)((int32_t)regs[rt]>>(regs[rs]&31u));\n";
+    source << "return;\n";
+    source << "case 3:\n";
+    source << "if(special==33||special==32)regs[rd]=regs[rs]+regs[rt];\n";
+    source << "else regs[rd]=regs[rs]-regs[rt];\n";
+    source << "return;\n";
+    source << "case 4:\n";
+    source << "if(special==36)regs[rd]=regs[rs]&regs[rt];\n";
+    source << "else if(special==37)regs[rd]=regs[rs]|regs[rt];\n";
+    source << "else if(special==38)regs[rd]=regs[rs]^regs[rt];\n";
+    source << "else regs[rd]=~(regs[rs]|regs[rt]);\n";
+    source << "return;\n";
+    source << "case 5:\n";
+    source << "if(special==42)regs[rd]=(int32_t)regs[rs]<(int32_t)regs[rt]?1u:0u;\n";
+    source << "else regs[rd]=regs[rs]<regs[rt]?1u:0u;\n";
+    source << "return;\n";
+    source << "case 6:\n";
+    source << "{uint64_t value=special==24?(uint64_t)(int64_t)((int32_t)regs[rs]*(int32_t)regs[rt]):(uint64_t)regs[rs]*(uint64_t)regs[rt];lo_value=(uint32_t)value;hi_value=(uint32_t)(value>>32u);}\n";
+    source << "return;\n";
+    source << "case 7:\n";
+    source << "if(regs[rt]!=0){if(special==26){lo_value=(uint32_t)((int32_t)regs[rs]/(int32_t)regs[rt]);hi_value=(uint32_t)((int32_t)regs[rs]%(int32_t)regs[rt]);}else{lo_value=regs[rs]/regs[rt];hi_value=regs[rs]%regs[rt];}}\n";
+    source << "return;\n";
+    source << "case 8:\n";
+    source << "if(special==16)regs[rd]=hi_value;else if(special==17)hi_value=regs[rs];else if(special==18)regs[rd]=lo_value;else lo_value=regs[rs];\n";
+    source << "return;\n";
+    source << "case 13:\n";
+    source << "if((word>>26)==8||((word>>26)==9))regs[rt]=regs[rs]+(uint32_t)(int32_t)(int16_t)immediate;\n";
+    source << "else if((word>>26)==10)regs[rt]=(int32_t)regs[rs]<(int32_t)(int16_t)immediate?1u:0u;\n";
+    source << "else if((word>>26)==11)regs[rt]=regs[rs]<((uint32_t)(uint16_t)immediate)?1u:0u;\n";
+    source << "else if((word>>26)==12)regs[rt]=regs[rs]&immediate;\n";
+    source << "else if((word>>26)==13)regs[rt]=regs[rs]|immediate;\n";
+    source << "else if((word>>26)==14)regs[rt]=regs[rs]^immediate;\n";
+    source << "else if((word>>26)==15)regs[rt]=immediate<<16;\n";
+    source << "return;\n";
+    source << "case 14:\n";
+    source << "{uint32_t take=0;if((word>>26)==4)take=regs[rs]==regs[rt];else if((word>>26)==5)take=regs[rs]!=regs[rt];else if((word>>26)==6)take=(int32_t)regs[rs]<=0;else if((word>>26)==7)take=(int32_t)regs[rs]>0;if(take){pending_target=target;delay_remaining=2u;}}\n";
+    source << "return;\n";
+    source << "case 15:\n";
+    source << "pending_target=target;if((word>>26)==3)regs[31]=address+8u;delay_remaining=2u;\n";
+    source << "return;\n";
+    source << "case 16:\n";
+    source << "pending_target=regs[rs];delay_remaining=2u;\n";
+    source << "return;\n";
+    source << "case 17:\n";
+    source << "regs[rd]=address+8u;pending_target=regs[rs];delay_remaining=2u;\n";
+    source << "return;\n";
+    source << "case 18:\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)regs[rt]=(uint32_t)*((uint8_t*)ram+ea);else if(size_value==2)regs[rt]=(uint32_t)*((uint16_t*)((uint8_t*)ram+ea));else regs[rt]=ram[ea>>2u];}else if(ea>=0x1F800000u&&ea<0x1F800400u)regs[rt]=scratchpad[(ea&0x3FFu)>>2u];else ExitProcess(17u);}\n";
+    source << "return;\n";
+    source << "case 19:\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else ExitProcess(17u);}\n";
+    source << "return;\n";
+    source << "case 22:\n";
+    source << "ExitProcess(special==12?0u:9u);\n";
+    source << "return;\n";
+    source << "default:ExitProcess(16u);\n";
+    source << "}\n}\n";
+    for (std::size_t chunk_index = 0; chunk_index < plan.leader_chunks.size(); ++chunk_index) {
+        source << "extern \"C\" bool native_chunk_" << chunk_index << "(void);\n";
+    }
     source << "int main(void) {\n";
     source << "#ifdef _WIN32\n";
     source << "void* handle = GetStdHandle(0xfffffff5u);\n";
@@ -112,234 +185,16 @@ void MipsWindowsLowerer::lower(
     source << "for(uint32_t i=0;i<sizeof(payload)/sizeof(payload[0]);++i) "
                "ram[" << (plan.payload_ram_offset / 4u)
             << "+i]=payload[i];\n";
-    source << "uint32_t pc=0x" << std::hex << initial_pc << std::dec << "u;\n";
-    source << "uint32_t next_pc=pc+4u;\n";
-    source << "uint32_t pending_target=0;\n";
-    source << "uint32_t delay_remaining=0;\n";
+    source << "pc=0x" << std::hex << initial_pc << std::dec << "u;\n";
+    source << "next_pc=pc+4u;\n";
+    source << "pending_target=0u;\n";
+    source << "delay_remaining=0u;\n";
     source << "for(uint32_t steps=0;steps<10000000u;++steps){\n";
     source << "if(delay_remaining==1u){pc=pending_target;delay_remaining=0u;}\n";
     source << "else if(delay_remaining==2u){pc=next_pc;delay_remaining=1u;}\n";
     source << "bool dispatched=false;\n";
-
-    for (const auto& bucket_entry : plan.leader_dispatch) {
-        source << "if(!dispatched && (pc>>8u)==0x"
-               << std::hex << bucket_entry.first << std::dec << "u){\n";
-        source << "dispatched=true;\n";
-        source << "switch(pc){\n";
-        for (std::uint32_t address : bucket_entry.second) {
-        if (address < plan.load_address ||
-            address >= plan.load_address + plan.file_size ||
-            (address & 3u) != 0u) continue;
-        const std::uint32_t offset = address - plan.load_address;
-        if (offset + 4u > plan.file_size) continue;
-        const std::uint32_t word =
-            read_psx32(data, PSX_HEADER_SIZE + offset);
-        const MipsInstructionIr ir =
-            build_mips_instruction_ir(address, word);
-        if (!is_supported_mips_instruction(word)) {
-            source << "case 0x" << std::hex << std::setfill('0')
-                   << std::setw(8) << address << std::dec << "u:{"
-                   << "ExitProcess(16u);break;}\n";
-            continue;
-        }
-        source << "case 0x" << std::hex << std::setfill('0') << std::setw(8)
-               << address << std::dec << "u:{\n";
-        source << "next_pc=pc+4u;\n";
-        switch (ir.kind) {
-        case MipsInstructionKind::Nop:
-            break;
-        case MipsInstructionKind::Shift:
-            if (ir.special == 0x00u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rt
-                       << "]<<" << ir.shamt << "u;\n";
-            else if (ir.special == 0x02u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rt
-                       << "]>>" << ir.shamt << "u;\n";
-            else if (ir.special == 0x03u)
-                source << "regs[" << ir.rd << "]=(uint32_t)((int32_t)regs[" << ir.rt
-                       << "]>>" << ir.shamt << "u);\n";
-            else if (ir.special == 0x04u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rt
-                       << "]<<(regs[" << ir.rs << "]&31u);\n";
-            else if (ir.special == 0x06u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rt
-                       << "]>>(regs[" << ir.rs << "]&31u);\n";
-            else if (ir.special == 0x07u)
-                source << "regs[" << ir.rd << "]=(uint32_t)((int32_t)regs[" << ir.rt
-                       << "]>>(regs[" << ir.rs << "]&31u));\n";
-            break;
-        case MipsInstructionKind::Arithmetic:
-            if (ir.special == 0x21u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]+regs[" << ir.rt << "];\n";
-            else if (ir.special == 0x23u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]-regs[" << ir.rt << "];\n";
-            else if (ir.special == 0x20u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]+regs[" << ir.rt << "];\n";
-            else if (ir.special == 0x22u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]-regs[" << ir.rt << "];\n";
-            break;
-        case MipsInstructionKind::Logical:
-            if (ir.special == 0x24u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]&regs[" << ir.rt << "];\n";
-            else if (ir.special == 0x25u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]|regs[" << ir.rt << "];\n";
-            else if (ir.special == 0x26u)
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]^regs[" << ir.rt << "];\n";
-            else if (ir.special == 0x27u)
-                source << "regs[" << ir.rd << "] =~(regs[" << ir.rs
-                       << "]|regs[" << ir.rt << "]);\n";
-            break;
-        case MipsInstructionKind::Compare:
-            if (ir.special == 0x2Au)
-                source << "regs[" << ir.rd << "]=(int32_t)regs[" << ir.rs
-                       << "]<(int32_t)regs[" << ir.rt << "]?1u:0u;\n";
-            else
-                source << "regs[" << ir.rd << "]=regs[" << ir.rs
-                       << "]<regs[" << ir.rt << "]?1u:0u;\n";
-            break;
-        case MipsInstructionKind::Multiply:
-            if (ir.special == 0x18u)
-                source << "{int64_t v=(int64_t)(int32_t)regs[" << ir.rs
-                       << "]*(int64_t)(int32_t)regs[" << ir.rt
-                       << "];lo_value=(uint32_t)v;hi_value=(uint32_t)((uint64_t)v>>32u);}\n";
-            else
-                source << "{uint64_t v=(uint64_t)regs[" << ir.rs
-                       << "]*(uint64_t)regs[" << ir.rt
-                       << "];lo_value=(uint32_t)v;hi_value=(uint32_t)(v>>32u);}\n";
-            break;
-        case MipsInstructionKind::Divide:
-            source << "if(regs[" << ir.rt << "]!=0){";
-            if (ir.special == 0x1Au)
-                source << "lo_value=(uint32_t)((int32_t)regs[" << ir.rs
-                       << "]/(int32_t)regs[" << ir.rt
-                       << "]);hi_value=(uint32_t)((int32_t)regs[" << ir.rs
-                       << "]%(int32_t)regs[" << ir.rt << "]);";
-            else
-                source << "lo_value=regs[" << ir.rs << "]/regs[" << ir.rt
-                       << "];hi_value=regs[" << ir.rs << "]%regs[" << ir.rt << "];";
-            source << "}\n";
-            break;
-        case MipsInstructionKind::HiLo:
-            if (ir.special == 0x10u)
-                source << "regs[" << ir.rd << "]=hi_value;\n";
-            else if (ir.special == 0x11u)
-                source << "hi_value=regs[" << ir.rs << "];\n";
-            else if (ir.special == 0x12u)
-                source << "regs[" << ir.rd << "]=lo_value;\n";
-            else if (ir.special == 0x13u)
-                source << "lo_value=regs[" << ir.rs << "];\n";
-            break;
-        case MipsInstructionKind::Immediate:
-            if (ir.opcode == 0x08u)
-                source << "regs[" << ir.rt << "]=regs[" << ir.rs
-                       << "]+0x" << std::hex << ir.immediate << std::dec << "u;\n";
-            else if (ir.opcode == 0x09u)
-                source << "regs[" << ir.rt << "]=regs[" << ir.rs
-                       << "]+0x" << std::hex << ir.immediate << std::dec << "u;\n";
-            else if (ir.opcode == 0x0Au)
-                source << "regs[" << ir.rt << "]=(int32_t)regs[" << ir.rs
-                       << "]<(int32_t)0x" << std::hex
-                       << ir.immediate << std::dec << "u?1u:0u;\n";
-            else if (ir.opcode == 0x0Bu)
-                source << "regs[" << ir.rt << "]=regs[" << ir.rs
-                       << "]<0x" << std::hex << ir.immediate << std::dec << "u?1u:0u;\n";
-            else if (ir.opcode == 0x0Cu)
-                source << "regs[" << ir.rt << "]=regs[" << ir.rs
-                       << "]&0x" << std::hex << ir.immediate << std::dec << "u;\n";
-            else if (ir.opcode == 0x0Du)
-                source << "regs[" << ir.rt << "]=regs[" << ir.rs
-                       << "]|0x" << std::hex << ir.immediate << std::dec << "u;\n";
-            else if (ir.opcode == 0x0Eu)
-                source << "regs[" << ir.rt << "]=regs[" << ir.rs
-                       << "]^0x" << std::hex << ir.immediate << std::dec << "u;\n";
-            else if (ir.opcode == 0x0Fu) {
-                source << "regs[" << ir.rt << "]=";
-                source << "0x" << std::hex << (ir.immediate << 16u)
-                       << std::dec << "u;\n";
-            }
-            break;
-        case MipsInstructionKind::Branch:
-            source << "{uint32_t take=0u;";
-            if (ir.opcode == 0x04u)
-                source << "take=regs[" << ir.rs << "]==regs[" << ir.rt << "]?1u:0u;";
-            else if (ir.opcode == 0x05u)
-                source << "take=regs[" << ir.rs << "]!=regs[" << ir.rt << "]?1u:0u;";
-            else if (ir.opcode == 0x06u)
-                source << "take=(int32_t)regs[" << ir.rs << "]<=0?1u:0u;";
-            else if (ir.opcode == 0x07u)
-                source << "take=(int32_t)regs[" << ir.rs << "]>0?1u:0u;";
-            else
-                source << "take=0u;";
-            source << "if(take){pending_target=0x" << std::hex << ir.target
-                   << std::dec << "u;delay_remaining=2u;}}\n";
-            break;
-        case MipsInstructionKind::Jump:
-            source << "pending_target=0x" << std::hex << ir.target << std::dec << "u;";
-            if (ir.opcode == 0x03u)
-                source << "regs[31]=pc+8u;";
-            source << "delay_remaining=2u;\n";
-            break;
-        case MipsInstructionKind::Jr:
-            source << "pending_target=regs[" << ir.rs
-                   << "];delay_remaining=2u;\n";
-            break;
-        case MipsInstructionKind::Jalr:
-            source << "regs[" << ir.rd << "]=pc+8u;"
-                   << "pending_target=regs[" << ir.rs
-                   << "];delay_remaining=2u;\n";
-            break;
-        case MipsInstructionKind::Load:
-        case MipsInstructionKind::Store:
-            source << "{uint32_t ea=(regs[" << ir.rs << "]+"
-                   << static_cast<std::int32_t>(
-                          static_cast<std::int16_t>(ir.immediate))
-                   << "u)&0x1FFFFFFFu;";
-            if (ir.kind == MipsInstructionKind::Load) {
-                source << "if(ea<0x00200000u){";
-                if (ir.size == 1u)
-                    source << "regs[" << ir.rt << "]=(uint32_t)*((uint8_t*)ram+ea);";
-                else if (ir.size == 2u)
-                    source << "regs[" << ir.rt << "]=(uint32_t)*((uint16_t*)((uint8_t*)ram+ea));";
-                else
-                    source << "regs[" << ir.rt << "]=ram[ea>>2u];";
-                source << "}else if(ea>=0x1F800000u&&ea<0x1F800400u){"
-                           "regs[" << ir.rt << "]=scratchpad[(ea&0x3FFu)>>2u];"
-                           "}else{ExitProcess(17u);}}\n";
-            } else {
-                source << "if(ea<0x00200000u){";
-                if (ir.size == 1u)
-                    source << "*((uint8_t*)ram+ea)=(uint8_t)regs[" << ir.rt << "];";
-                else if (ir.size == 2u)
-                    source << "*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[" << ir.rt << "];";
-                else
-                    source << "ram[ea>>2u]=regs[" << ir.rt << "];";
-                source << "}else if(ea>=0x1F800000u&&ea<0x1F800400u){"
-                           "scratchpad[(ea&0x3FFu)>>2u]=regs[" << ir.rt << "];"
-                           "}else{ExitProcess(17u);}}\n";
-            }
-            break;
-        case MipsInstructionKind::System:
-            if (ir.special == 0x0Cu)
-                source << "ExitProcess(0u);\n";
-            else
-                source << "ExitProcess(9u);\n";
-            break;
-        default:
-            source << "ExitProcess(16u);\n";
-            break;
-        }
-        source << "regs[0]=0u;\n";
-        source << "break;}\n";
-    }
-        source << "default:ExitProcess(17u);}\n";
-        source << "}\n";
+    for (std::size_t chunk_index = 0; chunk_index < plan.leader_chunks.size(); ++chunk_index) {
+        source << "if(!dispatched && native_chunk_" << chunk_index << "())dispatched=true;\n";
     }
     source << "if(!dispatched)ExitProcess(17u);\n";
     source << "pc=next_pc;\n";
@@ -347,6 +202,8 @@ void MipsWindowsLowerer::lower(
     source << "ExitProcess(17u);\n";
     source << "return 17;\n";
     source << "}\n";
+
+    std::vector<std::string> chunks;
 
     const std::uint32_t exit_status =
         unsupported_count != 0 ? 16 :
@@ -356,6 +213,61 @@ void MipsWindowsLowerer::lower(
     ir.target = TargetPlatform::Windows;
     ir.entry_symbol = "main";
     ir.source = source.str();
+    ir.chunks.push_back(source.str());
+    for (std::size_t chunk_index = 0;
+         chunk_index < plan.leader_chunks.size();
+         ++chunk_index) {
+        std::ostringstream chunk;
+        chunk << "#include <stddef.h>\n";
+        chunk << "#include <stdint.h>\n";
+        chunk << "#ifdef _WIN32\n";
+        chunk << "extern \"C\" __declspec(dllimport) void __stdcall ExitProcess(unsigned int);\n";
+        chunk << "#endif\n";
+        chunk << "extern uint32_t regs[32];\n";
+        chunk << "extern uint32_t ram[524288];\n";
+        chunk << "extern uint32_t scratchpad[256];\n";
+        chunk << "extern uint32_t hi_value;\n";
+        chunk << "extern uint32_t lo_value;\n";
+        chunk << "extern uint32_t pc;\n";
+        chunk << "extern uint32_t next_pc;\n";
+        chunk << "extern uint32_t pending_target;\n";
+        chunk << "extern uint32_t delay_remaining;\n";
+        chunk << "extern \"C\" void native_execute_ir(uint32_t kind,uint32_t address,uint32_t word,uint32_t rs,uint32_t rt,uint32_t rd,uint32_t shamt,uint32_t immediate,uint32_t target,uint32_t size_value,uint32_t special);\n";
+        chunk << "extern \"C\" bool native_chunk_" << chunk_index << "(void){\n";
+        chunk << "switch(pc){\n";
+        for (std::uint32_t address : plan.leader_chunks[chunk_index]) {
+            const std::uint32_t offset =
+                address - plan.load_address;
+            if (offset + 4u > plan.file_size) continue;
+            const std::uint32_t word =
+                read_psx32(data, PSX_HEADER_SIZE + offset);
+            const MipsInstructionIr instruction_ir =
+                build_mips_instruction_ir(address, word);
+            chunk << "case 0x" << std::hex << std::setfill('0')
+                  << std::setw(8) << address << std::dec << "u:\n";
+            if (!is_supported_mips_instruction(word)) {
+                chunk << "ExitProcess(16u);return true;\n";
+            } else {
+                chunk << "next_pc=pc+4u;\n";
+                chunk << "native_execute_ir("
+                      << static_cast<std::uint32_t>(instruction_ir.kind)
+                      << ",0x" << std::hex << address << std::dec << "u,"
+                      << "0x" << std::hex << word << std::dec << "u,"
+                      << instruction_ir.rs << "u,"
+                      << instruction_ir.rt << "u,"
+                      << instruction_ir.rd << "u,"
+                      << instruction_ir.shamt << "u,"
+                      << instruction_ir.immediate << "u,"
+                      << "0x" << std::hex << instruction_ir.target << std::dec << "u,"
+                      << instruction_ir.size << "u,"
+                      << instruction_ir.special << "u);\n";
+                chunk << "regs[0]=0u;return true;\n";
+            }
+        }
+        chunk << "default:return false;\n";
+        chunk << "}\n}\n";
+        ir.chunks.push_back(chunk.str());
+    }
     ir.diagnostics = diagnostics.str();
     ir.exit_status = exit_status;
     write_pe_ir(options, ir);
