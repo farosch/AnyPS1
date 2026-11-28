@@ -29,8 +29,6 @@ struct MipsExecutablePlan {
     std::uint32_t call_edges = 0;
     std::uint32_t unresolved_indirect_transfers = 0;
     bool native_host_loop_required = false;
-    bool mmio_host_state = false;
-    bool memory_boundary_state = false;
     std::set<std::uint32_t> leaders;
     std::set<std::uint32_t> delay_slots;
     std::set<std::uint32_t> emittable_leaders;

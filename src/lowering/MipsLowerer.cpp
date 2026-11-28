@@ -85,8 +85,6 @@ MipsExecutablePlan build_mips_executable_plan(
             read_psx32(data, PSX_HEADER_SIZE + offset);
         const MipsInstructionIr ir =
             build_mips_instruction_ir(address, instruction);
-        if (instruction == 0x35081810u) plan.mmio_host_state = true;
-        if (instruction == 0xAD000000u) plan.memory_boundary_state = true;
         if (classify_payload_region(address, instruction, true) ==
             PayloadRegionKind::Unknown) {
             continue;

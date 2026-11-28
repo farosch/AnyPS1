@@ -33,6 +33,8 @@ void MipsWindowsLowerer::lower(
         << "entry_point=0x" << std::hex << initial_pc << "\n"
         << "initial_gp=0x" << std::hex << initial_gp << "\n"
         << "payload_size=" << std::dec << file_size << "\n"
+        << "reachable_words=" << plan.reachable_count << "\n"
+        << "supported_reachable_words=" << plan.supported_count << "\n"
         << "unsupported_instructions=" << unsupported_count << "\n";
     if (unsupported_count != 0) {
         diagnostics
@@ -41,6 +43,18 @@ void MipsWindowsLowerer::lower(
             << " name=" << first_name << "\n";
     } else {
         diagnostics << "first_unsupported_gap=none\n";
+    }
+    if (unsupported_count == 0) {
+        if (plan.native_host_loop_required) {
+            diagnostics
+                << "next_runtime_blocker=PS1 MMIO/host-device state progression\n";
+        } else if (plan.supported_count != 0) {
+            diagnostics
+                << "next_runtime_blocker=Windows native MIPS instruction emission\n";
+        } else {
+            diagnostics
+                << "next_runtime_blocker=no reachable supported MIPS instructions\n";
+        }
     }
 
     std::ostringstream source;
@@ -62,8 +76,7 @@ void MipsWindowsLowerer::lower(
     source << "WriteFile(handle, diagnostics, sizeof(diagnostics) - 1, &written, 0);\n";
     const std::uint32_t exit_status =
         unsupported_count != 0 ? 16 :
-        plan.mmio_host_state ? 9 :
-        plan.memory_boundary_state ? 13 : 0;
+        plan.supported_count != 0 ? 17 : 17;
     source << "ExitProcess(" << exit_status << ");\n";
     source << "#endif\n";
     source << "return " << exit_status << ";\n";

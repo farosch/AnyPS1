@@ -152,11 +152,7 @@ def main() -> int:
                     marker_offset + len(marker):
                 ].split(b"\n", 1)[0].strip(b"\0\r ")
                 unsupported_count = int(count_text)
-                expected_status = 16 if unsupported_count else 0
-                if "memory-boundary" in args.fixture.name:
-                    expected_status = 13
-                if "native-host-integration" in args.fixture.name:
-                    expected_status = 9
+                expected_status = 16 if unsupported_count else 17
                 if completed.returncode != expected_status:
                     raise RuntimeError(
                         f"PE executable returned unexpected status: "
