@@ -73,18 +73,23 @@ add_library(anyps1_memory
     memory/MemoryMap.cpp
 )
 
+add_library(anyps1_diagnostics
+    diagnostics/DiagnosticReport.cpp
+)
+target_include_directories(anyps1_diagnostics PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
 add_library(anyps1_relinker
     relinker/Relinker.cpp
 )
 
-foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory anyps1_relinker)
+foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory anyps1_diagnostics anyps1_relinker)
     target_include_directories(${target} PUBLIC ${CMAKE_SOURCE_DIR}/src)
 endforeach()
 
 if(ANYPS1_STRICT_WARNINGS)
     if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
         foreach(target anyps1_format anyps1_executable anyps1_lowering anyps1_gte
-                        anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory
+                        anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory anyps1_diagnostics
                         anyps1_relinker anyps1)
             if(TARGET ${target})
                 target_compile_options(${target} PRIVATE
@@ -93,7 +98,7 @@ if(ANYPS1_STRICT_WARNINGS)
         endforeach()
     elseif(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         foreach(target anyps1_format anyps1_executable anyps1_lowering
-                        anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory
+                        anyps1_gpu anyps1_input anyps1_host anyps1_device anyps1_memory anyps1_diagnostics
                         anyps1_relinker anyps1)
             if(TARGET ${target})
                 target_compile_options(${target} PRIVATE /W4 /WX)
@@ -109,6 +114,7 @@ endforeach()
 
 target_link_libraries(anyps1_input PUBLIC SDL3::SDL3)
 target_link_libraries(anyps1_lowering PUBLIC anyps1_memory)
+target_link_libraries(anyps1_lowering PUBLIC anyps1_diagnostics)
 target_link_libraries(anyps1_host PUBLIC SDL3::SDL3)
 target_link_libraries(anyps1_host PUBLIC anyps1_input)
 target_link_libraries(anyps1_host PUBLIC anyps1_gpu)

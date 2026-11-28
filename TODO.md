@@ -303,6 +303,9 @@
 - [x] Add benchmark and timeout tests for CFG discovery and assembly generation.
 - [x] Add CMake release artifacts and installation/packaging rules.
 - [x] Keep TODO current after every converter, lowering, host, and format change.
+- [x] Beautify generated executable diagnostics with shared summary, verbose,
+  and JSON report formats; preserve key=value compatibility lines and add
+  coverage, leader/chunk, runtime-counter, and result sections.
 - [x] Centralize ELF/PE native tool process execution, timeout handling,
   output capture, and typed linker failures.
 - [x] Remove obsolete manual PE layout lowering and duplicate lowering IR
