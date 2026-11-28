@@ -140,7 +140,13 @@ MipsInstructionIr build_mips_instruction_ir(
             ir.opcode == 0x29u ? 2u : 4u;
         break;
     case 0x22u: case 0x26u: case 0x2Au: case 0x2Eu:
-        ir.kind = MipsInstructionKind::Unsupported;
+        if (ir.opcode == 0x22u || ir.opcode == 0x26u) {
+            ir.kind = MipsInstructionKind::Load;
+        } else {
+            ir.kind = MipsInstructionKind::Store;
+        }
+        ir.size = 4u;
+        ir.supported = true;
         break;
     case 0x30u: case 0x31u: case 0x32u: case 0x33u:
         ir.kind = MipsInstructionKind::CoprocessorLoad;

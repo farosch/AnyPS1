@@ -91,6 +91,22 @@ int main()
             !load.supported) {
             throw std::runtime_error("load was not decoded into the instruction IR");
         }
+        const std::uint32_t unaligned_opcodes[] = {
+            0x88220000u, 0x98260000u, 0xA82A0000u, 0xB82E0000u
+        };
+        for (const std::uint32_t word : unaligned_opcodes) {
+            const anyps1::MipsInstructionIr unaligned =
+                anyps1::build_mips_instruction_ir(
+                    0x80010000u,
+                    word);
+            if (!unaligned.supported ||
+                unaligned.size != 4u ||
+                (unaligned.kind != anyps1::MipsInstructionKind::Load &&
+                 unaligned.kind != anyps1::MipsInstructionKind::Store)) {
+                throw std::runtime_error(
+                    "unaligned MIPS load/store was not decoded consistently");
+            }
+        }
         const anyps1::MipsInstructionIr reserved =
             anyps1::build_mips_instruction_ir(
                 0x80010000u,
