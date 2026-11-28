@@ -31,6 +31,13 @@ int main()
                 true) != anyps1::PayloadRegionKind::Unknown) {
             throw std::runtime_error("reserved word was not classified as unknown");
         }
+        if (anyps1::classify_payload_region(
+                0x80010010u,
+                0x5A82A57Du,
+                true) != anyps1::PayloadRegionKind::Unknown) {
+            throw std::runtime_error(
+                "invalid BLEZL encoding was classified as code");
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Payload region test failed: " << error.what() << "\n";

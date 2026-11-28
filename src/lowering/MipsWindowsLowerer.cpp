@@ -276,6 +276,11 @@ void MipsWindowsLowerer::lower(
         if (offset + 4 > file_size) continue;
         const std::uint32_t instruction =
             read_psx32(data, PSX_HEADER_SIZE + offset);
+        if (classify_payload_region(
+                address, instruction, true) ==
+            PayloadRegionKind::Unknown) {
+            continue;
+        }
         const std::uint32_t opcode = instruction >> 26;
         const std::uint32_t immediate = instruction & 0xFFFFu;
         const std::uint32_t special = instruction & 63u;
@@ -412,7 +417,10 @@ void MipsWindowsLowerer::lower(
             is_supported_mips_instruction(instruction)) {
             emittable_leaders.insert(address);
         }
-        if (region == PayloadRegionKind::Unknown) ++unknown_region_count;
+        if (region == PayloadRegionKind::Unknown) {
+            ++unknown_region_count;
+            continue;
+        }
         ++reachable_count;
         if (!is_supported_mips_instruction(instruction)) {
             ++unsupported_count;
@@ -618,7 +626,7 @@ void MipsWindowsLowerer::lower(
     source << "jmp unresolved_indirect_exit\n";
     source << "indirect_jump ENDP\n";
     source << "unresolved_indirect_exit PROC\n";
-    source << "mov ecx,17\n";
+    source << "mov ecx,eax\n";
     source << "call ExitProcess\n";
     source << "unresolved_indirect_exit ENDP\n";
     source << "bios_memory_fault_exit PROC\n";

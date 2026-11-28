@@ -129,7 +129,7 @@
 
 - [x] Replace BIOS-vector assumptions with native host services or explicit
   unsupported results.
-- [x] Implement the A0 `0x39` byte-copy BIOS service with native RAM bounds and
+- [x] Implement the A0 `0x39` InitHeap BIOS service with native RAM bounds and
   return-address handling on Linux and Windows.
 - [x] Add native Linux console write and process exit handling.
 - [x] Implement generic file, input, audio, video, and Vulkan host mappings.

@@ -101,6 +101,11 @@ void MipsLinuxLowerer::lower(
         const std::uint32_t offset = address - load_address;
         if (offset + 4 > file_size) continue;
         const std::uint32_t instruction = read_psx32(data, 2048 + offset);
+        if (classify_payload_region(
+                address, instruction, true) ==
+            PayloadRegionKind::Unknown) {
+            continue;
+        }
         const std::uint32_t opcode = instruction >> 26;
         if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 ||
             opcode == 0x24 || opcode == 0x25 || opcode == 0x28 ||
@@ -243,6 +248,7 @@ void MipsLinuxLowerer::lower(
         }
         if (region == PayloadRegionKind::Unknown) {
             ++unknown_region_count;
+            continue;
         }
         ++reachable_count;
         if (is_supported_mips_instruction(instruction)) {

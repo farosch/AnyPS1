@@ -193,10 +193,10 @@ int main()
                 throw std::runtime_error("interrupt mask MMIO round trip failed");
             }
             if (runtime.tick(1024u) != 0 ||
-                runtime.mmio_read(0x1F801070u) != 0x4u) {
+                runtime.mmio_read(0x1F801070u) != 0x1u) {
                 throw std::runtime_error("timer tick did not assert VBlank status");
             }
-            if (runtime.mmio_write(0x1F801070u, 0x4u) != 0 ||
+            if (runtime.mmio_write(0x1F801070u, 0x1u) != 0 ||
                 runtime.mmio_read(0x1F801070u) != 0u) {
                 throw std::runtime_error("interrupt acknowledge did not clear status");
             }

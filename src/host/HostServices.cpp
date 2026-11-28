@@ -876,8 +876,6 @@ int NativeHostLoopRuntime::tick(std::uint32_t cycles)
     impl_->devices.set_controller_state(
         static_cast<std::uint32_t>(impl_->input_state.buttons));
     impl_->devices.tick(cycles);
-    impl_->devices.write(0x1F801070u, 0x1u);
-    impl_->devices.assert_interrupt(0x4u);
     impl_->vblank_count += cycles / 1024u;
     return should_close() ? 1 : 0;
 }

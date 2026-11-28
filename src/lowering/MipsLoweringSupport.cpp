@@ -202,7 +202,7 @@ std::vector<std::uint32_t> discover_payload_pointer_targets(
         }
         const std::uint32_t run_start = index;
         while (index < word_count && pointer_candidate[index] != 0u) ++index;
-        if (index - run_start < 2u) continue;
+        if (index - run_start < 8u) continue;
         for (std::uint32_t table_index = run_start;
              table_index < index;
              ++table_index) {

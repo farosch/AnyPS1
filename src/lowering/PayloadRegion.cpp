@@ -61,9 +61,27 @@ PayloadRegionKind classify_payload_region(
         return known_special ? PayloadRegionKind::Instruction :
             PayloadRegionKind::Unknown;
     }
-    if (opcode == 0x01 ||
-        opcode == 0x02 || opcode == 0x03 ||
-        (opcode >= 0x04 && opcode <= 0x0F) ||
+    if (opcode == 0x01) {
+        const std::uint32_t rt = (word >> 16) & 31u;
+        return rt == 0x00u || rt == 0x01u ||
+                rt == 0x10u || rt == 0x11u
+            ? PayloadRegionKind::Instruction
+            : PayloadRegionKind::Unknown;
+    }
+    if (opcode >= 0x06 && opcode <= 0x07) {
+        return ((word >> 16) & 31u) == 0u
+            ? PayloadRegionKind::Instruction
+            : PayloadRegionKind::Unknown;
+    }
+    if (opcode == 0x16 || opcode == 0x17) {
+        return ((word >> 16) & 31u) == 0u
+            ? PayloadRegionKind::Instruction
+            : PayloadRegionKind::Unknown;
+    }
+    if (opcode == 0x02 || opcode == 0x03 ||
+        opcode == 0x04 || opcode == 0x05 ||
+        (opcode >= 0x08 && opcode <= 0x0F) ||
+        opcode == 0x14 || opcode == 0x15 ||
         (opcode >= 0x20 && opcode <= 0x2E)) {
         return PayloadRegionKind::Instruction;
     }
