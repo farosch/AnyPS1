@@ -80,9 +80,10 @@ void replace_unresolved_leader_targets(
     const std::string::size_type stub_position =
         line.find("unsupported_");
     if (stub_position != std::string::npos &&
+        line.back() != ':' &&
         line.find("_stub", stub_position) != std::string::npos) {
         const std::string::size_type stub_end =
-            line.find_first_of(" \t\r\n", stub_position);
+            line.find_first_of(" \t\r\n:", stub_position);
         if (stub_end != std::string::npos) {
             line.replace(
                 stub_position,
@@ -134,8 +135,7 @@ void replace_unresolved_leader_targets(
 void split_leader_assembly(
     const std::filesystem::path& assembly,
     const std::filesystem::path& output,
-    std::vector<std::filesystem::path>& chunk_assemblies,
-    const std::set<std::string>& unsupported_family_names)
+    std::vector<std::filesystem::path>& chunk_assemblies)
 {
     std::ifstream input(assembly);
     if (!input) {
@@ -227,21 +227,6 @@ void split_leader_assembly(
             base << "native_completion_exit:\n";
         }
         base << lines[index] << "\n";
-    }
-    for (const std::string& stub_name : unsupported_stub_names) {
-        base << ".globl " << stub_name << "\n";
-        base << stub_name << ":\n";
-        base << "jmp unsupported_instruction_exit\n";
-    }
-    for (const std::string& family : unsupported_family_names) {
-        const std::string stub_name =
-            instruction_family_source_name(family);
-        if (unsupported_stub_names.find(stub_name) ==
-            unsupported_stub_names.end()) {
-            base << ".globl " << stub_name << "\n";
-            base << stub_name << ":\n";
-            base << "jmp unsupported_instruction_exit\n";
-        }
     }
     base.close();
 
@@ -1765,8 +1750,7 @@ void MipsLinuxLowerer::lower(
     split_leader_assembly(
         assembly,
         std::filesystem::path(options.output),
-        assembly_chunks,
-        unsupported_family_names);
+        assembly_chunks);
     assembly_chunks.insert(assembly_chunks.begin(), assembly);
     ElfWriter::write(assembly_chunks, options.output);
     bool keep_assembly = false;
