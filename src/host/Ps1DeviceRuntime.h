@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace anyps1 {
 
@@ -26,7 +27,12 @@ struct Ps1DeviceRuntime {
     std::uint32_t interrupt_mask = 0;
     std::uint32_t controller_buttons = 0xFFFFu;
     std::uint32_t gpu_status = 0x14802000u;
-    std::uint16_t gpu_vram[GPU_VRAM_WORDS]{};
+    std::vector<std::uint16_t> gpu_vram;
+
+    Ps1DeviceRuntime()
+    {
+        gpu_vram.resize(GPU_VRAM_WORDS, 0u);
+    }
     std::uint32_t* ram = nullptr;
     std::uint32_t ram_word_count = 0x80000u;
     std::uint32_t cd_lba = 0;

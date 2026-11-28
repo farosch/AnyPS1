@@ -219,6 +219,7 @@ MipsExecutablePlan build_mips_executable_plan(
             classify_payload_region(address, instruction, true);
         if (region == PayloadRegionKind::EmbeddedData) {
             ++plan.embedded_data_count;
+            continue;
         }
         if (region == PayloadRegionKind::Instruction ||
             ir.supported) {

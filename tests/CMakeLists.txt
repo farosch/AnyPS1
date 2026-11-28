@@ -107,6 +107,11 @@ add_executable(anyps1_host_integration_test HostIntegrationTest.cpp)
 target_include_directories(anyps1_host_integration_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(anyps1_host_integration_test
     PRIVATE anyps1_host anyps1_input anyps1_gpu)
+if(MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "MSVC|Clang")
+    if(WIN32)
+        target_link_options(anyps1_host_integration_test PRIVATE /STACK:16777216)
+    endif()
+endif()
 add_test(NAME host_integration_ir
     COMMAND anyps1_host_integration_test)
 set_tests_properties(host_integration_ir PROPERTIES

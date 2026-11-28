@@ -121,7 +121,15 @@ MipsInstructionIr build_mips_instruction_ir(
         ir.kind = MipsInstructionKind::Cop0;
         break;
     case 0x12u:
-        ir.kind = MipsInstructionKind::Cop2;
+        if ((ir.rs == 8u || ir.rs == 12u) && ir.rt <= 3u) {
+            ir.kind = MipsInstructionKind::Branch;
+            ir.target = static_cast<std::uint32_t>(
+                static_cast<std::int64_t>(address) + 4 +
+                static_cast<std::int32_t>(static_cast<std::int16_t>(
+                    ir.immediate)) * 4);
+        } else {
+            ir.kind = MipsInstructionKind::Cop2;
+        }
         break;
     case 0x13u:
         ir.kind = MipsInstructionKind::Cop3;

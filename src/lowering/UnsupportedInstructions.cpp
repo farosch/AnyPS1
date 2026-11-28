@@ -83,6 +83,13 @@ UnsupportedInstruction classify_unsupported_instruction(
         return {UnsupportedInstructionKind::Cop1, "cop1"};
     }
     if (opcode == 0x12) {
+        const std::uint32_t rs =
+            (instruction >> 21) & 31u;
+        const std::uint32_t rt =
+            (instruction >> 16) & 31u;
+        if ((rs == 8u || rs == 12u) && rt <= 3u) {
+            return {UnsupportedInstructionKind::Cop2, "cop2_branch"};
+        }
         switch (instruction) {
         case 0x48C0C000u: return {UnsupportedInstructionKind::Cop2, "gte_nclip"};
         case 0x48C0C800u: return {UnsupportedInstructionKind::Cop2, "gte_op"};
@@ -126,6 +133,7 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
 {
     const std::uint32_t opcode = instruction >> 26;
     const std::uint32_t rs = (instruction >> 21) & 31u;
+    const std::uint32_t rt = (instruction >> 16) & 31u;
     const std::uint32_t special = instruction & 63u;
     if (instruction == 0) return true;
     if (opcode == 0) {
@@ -168,6 +176,9 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
                rs == 0x06 || (rs == 0x10 && special == 0x10);
     }
     if (opcode == 0x12) {
+        if ((rs == 8u || rs == 12u) && rt <= 3u) {
+            return true;
+        }
         if (rs == 0x00 || rs == 0x02 || rs == 0x04 || rs == 0x06) {
             return true;
         }
@@ -209,7 +220,7 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
     case 0x21: case 0x22: case 0x23: case 0x24:
     case 0x25: case 0x26: case 0x28: case 0x29:
     case 0x2A: case 0x2B: case 0x2E: case 0x2F:
-    case 0x31: case 0x32: case 0x33: case 0x38: case 0x39:
+    case 0x30: case 0x31: case 0x32: case 0x33: case 0x38: case 0x39:
     case 0x3A: case 0x3B:
         return true;
     default:

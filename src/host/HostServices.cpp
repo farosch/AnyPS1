@@ -109,6 +109,7 @@ Ps1BiosCallPlan map_ps1_bios_call(
         case 0x16u: return {Ps1BiosCallKind::B0PadReceive, vector, function};
         case 0x17u: return {Ps1BiosCallKind::B0ReturnFromException, vector, function};
         case 0x18u: return {Ps1BiosCallKind::B0ResetEntryInt, vector, function};
+        case 0x19u: return {Ps1BiosCallKind::B0ChangeClearPad, vector, function};
         case 0x32u: return {Ps1BiosCallKind::B0InitCard, vector, function};
         case 0x33u: return {Ps1BiosCallKind::B0StartCard, vector, function};
         case 0x34u: return {Ps1BiosCallKind::B0StopCard, vector, function};
@@ -128,6 +129,9 @@ Ps1BiosCallPlan map_ps1_bios_call(
         case 0x56u: return {Ps1BiosCallKind::B0GetC0Table, vector, function};
         case 0x57u: return {Ps1BiosCallKind::B0GetB0Table, vector, function};
         case 0x70u: return {Ps1BiosCallKind::B0BuInit, vector, function};
+        case 0x3Fu: return {Ps1BiosCallKind::B0Puts, vector, function};
+        case 0x9Fu: return {Ps1BiosCallKind::B0Unknown9F, vector, function};
+        case 0xA1u: return {Ps1BiosCallKind::B0UnknownA1, vector, function};
         default: break;
         }
     }
@@ -143,6 +147,7 @@ Ps1BiosCallPlan map_ps1_bios_call(
         case 0x0Bu: return {Ps1BiosCallKind::C0NewCard, vector, function};
         case 0x10u: return {Ps1BiosCallKind::C0FlushCache, vector, function};
         case 0x13u: return {Ps1BiosCallKind::C0ChangeClearRCnt, vector, function};
+        case 0x39u: return {Ps1BiosCallKind::C0ChangeClearRCnt, vector, function};
         default: break;
         }
     }
@@ -632,12 +637,14 @@ bool NativeHostLoopRuntime::initialize(
     impl_->gpu_vram.assign(1024u * 512u, 0u);
     impl_->initialized = true;
     impl_->last_frame_time = std::chrono::steady_clock::now();
-    std::string presentation_error;
-    (void)impl_->host.present_framebuffer(
-        impl_->gpu_vram.data(),
-        1024u,
-        512u,
-        presentation_error);
+    if (!impl_->headless) {
+        std::string presentation_error;
+        (void)impl_->host.present_framebuffer(
+            impl_->gpu_vram.data(),
+            1024u,
+            512u,
+            presentation_error);
+    }
     error.clear();
     return true;
 }

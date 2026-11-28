@@ -563,14 +563,14 @@ void MipsLinuxLowerer::lower(
     const std::uint32_t b0_functions[] = {
         0x00u, 0x01u, 0x02u, 0x07u, 0x08u, 0x09u,
         0x0Au, 0x0Bu, 0x0Cu, 0x0Du, 0x12u, 0x13u,
-        0x14u, 0x15u, 0x16u, 0x17u, 0x18u, 0x32u,
+        0x14u, 0x15u, 0x16u, 0x17u, 0x18u, 0x19u, 0x32u,
         0x33u, 0x34u, 0x35u, 0x36u, 0x37u, 0x40u, 0x41u, 0x42u, 0x43u, 0x45u,
         0x50u, 0x51u, 0x53u, 0x54u, 0x55u,
-        0x56u, 0x57u, 0x70u
+        0x56u, 0x57u, 0x70u, 0x3Fu, 0x9Fu, 0xA1u
     };
     const std::uint32_t c0_functions[] = {
         0x00u, 0x01u, 0x02u, 0x03u, 0x08u, 0x09u, 0x0Au, 0x0Bu,
-        0x10u, 0x13u
+        0x10u, 0x13u, 0x39u
     };
     for (std::uint32_t vector : bios_vectors) {
         const std::uint32_t* functions =
@@ -606,6 +606,11 @@ void MipsLinuxLowerer::lower(
             } else if (vector == 0xB0u &&
                        (function == 0x54u || function == 0x55u)) {
                 source << "movl $-1, 8(%r12)\n";
+            } else if (vector == 0xC0u && function == 0x39u) {
+                source << "movl $0, 8(%r12)\n";
+            } else if (vector == 0xB0u &&
+                       (function == 0x3Fu || function == 0x9Fu || function == 0xA1u)) {
+                source << "movl $0, 8(%r12)\n";
             } else {
                 source << "movl $1, 8(%r12)\n";
             }
@@ -1625,6 +1630,14 @@ void MipsLinuxLowerer::lower(
                 source << "movl fpcsr(%rip), %eax\n";
                 source << "testl $1, %eax\n";
                 if (rt == 0 || rt == 2) {
+                    source << "jz p" << std::hex << branch_target << std::dec << "\n";
+                } else {
+                    source << "jnz p" << std::hex << branch_target << std::dec << "\n";
+                }
+            } else if (opcode == 0x12 && (rs == 8 || rs == 12) && rt <= 3) {
+                source << "movl gte_data+124(%rip), %eax\n";
+                source << "testl $0x80000000, %eax\n";
+                if ((rt & 1u) == 0u) {
                     source << "jz p" << std::hex << branch_target << std::dec << "\n";
                 } else {
                     source << "jnz p" << std::hex << branch_target << std::dec << "\n";

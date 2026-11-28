@@ -63,7 +63,7 @@ int main()
         if (anyps1::classify_payload_region(
                 0x80010020u,
                 0x004236ADu,
-                true) != anyps1::PayloadRegionKind::Instruction) {
+                true) != anyps1::PayloadRegionKind::EmbeddedData) {
             throw std::runtime_error(
                 "reserved SPECIAL fixture was not classified as instruction");
         }
@@ -80,6 +80,27 @@ int main()
                 true) != anyps1::PayloadRegionKind::EmbeddedData) {
             throw std::runtime_error(
                 "printable COP2-shaped table word was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x800AF510u,
+                0x74736572u,
+                true) != anyps1::PayloadRegionKind::EmbeddedData) {
+            throw std::runtime_error(
+                "ASCII payload word was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x8001B194u,
+                0x7043102Au,
+                true) != anyps1::PayloadRegionKind::EmbeddedData) {
+            throw std::runtime_error(
+                "reserved table word was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x800A13D4u,
+                0x491C1B18u,
+                true) != anyps1::PayloadRegionKind::EmbeddedData) {
+            throw std::runtime_error(
+                "COP2-shaped table word was classified as code");
         }
         if (anyps1::classify_payload_region(
                 0x80010024u,

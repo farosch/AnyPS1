@@ -552,7 +552,7 @@ std::uint32_t Ps1DeviceRuntime::get_cd_lba() const
 
 const std::uint16_t* Ps1DeviceRuntime::gpu_vram_data() const
 {
-    return gpu_vram;
+    return gpu_vram.data();
 }
 
 std::uint32_t Ps1DeviceRuntime::gpu_vram_write_count_value() const

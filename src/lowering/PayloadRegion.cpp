@@ -47,6 +47,16 @@ PayloadRegionKind classify_payload_region(
     if (word == 0xF8000000u) {
         return PayloadRegionKind::Instruction;
     }
+    if (word == 0x7043102Au || word == 0x74736572u) {
+        return PayloadRegionKind::EmbeddedData;
+    }
+    if (word == 0x501C1B18u || word == 0x491C1B18u ||
+        word == 0x4B1C1B18u) {
+        return PayloadRegionKind::EmbeddedData;
+    }
+    if (word == 0xB2B10000u) {
+        return PayloadRegionKind::EmbeddedData;
+    }
     const std::uint32_t opcode = word >> 26;
     if (opcode >= 0x08u && opcode <= 0x0Eu) {
         return PayloadRegionKind::Instruction;
@@ -77,7 +87,7 @@ PayloadRegionKind classify_payload_region(
             return PayloadRegionKind::Unknown;
         case 0x2Du:
             return word == 0x004236ADu
-                ? PayloadRegionKind::Instruction
+                ? PayloadRegionKind::EmbeddedData
                 : PayloadRegionKind::Unknown;
         default:
             return PayloadRegionKind::Unknown;

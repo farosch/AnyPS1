@@ -14,6 +14,10 @@
 int main()
 {
     try {
+        {
+            std::ofstream marker("host-stage.txt", std::ios::trunc);
+            marker << "main-entered\n";
+        }
         const std::uint32_t open_vector = 0xA0000032u;
         const anyps1::Ps1FileCallPlan open_call =
             anyps1::map_ps1_file_call(open_vector);
@@ -85,10 +89,35 @@ int main()
         if (b0_erase.kind != anyps1::Ps1BiosCallKind::B0EraseCard) {
             throw std::runtime_error("B0 erase-card BIOS call mapping failed");
         }
+        const anyps1::Ps1BiosCallPlan b0_puts =
+            anyps1::map_ps1_bios_call(0xB0u, 0x3Fu);
+        if (b0_puts.kind != anyps1::Ps1BiosCallKind::B0Puts) {
+            throw std::runtime_error("B0 puts BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_unknown_9f =
+            anyps1::map_ps1_bios_call(0xB0u, 0x9Fu);
+        if (b0_unknown_9f.kind != anyps1::Ps1BiosCallKind::B0Unknown9F) {
+            throw std::runtime_error("B0 0x9F BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_unknown_a1 =
+            anyps1::map_ps1_bios_call(0xB0u, 0xA1u);
+        if (b0_unknown_a1.kind != anyps1::Ps1BiosCallKind::B0UnknownA1) {
+            throw std::runtime_error("B0 0xA1 BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_change_pad =
+            anyps1::map_ps1_bios_call(0xB0u, 0x19u);
+        if (b0_change_pad.kind != anyps1::Ps1BiosCallKind::B0ChangeClearPad) {
+            throw std::runtime_error("B0 ChangeClearPAD BIOS call mapping failed");
+        }
         const anyps1::Ps1BiosCallPlan c0_timer =
             anyps1::map_ps1_bios_call(0xC0u, 0x00u);
         if (c0_timer.kind != anyps1::Ps1BiosCallKind::C0SysEnqIntRP) {
             throw std::runtime_error("C0 interrupt BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan c0_change_clear =
+            anyps1::map_ps1_bios_call(0xC0u, 0x39u);
+        if (c0_change_clear.kind != anyps1::Ps1BiosCallKind::C0ChangeClearRCnt) {
+            throw std::runtime_error("C0 ChangeClearRCnt BIOS call mapping failed");
         }
         anyps1::NativeFileRuntime files;
         std::string host_error;
