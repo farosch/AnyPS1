@@ -107,7 +107,23 @@ Ps1BiosCallPlan map_ps1_bios_call(
         case 0x18u: return {Ps1BiosCallKind::B0ResetEntryInt, vector, function};
         case 0x32u: return {Ps1BiosCallKind::B0InitCard, vector, function};
         case 0x33u: return {Ps1BiosCallKind::B0StartCard, vector, function};
+        case 0x34u: return {Ps1BiosCallKind::B0StopCard, vector, function};
         case 0x35u: return {Ps1BiosCallKind::B0StopCard, vector, function};
+        case 0x36u: return {Ps1BiosCallKind::B0WriteCardSector, vector, function};
+        case 0x37u: return {Ps1BiosCallKind::B0ReadCardSector, vector, function};
+        case 0x40u: return {Ps1BiosCallKind::B0InitTimer, vector, function};
+        case 0x41u: return {Ps1BiosCallKind::B0GetTimer, vector, function};
+        case 0x42u: return {Ps1BiosCallKind::B0EnableTimer, vector, function};
+        case 0x43u: return {Ps1BiosCallKind::B0DisableTimer, vector, function};
+        case 0x45u: return {Ps1BiosCallKind::B0EraseCard, vector, function};
+        case 0x50u: return {Ps1BiosCallKind::B0AllowNewCard, vector, function};
+        case 0x51u: return {Ps1BiosCallKind::B0Krom2RawAdd, vector, function};
+        case 0x53u: return {Ps1BiosCallKind::B0Krom2Offset, vector, function};
+        case 0x54u: return {Ps1BiosCallKind::B0GetLastError, vector, function};
+        case 0x55u: return {Ps1BiosCallKind::B0GetLastFileError, vector, function};
+        case 0x56u: return {Ps1BiosCallKind::B0GetC0Table, vector, function};
+        case 0x57u: return {Ps1BiosCallKind::B0GetB0Table, vector, function};
+        case 0x70u: return {Ps1BiosCallKind::B0BuInit, vector, function};
         default: break;
         }
     }

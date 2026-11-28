@@ -541,8 +541,14 @@ void MipsLinuxLowerer::lower(
     source << "cmpl $" << init_heap_call.vector << ", %eax\n";
     source << "jne bios_b0_c0_dispatch\n";
     source << "cmpl $" << init_heap_call.function << ", 36(%r12)\n";
+    source << "je bios_a0_init_heap\n";
+    source << "cmpl $0x70, 36(%r12)\n";
     source << "jne unsupported_bios_exit\n";
     source << "movl $0, 8(%r12)\n";
+    source << "jmp bios_a0_return\n";
+    source << "bios_a0_init_heap:\n";
+    source << "movl $0, 8(%r12)\n";
+    source << "bios_a0_return:\n";
     source << "movl 124(%r12), %eax\n";
     source << "jmp indirect_jump\n";
     source << "bios_b0_c0_dispatch:\n";
@@ -553,7 +559,9 @@ void MipsLinuxLowerer::lower(
         0x00u, 0x01u, 0x02u, 0x07u, 0x08u, 0x09u,
         0x0Au, 0x0Bu, 0x0Cu, 0x0Du, 0x12u, 0x13u,
         0x14u, 0x15u, 0x16u, 0x17u, 0x18u, 0x32u,
-        0x33u, 0x35u
+        0x33u, 0x34u, 0x35u, 0x36u, 0x37u, 0x40u, 0x41u, 0x42u, 0x43u, 0x45u,
+        0x50u, 0x51u, 0x53u, 0x54u, 0x55u,
+        0x56u, 0x57u, 0x70u
     };
     const std::uint32_t c0_functions[] = {
         0x00u, 0x01u, 0x02u, 0x03u, 0x08u, 0x09u, 0x0Au, 0x0Bu,
@@ -579,6 +587,20 @@ void MipsLinuxLowerer::lower(
             source << "jne " << label << "_next_vector\n";
             if (vector == 0xB0u && function == 0x00u) {
                 source << "movl $0x80100000, 8(%r12)\n";
+            } else if (vector == 0xB0u && function == 0x56u) {
+                source << "movl $0x80000674, 8(%r12)\n";
+            } else if (vector == 0xB0u && function == 0x57u) {
+                source << "movl $0x80000874, 8(%r12)\n";
+            } else if (vector == 0xB0u && function == 0x70u) {
+                source << "movl $0, 8(%r12)\n";
+            } else if (vector == 0xB0u && function == 0x45u) {
+                source << "movl $-1, 8(%r12)\n";
+            } else if (vector == 0xB0u &&
+                       (function == 0x50u || function == 0x51u || function == 0x53u)) {
+                source << "movl $0, 8(%r12)\n";
+            } else if (vector == 0xB0u &&
+                       (function == 0x54u || function == 0x55u)) {
+                source << "movl $-1, 8(%r12)\n";
             } else {
                 source << "movl $1, 8(%r12)\n";
             }

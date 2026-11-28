@@ -45,6 +45,41 @@ int main()
         if (b0_event.kind != anyps1::Ps1BiosCallKind::B0DeliverEvent) {
             throw std::runtime_error("B0 event BIOS call mapping failed");
         }
+        const anyps1::Ps1BiosCallPlan b0_c0_table =
+            anyps1::map_ps1_bios_call(0xB0u, 0x56u);
+        if (b0_c0_table.kind != anyps1::Ps1BiosCallKind::B0GetC0Table) {
+            throw std::runtime_error("B0 GetC0Table BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_b0_table =
+            anyps1::map_ps1_bios_call(0xB0u, 0x57u);
+        if (b0_b0_table.kind != anyps1::Ps1BiosCallKind::B0GetB0Table) {
+            throw std::runtime_error("B0 GetB0Table BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_bu_init =
+            anyps1::map_ps1_bios_call(0xB0u, 0x70u);
+        if (b0_bu_init.kind != anyps1::Ps1BiosCallKind::B0BuInit) {
+            throw std::runtime_error("B0 _bu_init BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_write_card =
+            anyps1::map_ps1_bios_call(0xB0u, 0x36u);
+        if (b0_write_card.kind != anyps1::Ps1BiosCallKind::B0WriteCardSector) {
+            throw std::runtime_error("B0 write-card BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_read_card =
+            anyps1::map_ps1_bios_call(0xB0u, 0x37u);
+        if (b0_read_card.kind != anyps1::Ps1BiosCallKind::B0ReadCardSector) {
+            throw std::runtime_error("B0 read-card BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_get_timer =
+            anyps1::map_ps1_bios_call(0xB0u, 0x41u);
+        if (b0_get_timer.kind != anyps1::Ps1BiosCallKind::B0GetTimer) {
+            throw std::runtime_error("B0 GetTimer BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan b0_erase =
+            anyps1::map_ps1_bios_call(0xB0u, 0x45u);
+        if (b0_erase.kind != anyps1::Ps1BiosCallKind::B0EraseCard) {
+            throw std::runtime_error("B0 erase-card BIOS call mapping failed");
+        }
         const anyps1::Ps1BiosCallPlan c0_timer =
             anyps1::map_ps1_bios_call(0xC0u, 0x00u);
         if (c0_timer.kind != anyps1::Ps1BiosCallKind::C0SysEnqIntRP) {

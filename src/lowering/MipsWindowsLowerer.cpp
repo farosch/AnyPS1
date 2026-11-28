@@ -216,7 +216,7 @@ void MipsWindowsLowerer::lower(
     source << "pending_target=target;if((word>>26)==3)regs[31]=address+8u;delay_remaining=2u;\n";
     source << "return;\n";
     source << "case 16:\n";
-    source << "{uint32_t target=regs[rs];uint32_t vector=(target&0xFF000000u)>>24u;if(target<0x100u)vector=target;bool bios=(vector==0xA0u||vector==0xB0u||vector==0xC0u);if(bios){write_windows_trace(\"bios_vector=\",vector);write_windows_trace(\"bios_function=\",regs[9]);if(vector==0xA0u){if(regs[9]==0x39u)regs[2]=0x80100000u;else if(regs[9]==0x06u)ExitProcess(0u);else if(regs[9]==0x03u)regs[2]=regs[6];else if(regs[9]>=0x32u&&regs[9]<=0x36u)regs[2]=0u;else regs[2]=0xffffffffu;}else if(vector==0xB0u){if(regs[9]==0x17u||regs[9]==0x18u){}else if(regs[9]<=0x18u)regs[2]=1u;else if(regs[9]==0x32u||regs[9]==0x33u||regs[9]==0x35u)regs[2]=0u;else{write_windows_trace(\"unsupported_b0_function=\",regs[9]);ExitProcess(17u);}}else{if(regs[9]==0x10u||regs[9]==0x13u)regs[2]=0u;else if(regs[9]<=0x13u)regs[2]=1u;else{write_windows_trace(\"unsupported_c0_function=\",regs[9]);ExitProcess(17u);}}pending_target=address+8u;}else{pending_target=target;delay_remaining=2u;}}\n";
+    source << "{uint32_t target=regs[rs];uint32_t vector=(target&0xFF000000u)>>24u;if(target<0x100u)vector=target;bool bios=(vector==0xA0u||vector==0xB0u||vector==0xC0u);if(bios){write_windows_trace(\"bios_pc=\",address);write_windows_trace(\"bios_vector=\",vector);write_windows_trace(\"bios_function=\",regs[9]);if(vector==0xA0u){if(regs[9]==0x39u)regs[2]=0x80100000u;else if(regs[9]==0x06u)ExitProcess(0u);else if(regs[9]==0x03u)regs[2]=regs[6];else if(regs[9]==0x70u)regs[2]=0u;else if(regs[9]>=0x32u&&regs[9]<=0x36u)regs[2]=0u;else regs[2]=0xffffffffu;}        else if(vector==0xB0u){if(regs[9]==0x17u||regs[9]==0x18u){}else if(regs[9]<=0x18u)regs[2]=1u;else if(regs[9]==0x32u||regs[9]==0x33u||regs[9]==0x34u||regs[9]==0x35u)regs[2]=0u;    else if(regs[9]==0x36u||regs[9]==0x37u)regs[2]=1u;else if(regs[9]==0x40u||regs[9]==0x42u||regs[9]==0x43u)regs[2]=1u;    else if(regs[9]==0x41u)regs[2]=timer_cycles+(regs[4]&3u)*0x400u;    else if(regs[9]==0x45u)regs[2]=0xffffffffu;else if(regs[9]==0x50u||regs[9]==0x51u||regs[9]==0x53u)regs[2]=0u;else if(regs[9]==0x54u||regs[9]==0x55u)regs[2]=0xffffffffu;else if(regs[9]==0x56u)regs[2]=0x80000674u;else if(regs[9]==0x57u)regs[2]=0x80000874u;else if(regs[9]==0x70u)regs[2]=0u;else{write_windows_trace(\"unsupported_b0_function=\",regs[9]);ExitProcess(17u);}}else{if(regs[9]==0x10u||regs[9]==0x13u)regs[2]=0u;else if(regs[9]<=0x13u)regs[2]=1u;else{write_windows_trace(\"unsupported_c0_function=\",regs[9]);ExitProcess(17u);}}pending_target=address+8u;}else{pending_target=target;delay_remaining=2u;}}\n";
     source << "return;\n";
     source << "case 17:\n";
     source << "regs[rd]=address+8u;pending_target=regs[rs];delay_remaining=2u;\n";
@@ -371,7 +371,7 @@ void MipsWindowsLowerer::lower(
                 }
             }
             for (std::uint32_t block_address = address;
-                 block_address <= block_end;
+                 block_address < block_end;
                  block_address += 4u) {
                 const std::uint32_t offset =
                     block_address - plan.load_address;
@@ -380,6 +380,11 @@ void MipsWindowsLowerer::lower(
                     read_psx32(data, PSX_HEADER_SIZE + offset);
                 const MipsInstructionIr instruction_ir =
                     build_mips_instruction_ir(block_address, word);
+                if (block_address != address) {
+                    chunk << "case 0x" << std::hex << std::setfill('0')
+                          << std::setw(8) << block_address << std::dec
+                          << "u:\n";
+                }
                 if (block_address >= plan.load_address + 8u &&
                     block_address - 8u >= plan.load_address) {
                     const std::uint32_t compare_word =
