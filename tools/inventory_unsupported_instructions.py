@@ -91,9 +91,23 @@ def classify_payload_region(word: int) -> str:
     if len(set(bytes_)) == 1 or word in (0x77777777, 0x77770700):
         return "embedded-data"
     opcode = word >> 26
+    if opcode == 0:
+        special = word & 0x3F
+        if special in SUPPORTED_SPECIAL or word == 0x004236AD:
+            return "instruction"
+        return "unknown"
+    if opcode == 0x01:
+        rt = (word >> 16) & 0x1F
+        return "instruction" if rt in (0x00, 0x01, 0x10, 0x11) else "unknown"
+    if opcode == 0x10:
+        rs = (word >> 21) & 0x1F
+        return "instruction" if rs in (0x00, 0x02, 0x04, 0x06, 0x08, 0x0C, 0x10) else "unknown"
+    if opcode == 0x12:
+        rs = (word >> 21) & 0x1F
+        return "instruction" if rs in (0x00, 0x02, 0x04, 0x06, 0x12) or rs >= 16 else "unknown"
     if opcode in (0x3C, 0x3D, 0x3F):
         return "unknown"
-    if opcode == 0 or 1 <= opcode <= 15 or 32 <= opcode <= 59:
+    if 1 <= opcode <= 15 or 32 <= opcode <= 59:
         return "instruction"
     return "unknown"
 
