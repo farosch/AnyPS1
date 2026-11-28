@@ -4,6 +4,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace anyps1 {
@@ -33,6 +34,8 @@ struct MipsExecutablePlan {
     std::set<std::uint32_t> delay_slots;
     std::set<std::uint32_t> emittable_leaders;
     std::set<std::string> unsupported_family_names;
+    std::unordered_map<std::uint32_t, std::vector<std::uint32_t>>
+        leader_dispatch;
 };
 
 class MipsLowerer {

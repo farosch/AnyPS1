@@ -1,5 +1,7 @@
 #include "lowering/MipsLoweringSupport.h"
+#include "lowering/MipsLowerer.h"
 #include "format/PsExe.h"
+#include "relinker/Relinker.h"
 
 #include <cstdint>
 #include <cstring>
@@ -22,11 +24,38 @@ void write_word(
     data[offset + 3] = static_cast<unsigned char>(word >> 24);
 }
 
+void write_psx_field(
+    std::vector<unsigned char>& data,
+    std::uint32_t offset,
+    std::uint32_t value)
+{
+    data[offset] = static_cast<unsigned char>(value);
+    data[offset + 1] = static_cast<unsigned char>(value >> 8);
+    data[offset + 2] = static_cast<unsigned char>(value >> 16);
+    data[offset + 3] = static_cast<unsigned char>(value >> 24);
+}
+
 }
 
 int main()
 {
     try {
+        std::vector<unsigned char> sparse_data(
+            anyps1::PSX_HEADER_SIZE + 520u);
+        write_psx_field(sparse_data, 0x10u, 0x80010000u);
+        write_psx_field(sparse_data, 0x18u, 0x80010000u);
+        write_psx_field(sparse_data, 0x1Cu, 520u);
+        write_word(sparse_data, 0u, 0u);
+        write_word(sparse_data, 128u, 0x10000000u);
+        anyps1::RelinkOptions sparse_options;
+        const anyps1::MipsExecutablePlan sparse_plan =
+            anyps1::build_mips_executable_plan(
+                sparse_options,
+                sparse_data);
+        if (sparse_plan.leader_dispatch.size() < 2u) {
+            throw std::runtime_error(
+                "sparse leader dispatch did not span address buckets");
+        }
         const anyps1::MipsInstructionIr nop =
             anyps1::build_mips_instruction_ir(0x80010000u, 0u);
         if (nop.kind != anyps1::MipsInstructionKind::Nop) {

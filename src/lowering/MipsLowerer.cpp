@@ -227,6 +227,11 @@ MipsExecutablePlan build_mips_executable_plan(
             }
         }
     }
+    for (std::uint32_t address : plan.emittable_leaders) {
+        const std::uint32_t bucket =
+            address >> 8u;
+        plan.leader_dispatch[bucket].push_back(address);
+    }
     return plan;
 }
 

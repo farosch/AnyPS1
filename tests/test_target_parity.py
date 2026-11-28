@@ -105,6 +105,14 @@ class LoweringInventoryTest(unittest.TestCase):
             linux,
             "Linux lowering must consume the shared instruction IR",
         )
+        shared = (
+            ROOT / "src" / "lowering" / "MipsLowerer.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "leader_dispatch",
+            shared,
+            "Shared lowering must provide sparse leader dispatch buckets",
+        )
         self.assertNotIn(
             "for (std::uint32_t target : leaders)",
             windows,

@@ -185,8 +185,9 @@
 - [x] Implement initial real Windows native MIPS instruction emission for the
   shared lowering IR, with RAM, scratchpad, arithmetic, branches, loads/stores,
   HI/LO, and explicit unsupported exits.
-- [ ] Remove the 30,000-leader Windows CFG emission limit and lower large
-  executable CFG regions without generating an oversized switch-based PE source.
+- [ ] Replace target-source size limits with chunked/sparse native lowering
+  so large Linux assembly and Windows PE sources do not require unbounded
+  compiler jobs; keep explicit cross-target rejection until chunking exists.
 - [x] Apply the 30,000-leader CFG emission limit and a two-minute
   assembler/linker timeout explicitly to Linux lowering; Linux no longer hangs
   on oversized assembly or a stalled native toolchain.

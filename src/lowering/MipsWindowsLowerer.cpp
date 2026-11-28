@@ -21,10 +21,13 @@ void MipsWindowsLowerer::lower(
     const std::vector<unsigned char>& data)
 {
     const MipsExecutablePlan plan = build_mips_executable_plan(options, data);
-    if (plan.emittable_leaders.size() > 30000u) {
+    const std::uint64_t estimated_source_bytes =
+        static_cast<std::uint64_t>(plan.emittable_leaders.size()) *
+        512u;
+    if (estimated_source_bytes > 8u * 1024u * 1024u) {
         throw std::runtime_error(
-            "unsupported native Windows lowering: executable CFG exceeds "
-            "the current native IR emission limit");
+            "unsupported native lowering: executable CFG exceeds "
+            "the 8 MiB target-source emission limit");
     }
     const std::uint32_t file_size = plan.file_size;
     const std::uint32_t load_address = plan.load_address;
@@ -119,9 +122,14 @@ void MipsWindowsLowerer::lower(
     source << "for(uint32_t steps=0;steps<10000000u;++steps){\n";
     source << "if(delay_remaining==1u){pc=pending_target;delay_remaining=0u;}\n";
     source << "else if(delay_remaining==2u){pc=next_pc;delay_remaining=1u;}\n";
-    source << "switch(pc){\n";
+    source << "bool dispatched=false;\n";
 
-    for (std::uint32_t address : plan.leaders) {
+    for (const auto& bucket_entry : plan.leader_dispatch) {
+        source << "if(!dispatched && (pc>>8u)==0x"
+               << std::hex << bucket_entry.first << std::dec << "u){\n";
+        source << "dispatched=true;\n";
+        source << "switch(pc){\n";
+        for (std::uint32_t address : bucket_entry.second) {
         if (address < plan.load_address ||
             address >= plan.load_address + plan.file_size ||
             (address & 3u) != 0u) continue;
@@ -333,7 +341,10 @@ void MipsWindowsLowerer::lower(
         source << "regs[0]=0u;\n";
         source << "break;}\n";
     }
-    source << "default:ExitProcess(17u);}\n";
+        source << "default:ExitProcess(17u);}\n";
+        source << "}\n";
+    }
+    source << "if(!dispatched)ExitProcess(17u);\n";
     source << "pc=next_pc;\n";
     source << "}\n";
     source << "ExitProcess(17u);\n";
