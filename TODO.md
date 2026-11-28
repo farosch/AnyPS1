@@ -212,6 +212,9 @@
   progression with a checked-in fixture and PE/source assertions.
 - [x] Replace the Windows 10-million native-step guard with a 100-million
   bounded startup/runtime budget and test the generated source guard.
+- [x] Remove overly aggressive linear CFG leader closure and add an exact
+  fixture for the reserved SPECIAL `0x004236AD` (`reserved_special_2d`)
+  gap so unsupported execution exits explicitly.
 
 ## PS1 GPU lowering and Vulkan shaders
 

@@ -210,7 +210,9 @@ int main(int argc, char** argv)
             WIFEXITED(capture_status) ? WEXITSTATUS(capture_status) : -1;
         const bool partial_fixture =
             std::string(fixture_path).find("native-unsupported.ps-exe") != std::string::npos
-            || std::string(fixture_path).find("coprocessor-coverage.ps-exe") != std::string::npos;
+            || std::string(fixture_path).find("coprocessor-coverage.ps-exe") != std::string::npos
+            || std::string(fixture_path).find("native-reserved-special-2d.ps-exe") !=
+                std::string::npos;
         const bool host_unsupported_fixture =
             std::string(fixture_path).find("native-host-integration.ps-exe") !=
             std::string::npos;
