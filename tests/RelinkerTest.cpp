@@ -233,6 +233,8 @@ int main(int argc, char** argv)
             std::string(fixture_path).find("native-windows-host-loop.ps-exe") !=
             std::string::npos ||
             std::string(fixture_path).find("native-break-continuation.ps-exe") !=
+            std::string::npos ||
+            std::string(fixture_path).find("native-startup-loop.ps-exe") !=
             std::string::npos;
         const bool memory_boundary_fixture =
             std::string(fixture_path).find("memory-boundary.ps-exe") !=
@@ -275,6 +277,13 @@ int main(int argc, char** argv)
              terminal_output.find("unsupported_instructions=0") == std::string::npos)) {
             throw std::runtime_error(
                 "BREAK continuation fixture did not report its continuation status");
+        }
+        if (std::string(fixture_path).find("native-startup-loop.ps-exe") !=
+                std::string::npos &&
+            (terminal_output.find("unsupported_instructions=0") == std::string::npos ||
+             terminal_output.find("lowered_coverage_percent=") == std::string::npos)) {
+            throw std::runtime_error(
+                "startup loop fixture lacked lowering coverage diagnostics");
         }
         if (std::string(fixture_path).find("delay-slot-data-boundary.ps-exe") !=
                 std::string::npos &&
