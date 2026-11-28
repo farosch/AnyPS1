@@ -285,7 +285,7 @@ void MipsWindowsLowerer::lower(
                     read_psx32(data, PSX_HEADER_SIZE + offset);
                 const MipsInstructionIr instruction_ir =
                     build_mips_instruction_ir(block_address, word);
-                if (!is_supported_mips_instruction(word)) {
+                if (!instruction_ir.supported) {
                     chunk << "ExitProcess(16u);return true;\n";
                     break;
                 }

@@ -125,6 +125,21 @@ class LoweringInventoryTest(unittest.TestCase):
             ROOT / "src" / "lowering" / "MipsWindowsLowerer.cpp"
         ).read_text(encoding="utf-8")
         self.assertIn(
+            ".supported",
+            windows_text,
+            "Windows lowering must consume canonical IR support state",
+        )
+        self.assertNotIn(
+            "is_supported_mips_instruction",
+            windows_text,
+            "Windows lowering must not maintain a separate support classifier",
+        )
+        self.assertNotIn(
+            "is_supported_mips_instruction",
+            linux_text,
+            "Linux lowering must not maintain a separate support classifier",
+        )
+        self.assertIn(
             "leader_chunks",
             windows_text,
             "Windows lowering must consume bounded leader chunks",

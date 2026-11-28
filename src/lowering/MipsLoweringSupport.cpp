@@ -22,6 +22,7 @@ MipsInstructionIr build_mips_instruction_ir(
     ir.shamt = (instruction >> 6) & 31u;
     ir.immediate = instruction & 0xFFFFu;
     ir.special = instruction & 63u;
+    ir.supported = is_supported_mips_instruction(instruction);
 
     if (instruction == 0u) {
         ir.kind = MipsInstructionKind::Nop;

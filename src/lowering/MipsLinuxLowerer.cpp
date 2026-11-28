@@ -1716,7 +1716,8 @@ void MipsLinuxLowerer::lower(
                     if (target_offset + 4u <= file_size) {
                         const std::uint32_t target_instruction =
                             read_psx32(data, PSX_HEADER_SIZE + target_offset);
-                        if (is_supported_mips_instruction(target_instruction)) {
+                        if (build_mips_instruction_ir(
+                                jump_target, target_instruction).supported) {
                             source << "call p" << std::hex << jump_target << std::dec << "\n";
                         } else {
                             source << "jmp unsupported_jump_exit\n";

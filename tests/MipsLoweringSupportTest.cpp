@@ -87,8 +87,25 @@ int main()
         if (load.kind != anyps1::MipsInstructionKind::Load ||
             load.size != 4u ||
             load.rs != 8u ||
-            load.rt != 2u) {
+            load.rt != 2u ||
+            !load.supported) {
             throw std::runtime_error("load was not decoded into the instruction IR");
+        }
+        const anyps1::MipsInstructionIr reserved =
+            anyps1::build_mips_instruction_ir(
+                0x80010000u,
+                0x004236ADu);
+        if (reserved.supported ||
+            reserved.kind != anyps1::MipsInstructionKind::Unsupported) {
+            throw std::runtime_error(
+                "reserved SPECIAL 0x2D was not represented consistently");
+        }
+        const anyps1::MipsInstructionIr nop_ir =
+            anyps1::build_mips_instruction_ir(0x80010000u, 0u);
+        if (!nop_ir.supported ||
+            nop_ir.kind != anyps1::MipsInstructionKind::Nop) {
+            throw std::runtime_error(
+                "NOP support was not represented consistently");
         }
         constexpr std::uint32_t load_address = 0x80010000u;
         constexpr std::uint32_t file_size = 112u;

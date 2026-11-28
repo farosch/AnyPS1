@@ -131,7 +131,8 @@ MipsExecutablePlan build_mips_executable_plan(
                     if (target_offset + 4u <= plan.file_size) {
                         const std::uint32_t target_instruction =
                             read_psx32(data, PSX_HEADER_SIZE + target_offset);
-                        if (is_supported_mips_instruction(target_instruction)) {
+                        if (build_mips_instruction_ir(
+                                target, target_instruction).supported) {
                             plan.emittable_leaders.insert(target);
                         }
                     }
@@ -212,6 +213,8 @@ MipsExecutablePlan build_mips_executable_plan(
         if (offset + 4u > plan.file_size) continue;
         const std::uint32_t instruction =
             read_psx32(data, PSX_HEADER_SIZE + offset);
+        const MipsInstructionIr ir =
+            build_mips_instruction_ir(address, instruction);
         const PayloadRegionKind region =
             classify_payload_region(address, instruction, true);
         if (region == PayloadRegionKind::EmbeddedData) {
@@ -219,7 +222,7 @@ MipsExecutablePlan build_mips_executable_plan(
             continue;
         }
         if (region == PayloadRegionKind::Instruction ||
-            is_supported_mips_instruction(instruction)) {
+            ir.supported) {
             plan.emittable_leaders.insert(address);
         }
         if (region == PayloadRegionKind::Unknown) {
@@ -227,7 +230,7 @@ MipsExecutablePlan build_mips_executable_plan(
             continue;
         }
         ++plan.reachable_count;
-        if (is_supported_mips_instruction(instruction)) {
+        if (ir.supported) {
             ++plan.supported_count;
         } else {
             ++plan.unsupported_count;

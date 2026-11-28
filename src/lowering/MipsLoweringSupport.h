@@ -46,6 +46,7 @@ struct MipsInstructionIr {
     std::uint32_t size = 0;
     bool signed_value = false;
     bool overflow_check = false;
+    bool supported = false;
 };
 
 MipsInstructionIr build_mips_instruction_ir(
