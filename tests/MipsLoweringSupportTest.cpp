@@ -28,7 +28,7 @@ int main()
 {
     try {
         constexpr std::uint32_t load_address = 0x80010000u;
-        constexpr std::uint32_t file_size = 96u;
+        constexpr std::uint32_t file_size = 112u;
         std::vector<unsigned char> data(
             anyps1::PSX_HEADER_SIZE + file_size);
         write_word(data, 0, 0x3C088001u);
@@ -86,7 +86,7 @@ int main()
             throw std::runtime_error("payload-loaded target was not resolved");
         }
 
-        write_word(data, 8, 0x3C028001u);
+        write_word(data, 8, 0x34028001u);
         write_word(data, 9, 0x8C420020u);
         write_word(data, 10, 0x24420004u);
         write_word(data, 11, 0u);
@@ -94,16 +94,27 @@ int main()
         write_word(data, 13, 0x24840040u);
         write_word(data, 14, 0x24840004u);
         write_word(data, 15, 0u);
-        write_word(data, 18, load_address + 32u);
-        write_word(data, 19, load_address + 48u);
+        write_word(data, 16, 0x34048001u);
+        write_word(data, 17, 0xAC840000u);
+        write_word(data, 18, 0x3C048001u);
+        write_word(data, 19, 0u);
+        write_word(data, 20, load_address + 32u);
+        write_word(data, 21, load_address + 48u);
+        write_word(data, 22, load_address + 64u);
+        write_word(data, 23, load_address + 32u);
+        write_word(data, 24, load_address + 48u);
+        write_word(data, 25, load_address + 64u);
+        write_word(data, 26, load_address + 32u);
+        write_word(data, 27, load_address + 48u);
         const std::vector<std::uint32_t> pointer_targets =
             anyps1::discover_payload_pointer_targets(
                 data,
                 load_address,
                 file_size);
-        if (pointer_targets.size() != 2u ||
+        if (pointer_targets.size() != 3u ||
             pointer_targets[0] != load_address + 32u ||
-            pointer_targets[1] != load_address + 48u) {
+            pointer_targets[1] != load_address + 48u ||
+            pointer_targets[2] != load_address + 64u) {
             throw std::runtime_error(
                 "contiguous payload pointer table was not discovered");
         }

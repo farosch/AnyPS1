@@ -165,7 +165,7 @@ std::vector<std::uint32_t> discover_payload_pointer_targets(
     std::uint32_t file_size)
 {
     const std::uint32_t word_count = file_size / 4u;
-    std::vector<bool> pointer_candidate(word_count, false);
+    std::vector<unsigned char> pointer_candidate(word_count, 0u);
     for (std::uint32_t index = 0; index < word_count; ++index) {
         const std::uint32_t target = read_psx32(
             data,
@@ -180,18 +180,10 @@ std::vector<std::uint32_t> discover_payload_pointer_targets(
         if (target_index + 4u > word_count) continue;
         std::size_t nonzero = 0;
         bool supported = true;
-        bool entry_like = false;
         for (std::uint32_t offset = 0; offset < 4u; ++offset) {
             const std::uint32_t instruction = read_psx32(
                 data,
                 PSX_HEADER_SIZE + (target_index + offset) * 4u);
-            if (offset == 0) {
-                const std::uint32_t opcode = instruction >> 26;
-                const std::uint32_t rt = (instruction >> 16) & 31u;
-                entry_like =
-                    opcode == 0x0F ||
-                    ((opcode == 0x08 || opcode == 0x09) && rt == 29u);
-            }
             nonzero += instruction != 0;
             if (!is_supported_mips_instruction(instruction)) {
                 supported = false;
@@ -199,17 +191,17 @@ std::vector<std::uint32_t> discover_payload_pointer_targets(
             }
         }
         pointer_candidate[index] =
-            entry_like && supported && nonzero >= 3u;
+            supported && nonzero >= 3u ? 1u : 0u;
     }
 
     std::set<std::uint32_t> targets;
     for (std::uint32_t index = 0; index < word_count;) {
-        if (!pointer_candidate[index]) {
+        if (pointer_candidate[index] == 0u) {
             ++index;
             continue;
         }
         const std::uint32_t run_start = index;
-        while (index < word_count && pointer_candidate[index]) ++index;
+        while (index < word_count && pointer_candidate[index] != 0u) ++index;
         if (index - run_start < 2u) continue;
         for (std::uint32_t table_index = run_start;
              table_index < index;

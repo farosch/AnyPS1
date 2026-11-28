@@ -559,53 +559,16 @@ void MipsWindowsLowerer::lower(
     source << "call ExitProcess\n";
     source << "unsupported_exit ENDP\n";
     source << "indirect_jump PROC\n";
-    const Ps1BiosCallPlan memcpy_call =
+    const Ps1BiosCallPlan init_heap_call =
         map_ps1_bios_call(0xA0u, 0x39u);
-    source << "cmp eax," << memcpy_call.vector << "\n";
-    source << "jne indirect_leader_dispatch\n";
-    source << "cmp dword ptr regs+36," << memcpy_call.function << "\n";
+    source << "cmp eax," << init_heap_call.vector << "\n";
+    source << "jne bios_b0_c0_dispatch\n";
+    source << "cmp dword ptr regs+36," << init_heap_call.function << "\n";
     source << "jne unresolved_indirect_exit\n";
-    source << "mov eax,dword ptr regs+16\n";
-    source << "mov dword ptr regs+8,eax\n";
-    source << "test eax,eax\n";
-    source << "jz bios_memcpy_return\n";
-    source << "mov ecx,dword ptr regs+24\n";
-    source << "test ecx,ecx\n";
-    source << "jle bios_memcpy_return\n";
-    source << "and eax,1FFFFFFFh\n";
-    source << "cmp eax,800000h\n";
-    source << "jae bios_memory_fault_exit\n";
-    source << "and eax,1FFFFFh\n";
-    source << "mov r10d,eax\n";
-    source << "add r10d,ecx\n";
-    source << "jb bios_memory_fault_exit\n";
-    source << "cmp r10d,200000h\n";
-    source << "ja bios_memory_fault_exit\n";
-    source << "mov r11d,dword ptr regs+20\n";
-    source << "and r11d,1FFFFFFFh\n";
-    source << "cmp r11d,800000h\n";
-    source << "jae bios_memory_fault_exit\n";
-    source << "and r11d,1FFFFFh\n";
-    source << "mov r8d,r11d\n";
-    source << "add r8d,ecx\n";
-    source << "jb bios_memory_fault_exit\n";
-    source << "cmp r8d,200000h\n";
-    source << "ja bios_memory_fault_exit\n";
-    source << "lea r8,ram\n";
-    source << "mov r10d,eax\n";
-    source << "add r8,r10\n";
-    source << "lea r9,ram\n";
-    source << "add r9,r11\n";
-    source << "bios_memcpy_byte:\n";
-    source << "mov dl,byte ptr [r8]\n";
-    source << "mov byte ptr [r9],dl\n";
-    source << "inc r8\n";
-    source << "inc r9\n";
-    source << "dec ecx\n";
-    source << "jnz bios_memcpy_byte\n";
-    source << "bios_memcpy_return:\n";
+    source << "mov dword ptr regs+8,0\n";
     source << "mov eax,dword ptr regs+124\n";
     source << "jmp indirect_jump\n";
+    source << "bios_b0_c0_dispatch:\n";
     const std::uint32_t b0_functions[] = {
         0x00u, 0x01u, 0x02u, 0x07u, 0x08u, 0x09u,
         0x0Au, 0x0Bu, 0x0Cu, 0x0Du, 0x12u, 0x13u,
@@ -627,8 +590,11 @@ void MipsWindowsLowerer::lower(
             const std::string label =
                 "bios_" + (vector == 0xB0u ? std::string("b0") : std::string("c0")) +
                 "_" + std::to_string(function);
+            source << "cmp eax," << vector << "\n";
+            source << "je " << label << "_vector_ok\n";
             source << "cmp eax," << (vector << 24) << "\n";
             source << "jne " << label << "_next_vector\n";
+            source << label << "_vector_ok:\n";
             source << "cmp dword ptr regs+36," << function << "\n";
             source << "jne " << label << "_next_vector\n";
             if (vector == 0xB0u && function == 0x00u) {

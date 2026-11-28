@@ -84,7 +84,7 @@ Ps1BiosCallPlan map_ps1_bios_call(
         vector_id = vector >> 24;
     }
     if (vector_id == 0xA0u && function == 0x39u) {
-        return {Ps1BiosCallKind::Memcpy, vector, function};
+        return {Ps1BiosCallKind::InitHeap, vector, function};
     }
     if (vector_id == 0xB0u) {
         switch (function) {

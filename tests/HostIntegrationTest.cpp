@@ -30,10 +30,15 @@ int main()
             std::string(close_call.windows_function) != "CloseHandle") {
             throw std::runtime_error("A0 close file call mapping failed");
         }
-        const anyps1::Ps1BiosCallPlan memcpy_call =
+        const anyps1::Ps1BiosCallPlan init_heap_call =
             anyps1::map_ps1_bios_call(0xA0u, 0x39u);
-        if (memcpy_call.kind != anyps1::Ps1BiosCallKind::Memcpy) {
-            throw std::runtime_error("A0 memcpy BIOS call mapping failed");
+        if (init_heap_call.kind != anyps1::Ps1BiosCallKind::InitHeap) {
+            throw std::runtime_error("A0 InitHeap BIOS call mapping failed");
+        }
+        const anyps1::Ps1BiosCallPlan stop_card_call =
+            anyps1::map_ps1_bios_call(0xB0u, 0x35u);
+        if (stop_card_call.kind != anyps1::Ps1BiosCallKind::B0StopCard) {
+            throw std::runtime_error("B0 StopCard BIOS call mapping failed");
         }
         const anyps1::Ps1BiosCallPlan b0_event =
             anyps1::map_ps1_bios_call(0xB0u, 0x07u);

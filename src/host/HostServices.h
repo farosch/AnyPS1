@@ -64,7 +64,7 @@ Ps1FileCallPlan map_ps1_file_call(std::uint32_t vector);
 
 enum class Ps1BiosCallKind {
     Unsupported,
-    Memcpy,
+    InitHeap,
     B0Alloc,
     B0Free,
     B0InitHeap,

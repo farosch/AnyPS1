@@ -443,52 +443,16 @@ void MipsLinuxLowerer::lower(
     source << "ret\n";
     source << ".extern anyps1_gte_execute\n";
     source << "indirect_jump:\n";
-    const Ps1BiosCallPlan memcpy_call =
+    const Ps1BiosCallPlan init_heap_call =
         map_ps1_bios_call(0xA0u, 0x39u);
-    source << "cmpl $" << memcpy_call.vector << ", %eax\n";
-    source << "jne indirect_leader_dispatch\n";
-    source << "cmpl $" << memcpy_call.function << ", 36(%r12)\n";
+    source << "cmpl $" << init_heap_call.vector << ", %eax\n";
+    source << "jne bios_b0_c0_dispatch\n";
+    source << "cmpl $" << init_heap_call.function << ", 36(%r12)\n";
     source << "jne unsupported_bios_exit\n";
-    source << "movl 16(%r12), %eax\n";
-    source << "movl %eax, 8(%r12)\n";
-    source << "testl %eax, %eax\n";
-    source << "jz bios_memcpy_return\n";
-    source << "movl 24(%r12), %ecx\n";
-    source << "testl %ecx, %ecx\n";
-    source << "jle bios_memcpy_return\n";
-    source << "andl $0x1FFFFFFF, %eax\n";
-    source << "cmpl $0x800000, %eax\n";
-    source << "jae memory_fault_exit\n";
-    source << "andl $0x1FFFFF, %eax\n";
-    source << "movl %eax, %r10d\n";
-    source << "addl %ecx, %r10d\n";
-    source << "jb memory_fault_exit\n";
-    source << "cmpl $0x200000, %r10d\n";
-    source << "ja memory_fault_exit\n";
-    source << "movl 20(%r12), %r11d\n";
-    source << "andl $0x1FFFFFFF, %r11d\n";
-    source << "cmpl $0x800000, %r11d\n";
-    source << "jae memory_fault_exit\n";
-    source << "andl $0x1FFFFF, %r11d\n";
-    source << "movl %r11d, %r10d\n";
-    source << "addl %ecx, %r10d\n";
-    source << "jb memory_fault_exit\n";
-    source << "cmpl $0x200000, %r10d\n";
-    source << "ja memory_fault_exit\n";
-    source << "leaq ram(%rip), %r8\n";
-    source << "addq %rax, %r8\n";
-    source << "leaq ram(%rip), %r9\n";
-    source << "addq %r11, %r9\n";
-    source << "bios_memcpy_byte:\n";
-    source << "movb (%r8), %dl\n";
-    source << "movb %dl, (%r9)\n";
-    source << "incq %r8\n";
-    source << "incq %r9\n";
-    source << "decl %ecx\n";
-    source << "jnz bios_memcpy_byte\n";
-    source << "bios_memcpy_return:\n";
+    source << "movl $0, 8(%r12)\n";
     source << "movl 124(%r12), %eax\n";
     source << "jmp indirect_jump\n";
+    source << "bios_b0_c0_dispatch:\n";
     const std::uint32_t bios_vectors[] = {
         0xB0u, 0xC0u
     };
@@ -513,8 +477,11 @@ void MipsLinuxLowerer::lower(
             const std::string label =
                 "bios_" + (vector == 0xB0u ? std::string("b0") : std::string("c0")) +
                 "_" + std::to_string(function);
+            source << "cmpl $" << vector << ", %eax\n";
+            source << "je " << label << "_vector_ok\n";
             source << "cmpl $" << (vector << 24) << ", %eax\n";
             source << "jne " << label << "_next_vector\n";
+            source << label << "_vector_ok:\n";
             source << "cmpl $" << function << ", 36(%r12)\n";
             source << "jne " << label << "_next_vector\n";
             if (vector == 0xB0u && function == 0x00u) {
