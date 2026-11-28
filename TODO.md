@@ -206,6 +206,8 @@
   executable loop.
 - [x] Validate generated PE images with platform format inspectors and signed
   executable tooling as applicable.
+- [ ] Implement Windows native execution past real-executable BREAK traps and
+  complete the remaining MMIO/host-device runtime state reached after startup.
 
 ## PS1 GPU lowering and Vulkan shaders
 

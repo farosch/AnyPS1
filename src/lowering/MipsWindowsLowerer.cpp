@@ -167,7 +167,8 @@ void MipsWindowsLowerer::lower(
     source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else ExitProcess(17u);}\n";
     source << "return;\n";
     source << "case 22:\n";
-    source << "ExitProcess(special==12?0u:9u);\n";
+    source << "if(special==12u)ExitProcess(0u);\n";
+    source << "if(special==13u){char text[25]={'b','r','e','a','k','_','a','d','d','r','e','s','s','=','0','x','0','0','0','0','0','0','0','0','\\n'};uint32_t value=address;for(int index=23;index>=16;--index){uint32_t digit=value&15u;text[index]=(char)(digit<10u?'0'+digit:'a'+digit-10u);value>>=4u;}void* handle=GetStdHandle(0xfffffff5u);unsigned long written=0;WriteFile(handle,text,sizeof(text),&written,0);ExitProcess(9u);}\n";
     source << "return;\n";
     source << "default:ExitProcess(16u);\n";
     source << "}\n}\n";
@@ -236,22 +237,32 @@ void MipsWindowsLowerer::lower(
         chunk << "extern \"C\" bool native_chunk_" << chunk_index << "(void){\n";
         chunk << "switch(pc){\n";
         for (std::uint32_t address : plan.leader_chunks[chunk_index]) {
-            const std::uint32_t offset =
-                address - plan.load_address;
-            if (offset + 4u > plan.file_size) continue;
-            const std::uint32_t word =
-                read_psx32(data, PSX_HEADER_SIZE + offset);
-            const MipsInstructionIr instruction_ir =
-                build_mips_instruction_ir(address, word);
             chunk << "case 0x" << std::hex << std::setfill('0')
                   << std::setw(8) << address << std::dec << "u:\n";
-            if (!is_supported_mips_instruction(word)) {
-                chunk << "ExitProcess(16u);return true;\n";
-            } else {
-                chunk << "next_pc=pc+4u;\n";
+            std::uint32_t block_end = plan.load_address + plan.file_size;
+            const auto next_leader = plan.leaders.upper_bound(address);
+            if (next_leader != plan.leaders.end()) {
+                block_end = *next_leader;
+            }
+            for (std::uint32_t block_address = address;
+                 block_address < block_end;
+                 block_address += 4u) {
+                const std::uint32_t offset =
+                    block_address - plan.load_address;
+                if (offset + 4u > plan.file_size) break;
+                const std::uint32_t word =
+                    read_psx32(data, PSX_HEADER_SIZE + offset);
+                const MipsInstructionIr instruction_ir =
+                    build_mips_instruction_ir(block_address, word);
+                if (!is_supported_mips_instruction(word)) {
+                    chunk << "ExitProcess(16u);return true;\n";
+                    break;
+                }
+                chunk << "next_pc=0x" << std::hex << block_address
+                      << std::dec << "u+4u;\n";
                 chunk << "native_execute_ir("
                       << static_cast<std::uint32_t>(instruction_ir.kind)
-                      << ",0x" << std::hex << address << std::dec << "u,"
+                      << ",0x" << std::hex << block_address << std::dec << "u,"
                       << "0x" << std::hex << word << std::dec << "u,"
                       << instruction_ir.rs << "u,"
                       << instruction_ir.rt << "u,"
@@ -261,11 +272,21 @@ void MipsWindowsLowerer::lower(
                       << "0x" << std::hex << instruction_ir.target << std::dec << "u,"
                       << instruction_ir.size << "u,"
                       << instruction_ir.special << "u);\n";
-                chunk << "regs[0]=0u;return true;\n";
+                chunk << "regs[0]=0u;\n";
+                const std::uint32_t instruction_kind =
+                    static_cast<std::uint32_t>(instruction_ir.kind);
+                if (instruction_kind >= 14u &&
+                    instruction_kind <= 17u) {
+                    chunk << "break;\n";
+                } else if (instruction_kind == 22u) {
+                    chunk << "break;\n";
+                }
             }
+            chunk << "return true;\n";
         }
         chunk << "default:return false;\n";
-        chunk << "}\n}\n";
+        chunk << "}\n";
+        chunk << "return true;\n}\n";
         ir.chunks.push_back(chunk.str());
     }
     ir.diagnostics = diagnostics.str();
