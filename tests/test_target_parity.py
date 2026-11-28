@@ -80,6 +80,26 @@ class LoweringInventoryTest(unittest.TestCase):
             windows,
             "Windows lowering must emit through the shared LLD PE backend",
         )
+        self.assertIn(
+            "build_mips_executable_plan",
+            linux,
+            "Linux lowering must consume the shared executable plan",
+        )
+        self.assertIn(
+            "build_mips_executable_plan",
+            windows,
+            "Windows lowering must consume the shared executable plan",
+        )
+        self.assertNotIn(
+            "discover_payload_pointer_targets",
+            linux,
+            "Linux lowering must not rebuild shared CFG pointer discovery",
+        )
+        self.assertNotIn(
+            "discover_indirect_table_targets",
+            linux,
+            "Linux lowering must not rebuild shared indirect-table discovery",
+        )
         self.assertNotIn(
             "for (std::uint32_t target : leaders)",
             windows,

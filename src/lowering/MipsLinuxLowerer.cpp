@@ -1,4 +1,5 @@
 #include "MipsLinuxLowerer.h"
+#include "MipsLowerer.h"
 #include "executable/ElfWriter.h"
 #include "relinker/Relinker.h"
 #include "format/PsExe.h"
@@ -14,7 +15,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <queue>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -32,232 +32,31 @@ void MipsLinuxLowerer::lower(
     const std::vector<unsigned char>& data
 )
 {
-    const std::uint32_t file_size = read_psx32(data, 0x1C);
-    const std::uint32_t load_address = read_psx32(data, 0x18);
-    const std::uint32_t initial_pc = read_psx32(data, 0x10);
-    const std::uint32_t initial_gp = read_psx32(data, 0x14);
-    const std::uint32_t initial_sp_base = read_psx32(data, 0x30);
-    const std::uint32_t initial_sp_offset = read_psx32(data, 0x34);
-    const std::uint32_t initial_sp =
-        initial_sp_base == 0 && initial_sp_offset == 0
-            ? 0x801FF000u
-            : initial_sp_base + initial_sp_offset;
-    if (file_size == 0 || file_size % 4 != 0) {
-        throw std::runtime_error("unsupported native lowering: executable size is not a MIPS word sequence");
-    }
-    if (initial_pc < load_address || initial_pc >= load_address + file_size) {
-        throw std::runtime_error("unsupported native lowering: entry point outside executable payload");
-    }
-    const std::uint32_t payload_ram_offset =
-        load_address & 0x1FFFFFu;
-    if (payload_ram_offset > 0x200000u ||
-        file_size > 0x200000u - payload_ram_offset) {
-        throw std::runtime_error(
-            "unsupported native lowering: executable payload exceeds PS1 RAM");
-    }
-
-    std::set<std::uint32_t> leaders;
-    std::set<std::uint32_t> delay_slots;
-    std::set<std::uint32_t> processed;
-    std::queue<std::uint32_t> work;
-    std::uint32_t unsupported_count = 0;
-    std::uint32_t reachable_count = 0;
-    std::uint32_t supported_count = 0;
-    std::uint32_t embedded_data_count = 0;
-    std::uint32_t unknown_region_count = 0;
-    std::uint32_t first_unsupported_address = 0;
-    std::uint32_t first_unsupported_word = 0;
-    std::string first_unsupported_name;
-    std::uint32_t call_edges = 0;
-    std::uint32_t unresolved_indirect_transfers = 0;
-    std::set<std::string> unsupported_family_names;
-    std::set<std::uint32_t> emittable_leaders;
-    bool native_host_loop_required = false;
-    leaders.insert(initial_pc);
-    work.push(initial_pc);
-    for (std::uint32_t target : discover_payload_pointer_targets(
-             data,
-             load_address,
-             file_size)) {
-        leaders.insert(target);
-        work.push(target);
-    }
-    while (!work.empty()) {
-        const std::uint32_t address = work.front();
-        work.pop();
-        if (!processed.insert(address).second) continue;
-        if (address < load_address || address >= load_address + file_size
-            || (address & 3u) != 0) {
-            continue;
-        }
-        const std::uint32_t offset = address - load_address;
-        if (offset + 4 > file_size) continue;
-        const std::uint32_t instruction = read_psx32(data, 2048 + offset);
-        if (classify_payload_region(
-                address, instruction, true) ==
-            PayloadRegionKind::Unknown) {
-            continue;
-        }
-        const std::uint32_t opcode = instruction >> 26;
-        if (opcode == 0x20 || opcode == 0x21 || opcode == 0x23 ||
-            opcode == 0x24 || opcode == 0x25 || opcode == 0x28 ||
-            opcode == 0x29 || opcode == 0x2B || opcode == 0x30 ||
-            opcode == 0x31 || opcode == 0x32 || opcode == 0x33 ||
-            opcode == 0x35 || opcode == 0x36 || opcode == 0x38 ||
-            opcode == 0x39 || opcode == 0x3A || opcode == 0x3B) {
-            native_host_loop_required = true;
-        }
-        const std::uint32_t rs = (instruction >> 21) & 31u;
-        const std::uint32_t immediate = instruction & 0xFFFFu;
-        const std::uint32_t special = instruction & 63u;
-        const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
-            || opcode == 0x06 || opcode == 0x07
-            || opcode == 0x14 || opcode == 0x15
-            || opcode == 0x16 || opcode == 0x17
-            || (opcode == 0x11 && (rs == 8 || rs == 12));
-        const bool jump = opcode == 0x02 || opcode == 0x03;
-        const bool jr = opcode == 0 && special == 0x08;
-        const bool jalr = opcode == 0 && special == 0x09;
-        const bool stop = opcode == 0 && (special == 0x0C || special == 0x0D);
-        if (branch) {
-            const std::int32_t displacement =
-                static_cast<std::int32_t>(static_cast<std::int16_t>(immediate)) * 4;
-            const std::uint32_t target =
-                static_cast<std::uint32_t>(static_cast<std::int64_t>(address) + 4 + displacement);
-            leaders.insert(target);
-            leaders.insert(address + 8);
-            work.push(target);
-            work.push(address + 8);
-        } else if (jump) {
-            const std::uint32_t target =
-                ((address + 4) & 0xF0000000u) | ((instruction & 0x03FFFFFFu) << 2);
-            if (opcode == 0x03) {
-                ++call_edges;
-                if (target < load_address || target >= load_address + file_size) {
-                    ++unresolved_indirect_transfers;
-                }
-            }
-            if ((target & 0xFF000000u) == 0xA0000000u
-                || (target & 0xFF000000u) == 0xB0000000u
-                || (target & 0xFF000000u) == 0xC0000000u) {
-                leaders.insert(address + 8);
-                work.push(address + 8);
-            } else {
-                leaders.insert(target);
-                work.push(target);
-            }
-            if (opcode == 0x03) {
-                leaders.insert(address + 8);
-                work.push(address + 8);
-            }
-        } else if (!jr && !jalr && !stop) {
-            leaders.insert(address + 4);
-            work.push(address + 4);
-        }
-        if (jr || jalr) {
-            if (jalr) {
-                ++call_edges;
-                leaders.insert(address + 8);
-                work.push(address + 8);
-            }
-            const std::uint32_t resolved_target =
-                resolve_static_indirect_target(
-                    data,
-                    load_address,
-                    file_size,
-                    address,
-                    rs);
-            if (resolved_target >= load_address &&
-                resolved_target < load_address + file_size &&
-                (resolved_target & 3u) == 0) {
-                leaders.insert(resolved_target);
-                work.push(resolved_target);
-            } else {
-                const Ps1BiosCallPlan bios_call = map_ps1_bios_call(
-                    resolved_target,
-                    resolve_static_indirect_target(
-                        data,
-                        load_address,
-                        file_size,
-                        address + 4,
-                        9u));
-                const std::uint32_t return_target =
-                    bios_call.kind == Ps1BiosCallKind::Unsupported
-                        ? 0u
-                        : resolve_static_indirect_target(
-                            data,
-                            load_address,
-                            file_size,
-                            address,
-                            31u);
-                if (return_target >= load_address &&
-                    return_target < load_address + file_size &&
-                    (return_target & 3u) == 0) {
-                    leaders.insert(return_target);
-                    work.push(return_target);
-                } else {
-                    const std::vector<std::uint32_t> table_targets =
-                        discover_indirect_table_targets(
-                            data,
-                            load_address,
-                            file_size,
-                            address,
-                            rs);
-                    if (table_targets.empty()) {
-                        ++unresolved_indirect_transfers;
-                    } else {
-                        for (std::uint32_t target : table_targets) {
-                            leaders.insert(target);
-                            work.push(target);
-                        }
-                    }
-                }
-            }
-        }
-        if (branch || jump || jr || jalr) {
-            const std::uint32_t delay_address = address + 4;
-            if (delay_address >= load_address && delay_address < load_address + file_size) {
-                delay_slots.insert(delay_address);
-                leaders.insert(delay_address);
-            }
-        }
-    }
-
-    for (std::uint32_t address : leaders) {
-        if (address < load_address || address >= load_address + file_size) continue;
-        const std::uint32_t offset = address - load_address;
-        if (offset + 4 > file_size) continue;
-        const std::uint32_t instruction = read_psx32(data, PSX_HEADER_SIZE + offset);
-        const PayloadRegionKind region =
-            classify_payload_region(address, instruction, true);
-        if (region == PayloadRegionKind::EmbeddedData) {
-            ++embedded_data_count;
-            continue;
-        }
-        if (region == PayloadRegionKind::Instruction ||
-            is_supported_mips_instruction(instruction)) {
-            emittable_leaders.insert(address);
-        }
-        if (region == PayloadRegionKind::Unknown) {
-            ++unknown_region_count;
-            continue;
-        }
-        ++reachable_count;
-        if (is_supported_mips_instruction(instruction)) {
-            ++supported_count;
-        }
-        if (!is_supported_mips_instruction(instruction)) {
-            ++unsupported_count;
-            unsupported_family_names.insert(
-                classify_unsupported_instruction(instruction).name);
-            if (first_unsupported_address == 0) {
-                first_unsupported_address = address;
-                first_unsupported_word = instruction;
-                first_unsupported_name =
-                    classify_unsupported_instruction(instruction).name;
-            }
-        }
-    }
+    const MipsExecutablePlan plan = build_mips_executable_plan(options, data);
+    const std::uint32_t file_size = plan.file_size;
+    const std::uint32_t load_address = plan.load_address;
+    const std::uint32_t initial_pc = plan.initial_pc;
+    const std::uint32_t initial_gp = plan.initial_gp;
+    const std::uint32_t initial_sp = plan.initial_sp;
+    const std::uint32_t payload_ram_offset = plan.payload_ram_offset;
+    const std::set<std::uint32_t>& leaders = plan.leaders;
+    const std::set<std::uint32_t>& delay_slots = plan.delay_slots;
+    const std::uint32_t& unsupported_count = plan.unsupported_count;
+    const std::uint32_t& reachable_count = plan.reachable_count;
+    const std::uint32_t& supported_count = plan.supported_count;
+    const std::uint32_t& embedded_data_count = plan.embedded_data_count;
+    const std::uint32_t& unknown_region_count = plan.unknown_region_count;
+    const std::uint32_t& first_unsupported_address = plan.first_unsupported_address;
+    const std::uint32_t& first_unsupported_word = plan.first_unsupported_word;
+    const std::string& first_unsupported_name = plan.first_unsupported_name;
+    const std::uint32_t& call_edges = plan.call_edges;
+    const std::uint32_t& unresolved_indirect_transfers =
+        plan.unresolved_indirect_transfers;
+    const std::set<std::string>& unsupported_family_names =
+        plan.unsupported_family_names;
+    const std::set<std::uint32_t>& emittable_leaders =
+        plan.emittable_leaders;
+    const bool native_host_loop_required = plan.native_host_loop_required;
 
     const std::filesystem::path assembly = std::filesystem::path(options.output + ".native.s");
     const std::filesystem::path payload = std::filesystem::path(options.output + ".native.bin");
