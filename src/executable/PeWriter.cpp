@@ -140,6 +140,7 @@ void write_pe_ir(
             L"/Fo:" + objects[index].wstring(),
             sources[index].wstring(),
         };
+        std::string tool_error;
         tool_error.clear();
         if (!run_windows_tool(clang, compile_arguments, tool_error)) {
             throw std::runtime_error(

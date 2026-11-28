@@ -327,7 +327,9 @@ int main(int argc, char** argv)
             source_text.find("anyps1_host_loop_attach_ram") == std::string::npos ||
             source_text.find("anyps1_host_loop_poll") == std::string::npos ||
             source_text.find("anyps1_host_loop_tick") == std::string::npos ||
-            source_text.find("anyps1_host_loop_present") == std::string::npos) {
+            source_text.find("anyps1_host_loop_present") == std::string::npos ||
+            source_text.find("bios_vector") == std::string::npos ||
+            source_text.find("pending_target=address+8u") == std::string::npos) {
             throw std::runtime_error(
                 "Windows PE native source lacks MMIO/frame-tick/host-loop state");
         }
