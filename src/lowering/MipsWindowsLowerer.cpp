@@ -105,6 +105,8 @@ void MipsWindowsLowerer::lower(
                << word << std::dec;
     }
     source << "};\n";
+    source << "static void write_windows_trace(const char* prefix,uint32_t value){\n";
+    source << "char text[48];uint32_t position=0;while(prefix[position]){text[position]=prefix[position];++position;}text[position++]='0';text[position++]='x';for(int shift=28;shift>=0;shift-=4){uint32_t digit=(value>>shift)&15u;text[position++]=(char)(digit<10u?'0'+digit:'a'+digit-10u);}text[position++]='\\n';void* handle=GetStdHandle(0xfffffff5u);unsigned long written=0;WriteFile(handle,text,position,&written,0);}\n";
     source << "extern \"C\" void native_execute_ir(uint32_t kind,uint32_t address,uint32_t word,uint32_t rs,uint32_t rt,uint32_t rd,uint32_t shamt,uint32_t immediate,uint32_t target,uint32_t size_value,uint32_t special){\n";
     source << "switch(kind){\n";
     source << "case 1:return;\n";
@@ -155,20 +157,20 @@ void MipsWindowsLowerer::lower(
     source << "pending_target=target;if((word>>26)==3)regs[31]=address+8u;delay_remaining=2u;\n";
     source << "return;\n";
     source << "case 16:\n";
-    source << "pending_target=regs[rs];delay_remaining=2u;\n";
+    source << "{uint32_t target=regs[rs];if(target==0xA0u||target==0xB0u||target==0xC0u||((target&0xFF000000u)==0xA0000000u)||((target&0xFF000000u)==0xB0000000u)||((target&0xFF000000u)==0xC0000000u)){write_windows_trace(\"bios_vector=\",target);write_windows_trace(\"bios_function=\",regs[9]);if(target==0xA0u){if(regs[9]==0x39u)regs[2]=0x80100000u;else if(regs[9]==0x06u)ExitProcess(0u);else if(regs[9]==0x03u)regs[2]=regs[6];else regs[2]=0xffffffffu;}else if(target==0xB0u){if(regs[9]!=0x17u){write_windows_trace(\"unsupported_b0_function=\",regs[9]);ExitProcess(17u);}}else if(target==0xC0u){if(regs[9]==0x10u||regs[9]==0x13u)regs[2]=0u;else{write_windows_trace(\"unsupported_c0_function=\",regs[9]);ExitProcess(17u);}}pending_target=address+8u;}else pending_target=target;delay_remaining=2u;}\n";
     source << "return;\n";
     source << "case 17:\n";
     source << "regs[rd]=address+8u;pending_target=regs[rs];delay_remaining=2u;\n";
     source << "return;\n";
     source << "case 18:\n";
-    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)regs[rt]=(uint32_t)*((uint8_t*)ram+ea);else if(size_value==2)regs[rt]=(uint32_t)*((uint16_t*)((uint8_t*)ram+ea));else regs[rt]=ram[ea>>2u];}else if(ea>=0x1F800000u&&ea<0x1F800400u)regs[rt]=scratchpad[(ea&0x3FFu)>>2u];else ExitProcess(17u);}\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)regs[rt]=(uint32_t)*((uint8_t*)ram+ea);else if(size_value==2)regs[rt]=(uint32_t)*((uint16_t*)((uint8_t*)ram+ea));else regs[rt]=ram[ea>>2u];}else if(ea>=0x1F800000u&&ea<0x1F800400u)regs[rt]=scratchpad[(ea&0x3FFu)>>2u];else{write_windows_trace(\"mmio_load_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 19:\n";
-    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else ExitProcess(17u);}\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else{write_windows_trace(\"mmio_store_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 22:\n";
     source << "if(special==12u)ExitProcess(0u);\n";
-    source << "if(special==13u){char text[25]={'b','r','e','a','k','_','a','d','d','r','e','s','s','=','0','x','0','0','0','0','0','0','0','0','\\n'};uint32_t value=address;for(int index=23;index>=16;--index){uint32_t digit=value&15u;text[index]=(char)(digit<10u?'0'+digit:'a'+digit-10u);value>>=4u;}void* handle=GetStdHandle(0xfffffff5u);unsigned long written=0;WriteFile(handle,text,sizeof(text),&written,0);ExitProcess(9u);}\n";
+    source << "if(special==13u){write_windows_trace(\"break_address=\",address);ExitProcess(9u);}\n";
     source << "return;\n";
     source << "default:ExitProcess(16u);\n";
     source << "}\n}\n";
@@ -197,9 +199,10 @@ void MipsWindowsLowerer::lower(
     for (std::size_t chunk_index = 0; chunk_index < plan.leader_chunks.size(); ++chunk_index) {
         source << "if(!dispatched && native_chunk_" << chunk_index << "())dispatched=true;\n";
     }
-    source << "if(!dispatched)ExitProcess(17u);\n";
+    source << "if(!dispatched){write_windows_trace(\"undispatched_pc=\",pc);ExitProcess(17u);}\n";
     source << "pc=next_pc;\n";
     source << "}\n";
+    source << "write_windows_trace(\"step_limit_pc=\",pc);\n";
     source << "ExitProcess(17u);\n";
     source << "return 17;\n";
     source << "}\n";
@@ -245,7 +248,7 @@ void MipsWindowsLowerer::lower(
                 block_end = *next_leader;
             }
             for (std::uint32_t block_address = address;
-                 block_address < block_end;
+                 block_address <= block_end;
                  block_address += 4u) {
                 const std::uint32_t offset =
                     block_address - plan.load_address;

@@ -149,17 +149,19 @@ MipsExecutablePlan build_mips_executable_plan(
                 plan.leaders.insert(resolved_target);
                 work.push(resolved_target);
             } else {
-                const Ps1BiosCallPlan bios_call = map_ps1_bios_call(
-                    resolved_target,
+                if ((resolved_target & 0xFF000000u) == 0xA0000000u ||
+                    (resolved_target & 0xFF000000u) == 0xB0000000u ||
+                    (resolved_target & 0xFF000000u) == 0xC0000000u ||
+                    resolved_target == 0xA0u ||
+                    resolved_target == 0xB0u ||
+                    resolved_target == 0xC0u) {
+                    plan.leaders.insert(address + 8u);
+                    work.push(address + 8u);
+                }
+                const std::uint32_t return_target =
                     resolve_static_indirect_target(
                         data, plan.load_address, plan.file_size,
-                        address + 4u, 9u));
-                const std::uint32_t return_target =
-                    bios_call.kind == Ps1BiosCallKind::Unsupported
-                        ? 0u
-                        : resolve_static_indirect_target(
-                            data, plan.load_address, plan.file_size,
-                            address, 31u);
+                        address, 31u);
                 if (return_target >= plan.load_address &&
                     return_target < plan.load_address + plan.file_size &&
                     (return_target & 3u) == 0u) {
@@ -189,6 +191,27 @@ MipsExecutablePlan build_mips_executable_plan(
                 plan.leaders.insert(delay_address);
             }
         }
+    }
+
+    for (;;) {
+        const std::set<std::uint32_t> current = plan.leaders;
+        bool added = false;
+        for (std::uint32_t address : current) {
+            const std::uint32_t next = address + 4u;
+            if (next >= plan.load_address + plan.file_size) continue;
+            const std::uint32_t offset = next - plan.load_address;
+            if (offset + 4u > plan.file_size) continue;
+            const std::uint32_t instruction =
+                read_psx32(data, PSX_HEADER_SIZE + offset);
+            if (classify_payload_region(next, instruction, true) ==
+                PayloadRegionKind::Instruction) {
+                if (plan.leaders.insert(next).second) {
+                    work.push(next);
+                    added = true;
+                }
+            }
+        }
+        if (!added) break;
     }
 
     for (std::uint32_t address : plan.leaders) {
@@ -226,6 +249,40 @@ MipsExecutablePlan build_mips_executable_plan(
                 plan.first_unsupported_name = unsupported.name;
             }
         }
+    }
+    for (;;) {
+        const std::set<std::uint32_t> current = plan.emittable_leaders;
+        bool added = false;
+        for (std::uint32_t address : current) {
+            const std::uint32_t next = address + 4u;
+            if (next >= plan.load_address + plan.file_size) continue;
+            const std::uint32_t offset = next - plan.load_address;
+            if (offset + 4u > plan.file_size) continue;
+            const std::uint32_t instruction =
+                read_psx32(data, PSX_HEADER_SIZE + offset);
+            const PayloadRegionKind region =
+                classify_payload_region(next, instruction, true);
+            if (region != PayloadRegionKind::Instruction) continue;
+            if (plan.emittable_leaders.insert(next).second) {
+                plan.leaders.insert(next);
+                added = true;
+                ++plan.reachable_count;
+                if (is_supported_mips_instruction(instruction)) {
+                    ++plan.supported_count;
+                } else {
+                    ++plan.unsupported_count;
+                    const UnsupportedInstruction unsupported =
+                        classify_unsupported_instruction(instruction);
+                    plan.unsupported_family_names.insert(unsupported.name);
+                    if (plan.first_unsupported_address == 0u) {
+                        plan.first_unsupported_address = next;
+                        plan.first_unsupported_word = instruction;
+                        plan.first_unsupported_name = unsupported.name;
+                    }
+                }
+            }
+        }
+        if (!added) break;
     }
     for (std::uint32_t address : plan.emittable_leaders) {
         const std::uint32_t bucket =
