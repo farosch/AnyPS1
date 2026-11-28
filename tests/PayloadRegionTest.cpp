@@ -38,6 +38,27 @@ int main()
             throw std::runtime_error(
                 "invalid BLEZL encoding was classified as code");
         }
+        if (anyps1::classify_payload_region(
+                0x80010014u,
+                0x00000001u,
+                true) != anyps1::PayloadRegionKind::Unknown) {
+            throw std::runtime_error(
+                "reserved SPECIAL encoding was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x80010018u,
+                0x03D103D7u,
+                true) != anyps1::PayloadRegionKind::Unknown) {
+            throw std::runtime_error(
+                "invalid LUI encoding was classified as code");
+        }
+        if (anyps1::classify_payload_region(
+                0x8001001Cu,
+                0x00FFFFFFu,
+                true) != anyps1::PayloadRegionKind::Unknown) {
+            throw std::runtime_error(
+                "reserved SPECIAL encoding was classified as code");
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Payload region test failed: " << error.what() << "\n";

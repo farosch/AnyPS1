@@ -228,7 +228,6 @@ int main(int argc, char** argv)
                 std::remove(output_path);
                 std::remove(windows_output_path);
                 std::error_code remove_error;
-                std::filesystem::remove(native_source, remove_error);
 #ifdef _WIN32
                 _putenv_s("ANYPS1_KEEP_ASSEMBLY", "");
 #else
