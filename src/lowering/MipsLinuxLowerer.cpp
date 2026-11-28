@@ -1097,6 +1097,9 @@ void MipsLinuxLowerer::lower(
             source << "addl $0x1F800000, %edi\n";
             source << "call anyps1_host_loop_mmio_read\n";
             source << "movl %eax, %edx\n";
+            source << "movl %edx, pending_load_value(%rip)\n";
+            source << "movb $" << rt << ", pending_load_register(%rip)\n";
+            source << "movb $1, pending_load_valid(%rip)\n";
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "leaq mmio_state(%rip), %rbx\n";
             source << "andl $0x1FFF, %ecx\n";
@@ -1107,6 +1110,9 @@ void MipsLinuxLowerer::lower(
             source << "jae mmio_load_spu_" << std::hex << address << std::dec << "\n";
             source << "call anyps1_host_loop_controller_state\n";
             source << "movl %eax, %edx\n";
+            source << "movl %edx, pending_load_value(%rip)\n";
+            source << "movb $" << rt << ", pending_load_register(%rip)\n";
+            source << "movb $1, pending_load_valid(%rip)\n";
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_load_spu_" << std::hex << address << std::dec << ": \n";
             source << "cmpl $0x1C00, %ecx\n";
@@ -1117,6 +1123,9 @@ void MipsLinuxLowerer::lower(
             source << "addl $0x1F800000, %edi\n";
             source << "call anyps1_host_loop_spu_read\n";
             source << "movl %eax, %edx\n";
+            source << "movl %edx, pending_load_value(%rip)\n";
+            source << "movb $" << rt << ", pending_load_register(%rip)\n";
+            source << "movb $1, pending_load_valid(%rip)\n";
             source << "jmp mmio_load_done_" << std::hex << address << std::dec << "\n";
             source << "mmio_load_default_" << std::hex << address << std::dec << ": \n";
             if (opcode == 0x20) source << "movsbl (%rbx,%rcx), %edx\n";
@@ -1695,8 +1704,26 @@ void MipsLinuxLowerer::lower(
                 } else if (emittable_leaders.find(jump_target) !=
                            emittable_leaders.end()) {
                     source << "call p" << std::hex << jump_target << std::dec << "\n";
+                } else if (leaders.find(jump_target) != leaders.end()) {
+                    source << "call p" << std::hex << jump_target << std::dec << "\n";
                 } else {
-                    source << "jmp unsupported_jump_exit\n";
+                    const std::uint32_t target_offset =
+                        jump_target >= load_address &&
+                        jump_target < load_address + file_size &&
+                        (jump_target & 3u) == 0u
+                            ? jump_target - load_address
+                            : file_size;
+                    if (target_offset + 4u <= file_size) {
+                        const std::uint32_t target_instruction =
+                            read_psx32(data, PSX_HEADER_SIZE + target_offset);
+                        if (is_supported_mips_instruction(target_instruction)) {
+                            source << "call p" << std::hex << jump_target << std::dec << "\n";
+                        } else {
+                            source << "jmp unsupported_jump_exit\n";
+                        }
+                    } else {
+                        source << "jmp unsupported_jump_exit\n";
+                    }
                 }
             } else {
                 if (emittable_leaders.find(jump_target) !=

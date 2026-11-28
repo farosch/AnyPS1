@@ -85,11 +85,15 @@ PayloadRegionKind classify_payload_region(
             ? PayloadRegionKind::Instruction
             : PayloadRegionKind::Unknown;
     }
+    if (opcode >= 0x10u && opcode <= 0x13u) {
+        return PayloadRegionKind::Instruction;
+    }
     if (opcode == 0x02 || opcode == 0x03 ||
         opcode == 0x04 || opcode == 0x05 ||
         (opcode >= 0x08 && opcode <= 0x0Eu) ||
         opcode == 0x14 || opcode == 0x15 ||
-        (opcode >= 0x20 && opcode <= 0x2Eu)) {
+        (opcode >= 0x20 && opcode <= 0x2Eu) ||
+        (opcode >= 0x30u && opcode <= 0x3Fu)) {
         return PayloadRegionKind::Instruction;
     }
     if (is_repeated_filler_word(word) || is_ascii_text_word(word)) {

@@ -28,8 +28,9 @@ int main()
         if (anyps1::classify_payload_region(
                 0x8001000Cu,
                 0xF8000000u,
-                true) != anyps1::PayloadRegionKind::Unknown) {
-            throw std::runtime_error("reserved word was not classified as unknown");
+                true) != anyps1::PayloadRegionKind::Instruction) {
+            throw std::runtime_error(
+                "reserved coprocessor opcode was not classified for explicit lowering");
         }
         if (anyps1::classify_payload_region(
                 0x80010010u,

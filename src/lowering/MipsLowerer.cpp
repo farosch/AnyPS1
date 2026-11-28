@@ -124,6 +124,18 @@ MipsExecutablePlan build_mips_executable_plan(
             } else {
                 plan.leaders.insert(target);
                 work.push(target);
+                if (target >= plan.load_address &&
+                    target < plan.load_address + plan.file_size &&
+                    (target & 3u) == 0u) {
+                    const std::uint32_t target_offset = target - plan.load_address;
+                    if (target_offset + 4u <= plan.file_size) {
+                        const std::uint32_t target_instruction =
+                            read_psx32(data, PSX_HEADER_SIZE + target_offset);
+                        if (is_supported_mips_instruction(target_instruction)) {
+                            plan.emittable_leaders.insert(target);
+                        }
+                    }
+                }
             }
             if (ir.opcode == 0x03u) {
                 plan.leaders.insert(address + 8u);

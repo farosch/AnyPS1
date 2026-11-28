@@ -100,6 +100,8 @@ target_link_libraries(anyps1_host_integration_test
     PRIVATE anyps1_host anyps1_input anyps1_gpu)
 add_test(NAME host_integration_ir
     COMMAND anyps1_host_integration_test)
+set_tests_properties(host_integration_ir PROPERTIES
+    ENVIRONMENT "ANYPS1_TEST_HEADLESS=1")
 
 add_test(NAME unsupported_instruction_inventory
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/inventory_unsupported_instructions.py
