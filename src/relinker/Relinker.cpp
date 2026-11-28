@@ -57,12 +57,7 @@ bool relink(RelinkOptions& options)
     if (load_address < 0x80000000 || load_address >= 0x80200000) throw std::runtime_error("PS-X EXE load address is outside PS1 KSEG0");
     if (initial_pc != 0 && (initial_pc < load_address || initial_pc >= load_address + file_size)) throw std::runtime_error("PS-X EXE entry point is outside the executable image");
 
-    try {
-        create_mips_lowerer(*resolved.target)->lower(resolved, data);
-    }
-    catch (...) {
-        throw;
-    }
+    create_mips_lowerer(*resolved.target)->lower(resolved, data);
     return true;
 }
 

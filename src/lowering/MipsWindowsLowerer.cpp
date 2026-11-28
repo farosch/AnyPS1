@@ -266,7 +266,6 @@ void MipsWindowsLowerer::lower(
     NativeLoweringIr ir;
     ir.target = TargetPlatform::Windows;
     ir.entry_symbol = "main";
-    ir.source = source.str();
     ir.chunks.push_back(source.str());
     for (std::size_t chunk_index = 0;
          chunk_index < plan.leader_chunks.size();

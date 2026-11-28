@@ -18,6 +18,7 @@ add_custom_target(generate_mips_opcode_registry
 
 add_library(anyps1_executable
     executable/ElfWriter.cpp
+    executable/NativeProcess.cpp
     executable/PeWriter.cpp
 )
 

@@ -1,4 +1,5 @@
 #include "ElfWriter.h"
+#include "NativeProcess.h"
 
 #include <array>
 #include <cerrno>
@@ -22,14 +23,14 @@
 
 namespace anyps1 {
 
-int ElfWriter::link(
+ElfLinkResult ElfWriter::link(
     const std::filesystem::path& assembly,
     const std::filesystem::path& output)
 {
     return link(std::vector<std::filesystem::path>{assembly}, output);
 }
 
-int ElfWriter::link(
+ElfLinkResult ElfWriter::link(
     const std::vector<std::filesystem::path>& assemblies,
     const std::filesystem::path& output)
 {
@@ -39,25 +40,6 @@ int ElfWriter::link(
     throw std::runtime_error(
         "native Linux lowering toolchain is not available on Windows");
 #else
-    const auto wait_with_timeout =
-        [](pid_t child, int& status, std::chrono::minutes timeout) -> int {
-            const auto deadline =
-                std::chrono::steady_clock::now() + timeout;
-            for (;;) {
-                const pid_t waited =
-                    waitpid(child, &status, WNOHANG);
-                if (waited == child) return 0;
-                if (waited < 0) return -1;
-                if (std::chrono::steady_clock::now() >= deadline) {
-                    kill(child, SIGKILL);
-                    waitpid(child, &status, 0);
-                    return 124;
-                }
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(10));
-            }
-        };
-
     std::vector<std::filesystem::path> objects;
     objects.reserve(assemblies.size());
     for (std::size_t index = 0; index < assemblies.size(); ++index) {
@@ -65,113 +47,90 @@ int ElfWriter::link(
             std::filesystem::path(
                 output.string() + ".native." +
                 std::to_string(index) + ".o");
-        const pid_t assembler = fork();
-        if (assembler < 0) {
-            throw std::runtime_error(
-                "cannot start native Linux assembler: " +
-                std::string(std::strerror(errno)));
-        }
-        if (assembler == 0) {
-            std::vector<const char*> assembler_args = {
+        std::vector<std::string> assembler_args = {
+            "-x",
+            "assembler",
+            "-c",
+            assemblies[index].string(),
+            "-o",
+            object.string(),
+        };
+        const NativeProcessResult assembler =
+            run_native_process(
                 "clang",
-                "-x",
-                "assembler",
-                "-c",
-            };
-            assembler_args.push_back(assemblies[index].c_str());
-            assembler_args.push_back("-o");
-            assembler_args.push_back(object.c_str());
-            assembler_args.push_back(nullptr);
-            execvp(assembler_args[0],
-                   const_cast<char* const*>(assembler_args.data()));
-            _exit(127);
+                assembler_args,
+                std::chrono::minutes(2));
+        if (!assembler.started) {
+            return {false, -1,
+                    assembler.stderr_text.empty()
+                        ? "cannot start native Linux assembler"
+                        : assembler.stderr_text};
         }
-
-        int assembler_status = 0;
-        const int assembler_wait =
-            wait_with_timeout(assembler, assembler_status,
-                              std::chrono::minutes(2));
-        if (assembler_wait == -1) {
-            throw std::runtime_error(
-                "cannot wait for native Linux assembler: " +
-                std::string(std::strerror(errno)));
+        if (assembler.timed_out) {
+            return {true, 124, assembler.stderr_text};
         }
-        if (assembler_wait == 124) return 124;
-        if (!WIFEXITED(assembler_status) ||
-            WEXITSTATUS(assembler_status) != 0) {
-            return 1;
+        if (assembler.exit_code != 0) {
+            return {false, assembler.exit_code, assembler.stderr_text};
         }
         objects.push_back(object);
     }
-
-    const pid_t child = fork();
-    if (child < 0) {
-        throw std::runtime_error(
-            "cannot start native Linux linker: " +
-            std::string(std::strerror(errno)));
+    std::vector<std::string> linker_args = {
+        "-nostdlib",
+        "-no-pie",
+        "-fuse-ld=lld",
+        "-Wl,-e,_start,-z,noexecstack,-z,relro,-z,now,-z,notext,--build-id=none",
+        "-o",
+        output.string(),
+    };
+    for (const std::filesystem::path& object : objects) {
+        linker_args.push_back(object.string());
     }
-    if (child == 0) {
-        std::vector<const char*> linker_args = {
+    const std::string build_dir = ANYPS1_BUILD_DIR;
+    linker_args.push_back(build_dir + "/src/libanyps1_gte.a");
+    linker_args.push_back(build_dir + "/src/libanyps1_device.a");
+    linker_args.push_back(build_dir + "/src/libanyps1_host.a");
+    linker_args.push_back(build_dir + "/src/libanyps1_input.a");
+    linker_args.push_back(build_dir + "/src/libanyps1_gpu.a");
+    linker_args.push_back("-lstdc++");
+    linker_args.push_back(build_dir + "/3rdparty/SDL/libSDL3.so.0.5.0");
+    linker_args.push_back("-Wl,-rpath," + build_dir + "/3rdparty/SDL");
+    linker_args.push_back("-lc");
+    linker_args.push_back("-lgcc_s");
+    linker_args.push_back("-lgcc");
+    linker_args.push_back("-lm");
+    linker_args.push_back("-ldl");
+    linker_args.push_back("-lpthread");
+    const NativeProcessResult linker =
+        run_native_process(
             "clang++",
-            "-nostdlib",
-            "-no-pie",
-            "-fuse-ld=lld",
-            "-Wl,-e,_start,-z,noexecstack,-z,relro,-z,now,-z,notext,--build-id=none",
-        };
-        linker_args.push_back("-o");
-        linker_args.push_back(output.c_str());
-        for (const std::filesystem::path& object : objects) {
-            linker_args.push_back(object.c_str());
-        }
-        const std::string build_dir = ANYPS1_BUILD_DIR;
-        const std::string gte_library = build_dir + "/src/libanyps1_gte.a";
-        const std::string device_library =
-            build_dir + "/src/libanyps1_device.a";
-        const std::string host_library = build_dir + "/src/libanyps1_host.a";
-        const std::string input_library = build_dir + "/src/libanyps1_input.a";
-        const std::string gpu_library = build_dir + "/src/libanyps1_gpu.a";
-        linker_args.push_back(gte_library.c_str());
-        linker_args.push_back(host_library.c_str());
-        linker_args.push_back(device_library.c_str());
-        linker_args.push_back(input_library.c_str());
-        linker_args.push_back(gpu_library.c_str());
-        linker_args.push_back("-lstdc++");
-        const std::string sdl_library =
-            build_dir + "/3rdparty/SDL/libSDL3.so.0.5.0";
-        linker_args.push_back(sdl_library.c_str());
-        const std::string sdl_rpath =
-            "-Wl,-rpath," + build_dir + "/3rdparty/SDL";
-        linker_args.push_back(sdl_rpath.c_str());
-        linker_args.push_back("-lc");
-        linker_args.push_back("-lgcc_s");
-        linker_args.push_back("-lgcc");
-        linker_args.push_back("-lm");
-        linker_args.push_back("-ldl");
-        linker_args.push_back("-lpthread");
-        linker_args.push_back(nullptr);
-        execvp(linker_args[0], const_cast<char* const*>(linker_args.data()));
-        _exit(127);
+            linker_args,
+            std::chrono::minutes(2));
+    if (!linker.started) {
+        return {false, -1,
+                linker.stderr_text.empty()
+                    ? "cannot start native Linux linker"
+                    : linker.stderr_text};
     }
-
-    int status = 0;
-    const int linker_wait =
-        wait_with_timeout(child, status, std::chrono::minutes(2));
-    if (linker_wait == -1) {
-        throw std::runtime_error(
-            "cannot wait for native Linux linker: " +
-            std::string(std::strerror(errno)));
+    if (linker.timed_out) {
+        return {true, 124, linker.stderr_text};
     }
-    if (linker_wait == 124) return 124;
-    if (!WIFEXITED(status)) return -1;
-    if (WEXITSTATUS(status) != 0) return WEXITSTATUS(status);
-    std::error_code remove_error;
+    if (linker.exit_code != 0) {
+        return {false, linker.exit_code, linker.stderr_text};
+    }
     const char* keep_environment = std::getenv("ANYPS1_KEEP_ASSEMBLY");
     if (keep_environment == nullptr) {
         for (const std::filesystem::path& object : objects) {
+            std::error_code remove_error;
             std::filesystem::remove(object, remove_error);
+            if (remove_error) {
+                return {false, -1,
+                        "cannot remove temporary ELF object: " +
+                            object.string() + ": " +
+                            remove_error.message()};
+            }
         }
     }
-    return 0;
+    return {false, 0, {}};
 #endif
 }
 
@@ -291,45 +250,50 @@ void ElfWriter::write(
     const std::filesystem::path& assembly,
     const std::filesystem::path& output)
 {
-    try {
-        const int status = link(assembly, output);
-        if (status != 0) {
-            throw std::runtime_error(
-                "native Linux lowering toolchain failed (assembly retained: " +
-                assembly.string() + ")");
-        }
-        validate(output);
-        std::filesystem::permissions(
-            output,
-            std::filesystem::perms::owner_exec
-                | std::filesystem::perms::group_exec
-                | std::filesystem::perms::others_exec,
-            std::filesystem::perm_options::add);
-    } catch (...) {
-        throw;
+    const ElfLinkResult result = link(assembly, output);
+    if (result.timed_out) {
+        throw std::runtime_error(
+            "native Linux lowering toolchain timed out");
     }
+    if (result.exit_code != 0) {
+        throw std::runtime_error(
+            "native Linux lowering toolchain failed" +
+                (result.stderr_text.empty()
+                     ? std::string{}
+                     : std::string(": ") + result.stderr_text));
+    }
+    validate(output);
+    std::filesystem::permissions(
+        output,
+        std::filesystem::perms::owner_exec
+            | std::filesystem::perms::group_exec
+            | std::filesystem::perms::others_exec,
+        std::filesystem::perm_options::add);
 }
 
 void ElfWriter::write(
     const std::vector<std::filesystem::path>& assemblies,
     const std::filesystem::path& output)
 {
-    try {
-        const int status = link(assemblies, output);
-        if (status != 0) {
-            throw std::runtime_error(
-                "native Linux lowering toolchain failed");
-        }
-        validate(output);
-        std::filesystem::permissions(
-            output,
-            std::filesystem::perms::owner_exec
-                | std::filesystem::perms::group_exec
-                | std::filesystem::perms::others_exec,
-            std::filesystem::perm_options::add);
-    } catch (...) {
-        throw;
+    const ElfLinkResult result = link(assemblies, output);
+    if (result.timed_out) {
+        throw std::runtime_error(
+            "native Linux lowering toolchain timed out");
     }
+    if (result.exit_code != 0) {
+        throw std::runtime_error(
+            "native Linux lowering toolchain failed" +
+                (result.stderr_text.empty()
+                     ? std::string{}
+                     : std::string(": ") + result.stderr_text));
+    }
+    validate(output);
+    std::filesystem::permissions(
+        output,
+        std::filesystem::perms::owner_exec
+            | std::filesystem::perms::group_exec
+            | std::filesystem::perms::others_exec,
+        std::filesystem::perm_options::add);
 }
 
 }

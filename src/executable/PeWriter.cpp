@@ -1,10 +1,12 @@
 #include "PeWriter.h"
+#include "NativeProcess.h"
 #include "lowering/NativeLoweringIr.h"
 #include "relinker/Relinker.h"
 
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <chrono>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -38,99 +40,39 @@ std::string environment_value(const char* name)
 
 bool run_windows_tool(
     const std::filesystem::path& tool,
-    const std::vector<std::wstring>& arguments)
+    const std::vector<std::wstring>& arguments,
+    std::string& error)
 {
-    std::wstring command_line = L"\"" + tool.wstring() + L"\"";
-    for (const std::wstring& argument : arguments) {
-        command_line += L" ";
-        if (argument.find(L' ') != std::wstring::npos) {
-            command_line += L"\"" + argument + L"\"";
-        } else {
-            command_line += argument;
-        }
-    }
-
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    PROCESS_INFORMATION process{};
-    if (!CreateProcessW(
-            nullptr,
-            command_line.data(),
-            nullptr,
-            nullptr,
-            FALSE,
-            0,
-            nullptr,
-            nullptr,
-            &startup,
-            &process)) {
-        return false;
-    }
-    const DWORD wait_result =
-        WaitForSingleObject(process.hProcess, 120000u);
-    if (wait_result == WAIT_TIMEOUT) {
-        TerminateProcess(process.hProcess, 124u);
-        WaitForSingleObject(process.hProcess, INFINITE);
-        CloseHandle(process.hThread);
-        CloseHandle(process.hProcess);
-        return false;
-    }
-    DWORD exit_code = 0;
-    GetExitCodeProcess(process.hProcess, &exit_code);
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
-    return exit_code == 0;
+    const NativeProcessResult result = run_native_process(
+        tool,
+        arguments,
+        std::chrono::minutes(2));
+    if (result.timed_out) error = "native Windows cross-tool timed out";
+    else if (!result.stderr_text.empty()) error = result.stderr_text;
+    if (result.timed_out) error = "native Windows tool timed out";
+    else if (!result.stderr_text.empty()) error = result.stderr_text;
+    return result.started &&
+        !result.timed_out &&
+        result.exit_code == 0;
 }
 #endif
 
 #ifndef _WIN32
 bool run_posix_tool(
     const char* tool,
-    const std::vector<std::string>& arguments)
+    const std::vector<std::string>& arguments,
+    std::string& error)
 {
-#ifndef _WIN32
-    const pid_t child = fork();
-    if (child < 0) {
-        throw std::runtime_error(
-            std::string("cannot start ") + tool + ": " +
-            std::string(std::strerror(errno)));
-    }
-    if (child == 0) {
-        std::vector<const char*> argv;
-        argv.reserve(arguments.size() + 2);
-        argv.push_back(tool);
-        for (const std::string& argument : arguments) {
-            argv.push_back(argument.c_str());
-        }
-        argv.push_back(nullptr);
-        execvp(tool, const_cast<char* const*>(argv.data()));
-        _exit(127);
-    }
-
-    int status = 0;
-    if (waitpid(child, &status, 0) < 0) {
-        throw std::runtime_error(
-            std::string("cannot wait for ") + tool);
-    }
-    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
-#else
-    (void)tool;
-    (void)arguments;
-    return false;
-#endif
+    const NativeProcessResult result = run_native_process(
+        tool,
+        arguments,
+        std::chrono::minutes(2));
+    return result.started &&
+        !result.timed_out &&
+        result.exit_code == 0;
 }
 #endif
 
-}
-
-void write_pe_layout(
-    const RelinkOptions&,
-    const std::vector<unsigned char>&,
-    std::uint32_t,
-    std::uint32_t)
-{
-    throw std::runtime_error(
-        "manual PE layout lowering is unsupported; use the native lowering IR");
 }
 
 void write_pe_ir(
@@ -141,29 +83,22 @@ void write_pe_ir(
         throw std::runtime_error(
             "cannot emit a Windows PE image from a non-Windows lowering IR");
     }
-    if (ir.source.empty()) {
+    if (ir.chunks.empty()) {
         throw std::runtime_error(
-            "native Windows lowering IR has no source");
+            "native Windows lowering IR has no chunk sources");
     }
 
     std::vector<std::filesystem::path> sources;
     std::vector<std::filesystem::path> objects;
-    if (ir.chunks.empty()) {
-        sources.push_back(
-            std::filesystem::path(options.output + ".native-pe.cpp"));
-        objects.push_back(
-            std::filesystem::path(options.output + ".native-pe.obj"));
-    } else {
-        sources.reserve(ir.chunks.size());
-        objects.reserve(ir.chunks.size());
-        for (std::size_t index = 0; index < ir.chunks.size(); ++index) {
-            sources.push_back(std::filesystem::path(
-                options.output + ".native-pe." +
-                std::to_string(index) + ".cpp"));
-            objects.push_back(std::filesystem::path(
-                options.output + ".native-pe." +
-                std::to_string(index) + ".obj"));
-        }
+    sources.reserve(ir.chunks.size());
+    objects.reserve(ir.chunks.size());
+    for (std::size_t index = 0; index < ir.chunks.size(); ++index) {
+        sources.push_back(std::filesystem::path(
+            options.output + ".native-pe." +
+            std::to_string(index) + ".cpp"));
+        objects.push_back(std::filesystem::path(
+            options.output + ".native-pe." +
+            std::to_string(index) + ".obj"));
     }
     for (std::size_t index = 0; index < sources.size(); ++index) {
         std::ofstream source_output(sources[index], std::ios::trunc);
@@ -171,9 +106,7 @@ void write_pe_ir(
             throw std::runtime_error(
                 "cannot create native Windows lowering source");
         }
-        source_output << (ir.chunks.empty()
-                              ? ir.source
-                              : ir.chunks[index]);
+        source_output << ir.chunks[index];
         source_output.close();
     }
 
@@ -198,9 +131,13 @@ void write_pe_ir(
             L"/Fo:" + objects[index].wstring(),
             sources[index].wstring(),
         };
-        if (!run_windows_tool(clang, compile_arguments)) {
+        std::string tool_error;
+        if (!run_windows_tool(clang, compile_arguments, tool_error)) {
             throw std::runtime_error(
-                "native Windows lowering Clang compilation failed");
+                "native Windows lowering Clang compilation failed" +
+                    (tool_error.empty()
+                         ? std::string{}
+                         : std::string(": ") + tool_error));
         }
     }
 
@@ -216,9 +153,13 @@ void write_pe_ir(
         link_arguments.push_back(object.wstring());
     }
     link_arguments.push_back(L"kernel32.lib");
-    if (!run_windows_tool(lld, link_arguments)) {
+    std::string tool_error;
+    if (!run_windows_tool(lld, link_arguments, tool_error)) {
         throw std::runtime_error(
-            "native Windows lowering LLD link failed");
+            "native Windows lowering LLD link failed" +
+                (tool_error.empty()
+                     ? std::string{}
+                     : std::string(": ") + tool_error));
     }
 #else
     const std::filesystem::path kernel32_def =
@@ -238,6 +179,7 @@ void write_pe_ir(
         def_output << "ExitProcess\n";
         def_output.close();
     }
+    std::string tool_error;
     if (!run_posix_tool(
             "llvm-dlltool",
             {
@@ -247,11 +189,16 @@ void write_pe_ir(
                 kernel32_def.string(),
                 "-l",
                 kernel32_import.string(),
-            })) {
+            },
+            tool_error)) {
         throw std::runtime_error(
-            "cannot create kernel32 import library");
+            "cannot create kernel32 import library" +
+                (tool_error.empty()
+                     ? std::string{}
+                     : std::string(": ") + tool_error));
     }
     for (std::size_t index = 0; index < sources.size(); ++index) {
+        std::string tool_error;
         if (!run_posix_tool(
                 "clang++",
                 {
@@ -261,9 +208,13 @@ void write_pe_ir(
                     "-o",
                     objects[index].string(),
                     sources[index].string(),
-                })) {
+                },
+                tool_error)) {
             throw std::runtime_error(
-                "native Windows lowering Clang compilation failed");
+                "native Windows lowering Clang compilation failed" +
+                    (tool_error.empty()
+                         ? std::string{}
+                         : std::string(": ") + tool_error));
         }
     }
     std::vector<std::string> posix_link_arguments{
@@ -278,9 +229,13 @@ void write_pe_ir(
         posix_link_arguments.push_back(object.string());
     }
     posix_link_arguments.push_back(kernel32_import.string());
-    if (!run_posix_tool("lld-link", posix_link_arguments)) {
+    std::string tool_error;
+    if (!run_posix_tool("lld-link", posix_link_arguments, tool_error)) {
         throw std::runtime_error(
-            "native Windows lowering LLD link failed");
+            "native Windows lowering LLD link failed" +
+                (tool_error.empty()
+                     ? std::string{}
+                     : std::string(": ") + tool_error));
     }
 #endif
 
@@ -296,16 +251,36 @@ void write_pe_ir(
         std::error_code remove_error;
         for (const std::filesystem::path& source_path : sources) {
             std::filesystem::remove(source_path, remove_error);
+            if (remove_error) {
+                throw std::runtime_error(
+                    "cannot remove temporary PE source: " +
+                    source_path.string() + ": " +
+                    remove_error.message());
+            }
         }
         for (const std::filesystem::path& object_path : objects) {
             std::filesystem::remove(object_path, remove_error);
+            if (remove_error) {
+                throw std::runtime_error(
+                    "cannot remove temporary PE object: " +
+                    object_path.string() + ": " +
+                    remove_error.message());
+            }
         }
         std::filesystem::remove(
             std::filesystem::path(options.output + ".kernel32.def"),
             remove_error);
+        if (remove_error) {
+            throw std::runtime_error(
+                "cannot remove temporary kernel32 definition");
+        }
         std::filesystem::remove(
             std::filesystem::path(options.output + ".kernel32.lib"),
             remove_error);
+        if (remove_error) {
+            throw std::runtime_error(
+                "cannot remove temporary kernel32 import library");
+        }
     }
 }
 
