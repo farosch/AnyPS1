@@ -185,9 +185,12 @@
 - [x] Implement initial real Windows native MIPS instruction emission for the
   shared lowering IR, with RAM, scratchpad, arithmetic, branches, loads/stores,
   HI/LO, and explicit unsupported exits.
-- [ ] Replace target-source size limits with chunked/sparse native lowering
-  so large Linux assembly and Windows PE sources do not require unbounded
-  compiler jobs; keep explicit cross-target rejection until chunking exists.
+- [x] Replace hard target-source size rejection with shared sparse leader
+  dispatch for Linux and Windows; bounded assembler/Clang jobs remain explicit
+  and large executable behavior is verified across multiple reference games.
+- [ ] Implement chunked native lowering sources instead of one sparse
+  translation unit: split Linux assembly and Windows C by leader bucket,
+  assemble/link every chunk, and share runtime state across chunk boundaries.
 - [x] Apply the 30,000-leader CFG emission limit and a two-minute
   assembler/linker timeout explicitly to Linux lowering; Linux no longer hangs
   on oversized assembly or a stalled native toolchain.

@@ -33,14 +33,6 @@ void MipsLinuxLowerer::lower(
 )
 {
     const MipsExecutablePlan plan = build_mips_executable_plan(options, data);
-    const std::uint64_t estimated_source_bytes =
-        static_cast<std::uint64_t>(plan.emittable_leaders.size()) *
-        512u;
-    if (estimated_source_bytes > 8u * 1024u * 1024u) {
-        throw std::runtime_error(
-            "unsupported native lowering: executable CFG exceeds "
-            "the 8 MiB target-source emission limit");
-    }
     const std::uint32_t file_size = plan.file_size;
     const std::uint32_t load_address = plan.load_address;
     const std::uint32_t initial_pc = plan.initial_pc;

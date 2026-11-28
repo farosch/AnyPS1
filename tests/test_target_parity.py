@@ -113,6 +113,22 @@ class LoweringInventoryTest(unittest.TestCase):
             shared,
             "Shared lowering must provide sparse leader dispatch buckets",
         )
+        linux_text = (
+            ROOT / "src" / "lowering" / "MipsLinuxLowerer.cpp"
+        ).read_text(encoding="utf-8")
+        windows_text = (
+            ROOT / "src" / "lowering" / "MipsWindowsLowerer.cpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "leader_dispatch",
+            windows_text,
+            "Windows lowering must consume sparse leader dispatch",
+        )
+        self.assertIn(
+            "indirect_leader_dispatch",
+            linux_text,
+            "Linux lowering must retain sparse indirect dispatch",
+        )
         self.assertNotIn(
             "for (std::uint32_t target : leaders)",
             windows,
