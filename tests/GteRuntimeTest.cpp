@@ -67,6 +67,16 @@ int main()
     if (anyps1_gte_execute(0x4B18043Fu, data, control) != 1) {
         throw std::runtime_error("NCCT operation failed");
     }
+    const std::uint32_t extended_operations[] = {
+        0x4B380413u, 0x4B400014u, 0x4B48001Cu,
+        0x4B08041Eu, 0x4B200020u, 0x4A680029u,
+        0x4B78002Au, 0x4A68003Du, 0x4A68003Eu
+    };
+    for (const std::uint32_t operation : extended_operations) {
+        if (anyps1_gte_execute(operation, data, control) != 1) {
+            throw std::runtime_error("extended GTE operation failed");
+        }
+    }
     const std::uint32_t normal_operations[] = {
         0x4B400006u, 0x4B38041Cu, 0x4B70000Cu,
         0x4B90003Du, 0x4BA0003Eu

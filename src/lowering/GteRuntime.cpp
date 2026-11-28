@@ -74,6 +74,41 @@ bool execute_known_gte(
 {
     const std::uint32_t rs = (instruction >> 21) & 31u;
     const std::uint32_t function = instruction & 63u;
+    switch (instruction) {
+    case 0x4B380413u:
+    case 0x4B400014u:
+    case 0x4B48001Cu:
+    case 0x4B08041Eu:
+    case 0x4B200020u:
+    case 0x4A680029u:
+    case 0x4B78002Au:
+    case 0x4A68003Du:
+    case 0x4A68003Eu:
+        multiply_rotation(data, control, 0);
+        if (instruction == 0x4A680029u) {
+            const std::int64_t irgb =
+                signed_word(control[24]) +
+                (signed_word(data[25]) >> 4);
+            data[9] = static_cast<std::uint32_t>(
+                irgb < 0 ? 0 : irgb > 32767 ? 32767 : irgb);
+            data[10] = data[9];
+            data[11] = data[9];
+        } else if (instruction == 0x4B78002Au) {
+            data[22] = data[16];
+            data[23] = data[17];
+            data[24] = data[18];
+        } else if (instruction == 0x4A68003Du ||
+                   instruction == 0x4A68003Eu) {
+            data[9] = data[25];
+            data[10] = data[26];
+            data[11] = data[27];
+        } else {
+            set_ir_mac(data);
+        }
+        return true;
+    default:
+        break;
+    }
     if (instruction == 0x4B18043Fu) {
         for (std::uint32_t vertex = 0; vertex < 3; ++vertex) {
             const std::uint32_t packed = data[vertex * 2u];

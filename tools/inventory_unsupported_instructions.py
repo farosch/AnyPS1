@@ -265,6 +265,9 @@ def reachable_leaders(psx_data: bytes) -> tuple[int, int, set[int]]:
         elif not (opcode == 0 and special in (0x08, 0x09, 0x0C, 0x0D)):
             leaders.add(address + 4)
             work.append(address + 4)
+        if opcode == 0 and special == 0x08:
+            leaders.add(address + 8)
+            work.append(address + 8)
         if opcode == 0 and special == 0x09:
             leaders.add(address + 8)
             work.append(address + 8)

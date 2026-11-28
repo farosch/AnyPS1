@@ -98,6 +98,15 @@ UnsupportedInstruction classify_unsupported_instruction(
         case 0x4A68002Eu:
         case 0x4B68002Eu: return {UnsupportedInstructionKind::Cop2, "gte_avsz4"};
         case 0x4B18043Fu: return {UnsupportedInstructionKind::Cop2, "gte_ncct"};
+        case 0x4B380413u: return {UnsupportedInstructionKind::Cop2, "gte_ncds"};
+        case 0x4B400014u: return {UnsupportedInstructionKind::Cop2, "gte_cdp"};
+        case 0x4B48001Cu: return {UnsupportedInstructionKind::Cop2, "gte_cc"};
+        case 0x4B08041Eu: return {UnsupportedInstructionKind::Cop2, "gte_ncs"};
+        case 0x4B200020u: return {UnsupportedInstructionKind::Cop2, "gte_nct"};
+        case 0x4A680029u: return {UnsupportedInstructionKind::Cop2, "gte_dcpl"};
+        case 0x4B78002Au: return {UnsupportedInstructionKind::Cop2, "gte_dpct"};
+        case 0x4A68003Du: return {UnsupportedInstructionKind::Cop2, "gte_gpf"};
+        case 0x4A68003Eu: return {UnsupportedInstructionKind::Cop2, "gte_gpl"};
         default: return {UnsupportedInstructionKind::Cop2, "cop2"};
         }
     }
@@ -164,6 +173,16 @@ bool is_supported_mips_instruction(std::uint32_t instruction)
         }
         if (rs == 18) return true;
         const std::uint32_t function = instruction & 63u;
+        switch (instruction) {
+        case 0x4B380413u: case 0x4B400014u:
+        case 0x4B48001Cu: case 0x4B08041Eu:
+        case 0x4B200020u: case 0x4A680029u:
+        case 0x4B78002Au: case 0x4A68003Du:
+        case 0x4A68003Eu:
+            return true;
+        default:
+            break;
+        }
         if (rs == 17 && function == 0x30) return true;
         return rs >= 16 &&
             (function == 0 || function == 1 || function == 0x06 ||

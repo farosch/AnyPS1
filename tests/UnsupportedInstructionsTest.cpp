@@ -71,7 +71,16 @@ int main()
             0x4B58002Du,
             0x4A68002Eu,
             0x4B68002Eu,
-            0x4B18043Fu
+            0x4B18043Fu,
+            0x4B380413u,
+            0x4B400014u,
+            0x4B48001Cu,
+            0x4B08041Eu,
+            0x4B200020u,
+            0x4A680029u,
+            0x4B78002Au,
+            0x4A68003Du,
+            0x4A68003Eu
         };
         for (const std::uint32_t operation : gte_operations) {
             if (!anyps1::is_supported_mips_instruction(operation)) {
