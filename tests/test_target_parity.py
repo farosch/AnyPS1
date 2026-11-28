@@ -100,6 +100,11 @@ class LoweringInventoryTest(unittest.TestCase):
             linux,
             "Linux lowering must not rebuild shared indirect-table discovery",
         )
+        self.assertIn(
+            "build_mips_instruction_ir",
+            linux,
+            "Linux lowering must consume the shared instruction IR",
+        )
         self.assertNotIn(
             "for (std::uint32_t target : leaders)",
             windows,

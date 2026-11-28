@@ -312,6 +312,9 @@ void MipsLinuxLowerer::lower(
     };
 
     auto emit_normal_body = [&](std::uint32_t address, std::uint32_t instruction) {
+        const MipsInstructionIr ir =
+            build_mips_instruction_ir(address, instruction);
+        if (ir.kind == MipsInstructionKind::Nop) return;
         const std::uint32_t opcode = instruction >> 26;
         const std::uint32_t rs = (instruction >> 21) & 31u;
         const std::uint32_t rt = (instruction >> 16) & 31u;
@@ -1227,7 +1230,6 @@ void MipsLinuxLowerer::lower(
         const std::uint32_t rt = (instruction >> 16) & 31u;
         const std::uint32_t rd = (instruction >> 11) & 31u;
         const std::uint32_t immediate = instruction & 0xFFFFu;
-        const std::uint32_t special = instruction & 63u;
         source << "p" << std::hex << address << std::dec << ":\n";
         if (native_host_loop_required) {
             source << "incl host_frame_counter(%rip)\n";
@@ -1243,13 +1245,13 @@ void MipsLinuxLowerer::lower(
 
         if (delay_slots.find(address) != delay_slots.end() &&
             emitted_delay_slots.find(address) == emitted_delay_slots.end()) {
+            const MipsInstructionIr ir =
+                build_mips_instruction_ir(address, instruction);
             const bool address_is_control =
-                opcode == 0x01 || opcode == 0x04 || opcode == 0x05 ||
-                opcode == 0x06 || opcode == 0x07 ||
-                opcode == 0x14 || opcode == 0x15 ||
-                opcode == 0x16 || opcode == 0x17 ||
-                opcode == 0x02 || opcode == 0x03 ||
-                (opcode == 0 && (special == 0x08 || special == 0x09));
+                ir.kind == MipsInstructionKind::Branch ||
+                ir.kind == MipsInstructionKind::Jump ||
+                ir.kind == MipsInstructionKind::Jr ||
+                ir.kind == MipsInstructionKind::Jalr;
             if (!address_is_control) {
                 emit_normal(address, instruction);
                 emitted_addresses.insert(address);
@@ -1260,14 +1262,12 @@ void MipsLinuxLowerer::lower(
                 continue;
             }
         }
-        const bool branch = opcode == 0x01 || opcode == 0x04 || opcode == 0x05
-            || opcode == 0x06 || opcode == 0x07
-            || opcode == 0x14 || opcode == 0x15
-            || opcode == 0x16 || opcode == 0x17
-            || (opcode == 0x11 && rs == 8);
-        const bool jump = opcode == 0x02 || opcode == 0x03;
-        const bool jr = opcode == 0 && special == 0x08;
-        const bool jalr = opcode == 0 && special == 0x09;
+        const MipsInstructionIr ir =
+            build_mips_instruction_ir(address, instruction);
+        const bool branch = ir.kind == MipsInstructionKind::Branch;
+        const bool jump = ir.kind == MipsInstructionKind::Jump;
+        const bool jr = ir.kind == MipsInstructionKind::Jr;
+        const bool jalr = ir.kind == MipsInstructionKind::Jalr;
         if (branch || jump || jr || jalr) {
             const std::uint32_t delay_address = address + 4;
             if (delay_address >= load_address && delay_address < load_address + file_size) {

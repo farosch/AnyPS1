@@ -27,6 +27,29 @@ void write_word(
 int main()
 {
     try {
+        const anyps1::MipsInstructionIr nop =
+            anyps1::build_mips_instruction_ir(0x80010000u, 0u);
+        if (nop.kind != anyps1::MipsInstructionKind::Nop) {
+            throw std::runtime_error("NOP was not decoded into the instruction IR");
+        }
+        const anyps1::MipsInstructionIr branch =
+            anyps1::build_mips_instruction_ir(
+                0x80010000u,
+                0x10000002u);
+        if (branch.kind != anyps1::MipsInstructionKind::Branch ||
+            branch.target != 0x8001000Cu) {
+            throw std::runtime_error("branch was not decoded into the instruction IR");
+        }
+        const anyps1::MipsInstructionIr load =
+            anyps1::build_mips_instruction_ir(
+                0x80010000u,
+                0x8D020020u);
+        if (load.kind != anyps1::MipsInstructionKind::Load ||
+            load.size != 4u ||
+            load.rs != 8u ||
+            load.rt != 2u) {
+            throw std::runtime_error("load was not decoded into the instruction IR");
+        }
         constexpr std::uint32_t load_address = 0x80010000u;
         constexpr std::uint32_t file_size = 112u;
         std::vector<unsigned char> data(

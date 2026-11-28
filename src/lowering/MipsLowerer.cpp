@@ -83,53 +83,35 @@ MipsExecutablePlan build_mips_executable_plan(
         if (offset + 4 > plan.file_size) continue;
         const std::uint32_t instruction =
             read_psx32(data, PSX_HEADER_SIZE + offset);
+        const MipsInstructionIr ir =
+            build_mips_instruction_ir(address, instruction);
         if (instruction == 0x35081810u) plan.mmio_host_state = true;
         if (instruction == 0xAD000000u) plan.memory_boundary_state = true;
         if (classify_payload_region(address, instruction, true) ==
             PayloadRegionKind::Unknown) {
             continue;
         }
-        const std::uint32_t opcode = instruction >> 26;
-        if (opcode >= 0x20u && opcode <= 0x3Bu &&
-            (opcode == 0x20u || opcode == 0x21u || opcode == 0x23u ||
-             opcode == 0x24u || opcode == 0x25u || opcode == 0x28u ||
-             opcode == 0x29u || opcode == 0x2Bu || opcode == 0x30u ||
-             opcode == 0x31u || opcode == 0x32u || opcode == 0x33u ||
-             opcode == 0x35u || opcode == 0x36u || opcode == 0x38u ||
-             opcode == 0x39u || opcode == 0x3Au || opcode == 0x3Bu)) {
+        if (ir.kind == MipsInstructionKind::Load ||
+            ir.kind == MipsInstructionKind::Store ||
+            ir.kind == MipsInstructionKind::CoprocessorLoad ||
+            ir.kind == MipsInstructionKind::CoprocessorStore) {
             plan.native_host_loop_required = true;
         }
-        const std::uint32_t rs = (instruction >> 21) & 31u;
-        const std::uint32_t immediate = instruction & 0xFFFFu;
-        const std::uint32_t special = instruction & 63u;
-        const bool branch =
-            opcode == 0x01u || opcode == 0x04u || opcode == 0x05u ||
-            opcode == 0x06u || opcode == 0x07u || opcode == 0x14u ||
-            opcode == 0x15u || opcode == 0x16u || opcode == 0x17u ||
-            (opcode == 0x11u && (rs == 8u || rs == 12u));
-        const bool jump = opcode == 0x02u || opcode == 0x03u;
-        const bool jr = opcode == 0u && special == 0x08u;
-        const bool jalr = opcode == 0u && special == 0x09u;
-        const bool stop = opcode == 0u &&
-            (special == 0x0Cu || special == 0x0Du);
+        const bool branch = ir.kind == MipsInstructionKind::Branch;
+        const bool jump = ir.kind == MipsInstructionKind::Jump;
+        const bool jr = ir.kind == MipsInstructionKind::Jr;
+        const bool jalr = ir.kind == MipsInstructionKind::Jalr;
+        const bool stop = ir.kind == MipsInstructionKind::System;
 
         if (branch) {
-            const std::int32_t displacement =
-                static_cast<std::int32_t>(
-                    static_cast<std::int16_t>(immediate)) * 4;
-            const std::uint32_t target =
-                static_cast<std::uint32_t>(
-                    static_cast<std::int64_t>(address) + 4 +
-                    displacement);
+            const std::uint32_t target = ir.target;
             plan.leaders.insert(target);
             plan.leaders.insert(address + 8u);
             work.push(target);
             work.push(address + 8u);
         } else if (jump) {
-            const std::uint32_t target =
-                ((address + 4u) & 0xF0000000u) |
-                ((instruction & 0x03FFFFFFu) << 2u);
-            if (opcode == 0x03u) {
+            const std::uint32_t target = ir.target;
+            if (ir.opcode == 0x03u) {
                 ++plan.call_edges;
                 if (target < plan.load_address ||
                     target >= plan.load_address + plan.file_size) {
@@ -145,7 +127,7 @@ MipsExecutablePlan build_mips_executable_plan(
                 plan.leaders.insert(target);
                 work.push(target);
             }
-            if (opcode == 0x03u) {
+            if (ir.opcode == 0x03u) {
                 plan.leaders.insert(address + 8u);
                 work.push(address + 8u);
             }
@@ -162,7 +144,7 @@ MipsExecutablePlan build_mips_executable_plan(
             }
             const std::uint32_t resolved_target =
                 resolve_static_indirect_target(
-                    data, plan.load_address, plan.file_size, address, rs);
+                    data, plan.load_address, plan.file_size, address, ir.rs);
             if (resolved_target >= plan.load_address &&
                 resolved_target < plan.load_address + plan.file_size &&
                 (resolved_target & 3u) == 0u) {
@@ -189,7 +171,7 @@ MipsExecutablePlan build_mips_executable_plan(
                     const std::vector<std::uint32_t> table_targets =
                         discover_indirect_table_targets(
                             data, plan.load_address, plan.file_size,
-                            address, rs);
+                            address, ir.rs);
                     if (table_targets.empty()) {
                         ++plan.unresolved_indirect_transfers;
                     } else {
