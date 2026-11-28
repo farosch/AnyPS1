@@ -6,8 +6,10 @@
 #include "lowering/NativeLoweringIr.h"
 #include "lowering/UnsupportedInstructions.h"
 #include "relinker/Relinker.h"
+#include "diagnostics/DiagnosticReport.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -63,6 +65,13 @@ void MipsWindowsLowerer::lower(
                 << "next_runtime_blocker=Windows MIPS execution loop completion\n";
         }
     }
+    const std::string mode = get_diagnostic_mode();
+    DiagnosticReport report{
+        TargetPlatform::Windows,
+        plan,
+        {},
+    };
+    diagnostics << "\n" << format_diagnostic_report(report, mode);
     std::ostringstream source;
     source << "#include <stddef.h>\n";
     source << "#include <stdint.h>\n";

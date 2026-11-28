@@ -8,6 +8,7 @@
 #include "memory/MemoryMap.h"
 #include "host/HostServices.h"
 #include "MipsLoweringSupport.h"
+#include "diagnostics/DiagnosticReport.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -406,6 +407,14 @@ void MipsLinuxLowerer::lower(
         " vulkan=" + std::to_string(host_loop.vulkan) +
         " memory_card=" + std::to_string(host_loop.memory_card) +
         " disc=" + std::to_string(host_loop.disc) + "\n";
+    const std::string mode = get_diagnostic_mode();
+    DiagnosticReport report{
+        TargetPlatform::Linux,
+        plan,
+        {},
+    };
+    const std::string formatted_report =
+        format_diagnostic_report(report, mode);
     const std::string completed = "native lowering complete\n";
     const std::string host_title = "AnyPS1";
     source << ".text\n.section .bss\n.p2align 4\n";
@@ -442,6 +451,7 @@ void MipsLinuxLowerer::lower(
     source << "diag_unsupported:.asciz \"" << escape_assembly_string(unsupported) << "\"\n";
     source << "diag_first_gap:.asciz \"" << escape_assembly_string(first_gap) << "\"\n";
     source << "diag_host_loop:.asciz \"" << escape_assembly_string(host_loop_diag) << "\"\n";
+    source << "diag_report:.asciz \"" << escape_assembly_string(formatted_report) << "\"\n";
     source << "diag_completed:.asciz \"" << escape_assembly_string(completed) << "\"\n";
     source << "diag_host_title:.asciz \"" << escape_assembly_string(host_title) << "\"\n";
     source << ".text\n.globl _start\n_start:\n";
@@ -466,6 +476,7 @@ void MipsLinuxLowerer::lower(
     source << "leaq diag_unsupported(%rip), %rsi\nmov $" << unsupported.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_first_gap(%rip), %rsi\nmov $" << first_gap.size() << ", %rdx\ncall print_diag\n";
     source << "leaq diag_host_loop(%rip), %rsi\nmov $" << host_loop_diag.size() << ", %rdx\ncall print_diag\n";
+    source << "leaq diag_report(%rip), %rsi\nmov $" << formatted_report.size() << ", %rdx\ncall print_diag\n";
     source << "leaq ram(%rip), %rdi\n";
     source << "add $" << payload_ram_offset << ", %rdi\n";
     source << "leaq payload(%rip), %rsi\n";
