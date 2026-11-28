@@ -208,6 +208,8 @@
   executable tooling as applicable.
 - [ ] Implement Windows native execution past real-executable BREAK traps and
   complete the remaining MMIO/host-device runtime state reached after startup.
+- [x] Add Windows native in-process MMIO, timer, interrupt, and frame-tick
+  progression with a checked-in fixture and PE/source assertions.
 
 ## PS1 GPU lowering and Vulkan shaders
 

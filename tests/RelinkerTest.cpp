@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -33,11 +34,12 @@ int main(int argc, char** argv)
     const char* output_path = "/tmp/anyps1-relinker-test/game.elf";
     const char* windows_output_path = "/tmp/anyps1-relinker-test/game.exe";
 #endif
+    std::error_code remove_error;
     try {
         if (!std::filesystem::is_regular_file(fixture_path)) {
             throw std::runtime_error("missing relinker fixture");
         }
-        std::filesystem::remove_all(game_root);
+        std::filesystem::remove_all(game_root, remove_error);
         std::filesystem::create_directories(game_root);
         std::filesystem::copy_file(fixture_path, input_path);
         std::ofstream system_cnf(std::filesystem::path(game_root) / "SYSTEM.CNF");
@@ -92,7 +94,7 @@ int main(int argc, char** argv)
                 throw std::runtime_error("BIOS-vector fixture produced invalid Windows PE");
             }
             bios_pe.close();
-            std::filesystem::remove_all(game_root);
+            std::filesystem::remove_all(game_root, remove_error);
             return 0;
 #else
             anyps1::RelinkOptions bios_options;
@@ -101,7 +103,7 @@ int main(int argc, char** argv)
             if (!anyps1::relink(bios_options)) {
                 throw std::runtime_error("partial BIOS-vector fixture relink failed");
             }
-            std::filesystem::remove_all(game_root);
+            std::filesystem::remove_all(game_root, remove_error);
             return 0;
 #endif
         }
@@ -154,7 +156,7 @@ int main(int argc, char** argv)
                         throw;
                     }
                 }
-                std::filesystem::remove_all(game_root);
+                std::filesystem::remove_all(game_root, remove_error);
                 return 0;
             }
         }
@@ -225,7 +227,14 @@ int main(int argc, char** argv)
             if (memory_boundary_fixture && exit_status == 13) {
                 std::remove(output_path);
                 std::remove(windows_output_path);
-                std::filesystem::remove_all("/tmp/anyps1-relinker-test");
+                std::error_code remove_error;
+                std::filesystem::remove(native_source, remove_error);
+#ifdef _WIN32
+                _putenv_s("ANYPS1_KEEP_ASSEMBLY", "");
+#else
+                unsetenv("ANYPS1_KEEP_ASSEMBLY");
+#endif
+                std::filesystem::remove_all(game_root, remove_error);
                 return 0;
             }
             throw std::runtime_error("native ELF artifact did not exit successfully");
@@ -278,8 +287,30 @@ int main(int argc, char** argv)
         anyps1::RelinkOptions windows_options;
         windows_options.input = game_root;
         windows_options.target = anyps1::TargetPlatform::Windows;
+#ifdef _WIN32
+        _putenv_s("ANYPS1_KEEP_ASSEMBLY", "1");
+#else
+        setenv("ANYPS1_KEEP_ASSEMBLY", "1", 1);
+#endif
         if (!anyps1::relink(windows_options)) {
             throw std::runtime_error("Windows PE relink failed");
+        }
+        const std::filesystem::path native_source =
+            std::filesystem::path(windows_output_path).string() +
+            ".native-pe.0.cpp";
+        std::ifstream source(native_source);
+        if (!source) {
+            throw std::runtime_error(
+                "Windows PE relink did not preserve a native source chunk");
+        }
+        std::string source_text(
+            (std::istreambuf_iterator<char>(source)),
+            std::istreambuf_iterator<char>());
+        if (source_text.find("native_mmio_read") == std::string::npos ||
+            source_text.find("native_mmio_write") == std::string::npos ||
+            source_text.find("interrupt_status|=1u") == std::string::npos) {
+            throw std::runtime_error(
+                "Windows PE native source lacks MMIO/frame-tick state");
         }
         std::ifstream pe(windows_output_path, std::ios::binary);
         std::vector<unsigned char> pe_bytes{
@@ -342,12 +373,12 @@ int main(int argc, char** argv)
 
         std::remove(output_path);
         std::remove(windows_output_path);
-        std::filesystem::remove_all("/tmp/anyps1-relinker-test");
+        std::filesystem::remove_all(game_root, remove_error);
         return 0;
     } catch (const std::exception& error) {
         std::remove(output_path);
         std::remove(windows_output_path);
-        std::filesystem::remove_all("/tmp/anyps1-relinker-test");
+        std::filesystem::remove_all(game_root, remove_error);
         std::cerr << "Relinker test failed: " << error.what() << "\n";
         return 1;
     }

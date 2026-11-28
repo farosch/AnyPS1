@@ -33,6 +33,7 @@ add_test(NAME relinker_native_memory COMMAND anyps1_relinker_test ${FIXTURE_OUTP
 add_test(NAME relinker_native_ram_mirror COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-ram-mirror.ps-exe)
 add_test(NAME relinker_native_host_integration COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-host-integration.ps-exe)
 add_test(NAME relinker_native_device_timer COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-device-timer.ps-exe)
+add_test(NAME relinker_native_mmio_frame_tick COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-mmio-frame-tick.ps-exe)
 add_test(NAME relinker_native_bios_vector COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-vector.ps-exe)
 add_test(NAME relinker_native_bios_init_heap COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-bios-init-heap.ps-exe)
 add_test(NAME relinker_native_load_delay COMMAND anyps1_relinker_test ${FIXTURE_OUTPUT_DIR}/mips/native-load-delay.ps-exe)
@@ -56,6 +57,7 @@ set_tests_properties(
     relinker_native_ram_mirror
     relinker_native_host_integration
     relinker_native_device_timer
+    relinker_native_mmio_frame_tick
     relinker_native_bios_vector
     relinker_native_bios_init_heap
     relinker_native_load_delay
@@ -149,6 +151,10 @@ add_test(NAME pe_device_timer
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>
         --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-device-timer.ps-exe)
+add_test(NAME pe_mmio_frame_tick
+    COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
+        --relinker $<TARGET_FILE:anyps1>
+        --fixture ${FIXTURE_OUTPUT_DIR}/mips/native-mmio-frame-tick.ps-exe)
 add_test(NAME pe_native_bios_init_heap
     COMMAND "${PYTHON_EXECUTABLE}" ${CMAKE_SOURCE_DIR}/tools/check_pe.py
         --relinker $<TARGET_FILE:anyps1>

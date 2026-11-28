@@ -90,6 +90,12 @@ void MipsWindowsLowerer::lower(
     source << "uint32_t scratchpad[256];\n";
     source << "uint32_t hi_value;\n";
     source << "uint32_t lo_value;\n";
+    source << "uint32_t mmio[2048];\n";
+    source << "uint32_t timer_cycles;\n";
+    source << "uint32_t frame_cycles;\n";
+    source << "uint32_t interrupt_status;\n";
+    source << "uint32_t interrupt_mask;\n";
+    source << "uint32_t native_frame_counter;\n";
     source << "uint32_t pc;\n";
     source << "uint32_t next_pc;\n";
     source << "uint32_t pending_target;\n";
@@ -105,6 +111,10 @@ void MipsWindowsLowerer::lower(
                << word << std::dec;
     }
     source << "};\n";
+    source << "static uint32_t native_mmio_read(uint32_t ea){\n";
+    source << "uint32_t n=ea&0x1FFFFFFFu;if(n>=0x1F801100u&&n<0x1F801130u){uint32_t base=n&~15u;uint32_t off=n-base;if(off==0u){uint32_t timer=(base-0x1F801100u)/16u;return timer_cycles+timer*0x400u;}return mmio[(n-0x1F801000u)>>2u];}if(n==0x1F801070u)return interrupt_status;if(n==0x1F801074u)return interrupt_mask;if(n==0x1F801040u)return 0xFFFFFFFFu;if(n==0x1F801810u||n==0x1F801814u)return 0x14802000u;if(n>=0x1F801000u&&n<0x1F802000u)return mmio[(n-0x1F801000u)>>2u];return 0u;}\n";
+    source << "static void native_mmio_write(uint32_t ea,uint32_t value){\n";
+    source << "uint32_t n=ea&0x1FFFFFFFu;if(n==0x1F801070u)interrupt_status &= ~value;if(n==0x1F801074u)interrupt_mask=value;if(n>=0x1F801000u&&n<0x1F802000u)mmio[(n-0x1F801000u)>>2u]=value;}\n";
     source << "static void write_windows_trace(const char* prefix,uint32_t value){\n";
     source << "char text[48];uint32_t position=0;while(prefix[position]){text[position]=prefix[position];++position;}text[position++]='0';text[position++]='x';for(int shift=28;shift>=0;shift-=4){uint32_t digit=(value>>shift)&15u;text[position++]=(char)(digit<10u?'0'+digit:'a'+digit-10u);}text[position++]='\\n';void* handle=GetStdHandle(0xfffffff5u);unsigned long written=0;WriteFile(handle,text,position,&written,0);}\n";
     source << "extern \"C\" void native_execute_ir(uint32_t kind,uint32_t address,uint32_t word,uint32_t rs,uint32_t rt,uint32_t rd,uint32_t shamt,uint32_t immediate,uint32_t target,uint32_t size_value,uint32_t special){\n";
@@ -163,10 +173,10 @@ void MipsWindowsLowerer::lower(
     source << "regs[rd]=address+8u;pending_target=regs[rs];delay_remaining=2u;\n";
     source << "return;\n";
     source << "case 18:\n";
-    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)regs[rt]=(uint32_t)*((uint8_t*)ram+ea);else if(size_value==2)regs[rt]=(uint32_t)*((uint16_t*)((uint8_t*)ram+ea));else regs[rt]=ram[ea>>2u];}else if(ea>=0x1F800000u&&ea<0x1F800400u)regs[rt]=scratchpad[(ea&0x3FFu)>>2u];else{write_windows_trace(\"mmio_load_address=\",ea);ExitProcess(17u);}}\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)regs[rt]=(uint32_t)*((uint8_t*)ram+ea);else if(size_value==2)regs[rt]=(uint32_t)*((uint16_t*)((uint8_t*)ram+ea));else regs[rt]=ram[ea>>2u];}else if(ea>=0x1F800000u&&ea<0x1F800400u)regs[rt]=scratchpad[(ea&0x3FFu)>>2u];else if(ea>=0x1F801000u&&ea<0x1F802000u){if(size_value==1)regs[rt]=(uint8_t)native_mmio_read(ea);else if(size_value==2)regs[rt]=(uint16_t)native_mmio_read(ea);else regs[rt]=native_mmio_read(ea);}else{write_windows_trace(\"mmio_load_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 19:\n";
-    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else{write_windows_trace(\"mmio_store_address=\",ea);ExitProcess(17u);}}\n";
+    source << "{uint32_t ea=(regs[rs]+(uint32_t)(int32_t)(int16_t)immediate)&0x1FFFFFFFu;if(ea<0x00200000u){if(size_value==1)*((uint8_t*)ram+ea)=(uint8_t)regs[rt];else if(size_value==2)*((uint16_t*)((uint8_t*)ram+ea))=(uint16_t)regs[rt];else ram[ea>>2u]=regs[rt];}else if(ea>=0x1F800000u&&ea<0x1F800400u)scratchpad[(ea&0x3FFu)>>2u]=regs[rt];else if(ea>=0x1F801000u&&ea<0x1F802000u)native_mmio_write(ea,regs[rt]);else{write_windows_trace(\"mmio_store_address=\",ea);ExitProcess(17u);}}\n";
     source << "return;\n";
     source << "case 22:\n";
     source << "if(special==12u)ExitProcess(0u);\n";
@@ -193,6 +203,7 @@ void MipsWindowsLowerer::lower(
     source << "pending_target=0u;\n";
     source << "delay_remaining=0u;\n";
     source << "for(uint32_t steps=0;steps<10000000u;++steps){\n";
+    source << "++native_frame_counter;++timer_cycles;++frame_cycles;if(frame_cycles>=1024u){frame_cycles-=1024u;interrupt_status|=1u;}\n";
     source << "if(delay_remaining==1u){pc=pending_target;delay_remaining=0u;}\n";
     source << "else if(delay_remaining==2u){pc=next_pc;delay_remaining=1u;}\n";
     source << "bool dispatched=false;\n";
